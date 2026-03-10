@@ -23,6 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/medicines")
 @RequiredArgsConstructor
+@io.swagger.v3.oas.annotations.tags.Tag(name = "7. Medicine Search", description = "Fast medicine search and autocomplete (Doctor/Admin)")
 public class MedicineController {
 
     private final MedicineService medicineService;

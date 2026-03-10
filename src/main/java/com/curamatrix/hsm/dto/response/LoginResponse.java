@@ -1,4 +1,4 @@
-package com.curamatrix.hsm.dto.response;
+package com.curamatrix.hsm.dto/response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,4 +16,11 @@ public class LoginResponse {
     private String fullName;
     private String role;
     private Long expiresIn;
+    
+    // Multi-tenant fields
+    private Long tenantId;
+    private String tenantKey;
+    private String hospitalName;
+    private String subscriptionPlan;
+    private String subscriptionExpiry;
 }

@@ -12,4 +12,7 @@ public class LoginRequest {
 
     @NotBlank(message = "Password is required")
     private String password;
+
+    @NotBlank(message = "Tenant key is required")
+    private String tenantKey; // e.g., "apollo-mumbai"
 }

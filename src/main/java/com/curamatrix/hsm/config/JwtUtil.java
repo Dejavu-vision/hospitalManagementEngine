@@ -26,7 +26,15 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
+    public String generateToken(UserDetails userDetails, Long tenantId, String tenantKey) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("tenantId", tenantId);
+        claims.put("tenantKey", tenantKey);
+        return createToken(claims, userDetails.getUsername());
+    }
+
     public String generateToken(UserDetails userDetails) {
+        // For backward compatibility - will be deprecated
         Map<String, Object> claims = new HashMap<>();
         return createToken(claims, userDetails.getUsername());
     }

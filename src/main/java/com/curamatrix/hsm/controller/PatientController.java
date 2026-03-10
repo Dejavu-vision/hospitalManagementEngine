@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/patients")
 @RequiredArgsConstructor
+@io.swagger.v3.oas.annotations.tags.Tag(name = "3. Patients", description = "Patient registration and management (Receptionist/Doctor)")
 public class PatientController {
 
     private final PatientService patientService;

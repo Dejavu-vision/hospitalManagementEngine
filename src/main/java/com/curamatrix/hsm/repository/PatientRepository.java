@@ -13,4 +13,6 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
            "LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
            "p.phone LIKE CONCAT('%', :search, '%')")
     Page<Patient> searchPatients(@Param("search") String search, Pageable pageable);
+    
+    long countByTenantId(Long tenantId);
 }

@@ -1,0 +1,13 @@
+{
+	"info": {
+		"name": "CuraMatrix HSM - Multi-Tenant SaaS",
+		"description": "Complete API collection for Multi-Tenant Hospital Management System with JWT authentication and tenant isolation",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"version": "2.0.0"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]
+	},
+	"item": []
+}

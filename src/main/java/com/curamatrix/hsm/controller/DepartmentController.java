@@ -14,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/departments")
 @RequiredArgsConstructor
+@io.swagger.v3.oas.annotations.tags.Tag(name = "8. Departments", description = "Hospital department management")
 public class DepartmentController {
 
     private final DepartmentRepository departmentRepository;

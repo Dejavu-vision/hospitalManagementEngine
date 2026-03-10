@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/diagnoses")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('DOCTOR')")
+@io.swagger.v3.oas.annotations.tags.Tag(name = "5. Diagnosis", description = "Patient diagnosis management (Doctor only)")
 public class DiagnosisController {
 
     private final DiagnosisService diagnosisService;

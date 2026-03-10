@@ -26,6 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/appointments")
 @RequiredArgsConstructor
+@io.swagger.v3.oas.annotations.tags.Tag(name = "4. Appointments", description = "Appointment booking and queue management")
 public class AppointmentController {
 
     private final AppointmentService appointmentService;

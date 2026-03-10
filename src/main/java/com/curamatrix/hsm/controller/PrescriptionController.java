@@ -18,6 +18,7 @@ import java.util.List;
 @RequestMapping("/api/prescriptions")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('DOCTOR')")
+@io.swagger.v3.oas.annotations.tags.Tag(name = "6. Prescriptions", description = "Medicine prescription management (Doctor only)")
 public class PrescriptionController {
 
     private final PrescriptionService prescriptionService;
