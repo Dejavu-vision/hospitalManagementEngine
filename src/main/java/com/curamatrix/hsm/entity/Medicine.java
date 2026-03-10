@@ -1,8 +1,6 @@
 package com.curamatrix.hsm.entity;
 
 import jakarta.persistence.*;
-
-import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
@@ -28,4 +26,10 @@ public class Medicine {
     private String strength;
 
     private String form;
+
+    private String category;
+
+    @Column(name = "is_active")
+    @Builder.Default
+    private Boolean isActive = true;
 }
