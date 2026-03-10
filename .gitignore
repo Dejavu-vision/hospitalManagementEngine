@@ -1,0 +1,247 @@
+# ============================================================
+# CuraMatrix HSM - .gitignore
+# Spring Boot + Gradle + MySQL Project
+# ============================================================
+
+# ============================================================
+# Gradle
+# ============================================================
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+.gradletasknamecache
+
+# ============================================================
+# IDE - IntelliJ IDEA
+# ============================================================
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+.idea_modules/
+atlassian-ide-plugin.xml
+
+# ============================================================
+# IDE - Eclipse
+# ============================================================
+.classpath
+.project
+.settings/
+bin/
+*.launch
+*.pydevproject
+.metadata
+
+# ============================================================
+# IDE - VS Code
+# ============================================================
+.vscode/
+*.code-workspace
+
+# ============================================================
+# Spring Boot
+# ============================================================
+target/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+
+# ============================================================
+# Logs
+# ============================================================
+logs/
+*.log
+*.log.*
+log/
+*.log.gz
+*.log.zip
+
+# ============================================================
+# Application Specific
+# ============================================================
+# Application properties with sensitive data (keep template, ignore actual)
+application-local.yml
+application-prod.yml
+application-dev.yml
+!application.yml
+!application-*.example.yml
+
+# ============================================================
+# Database
+# ============================================================
+*.db
+*.sqlite
+*.sqlite3
+*.h2.db
+*.mv.db
+*.trace.db
+data/
+*.lck
+
+# ============================================================
+# OS Files
+# ============================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.directory
+.Trash-*
+.nfs*
+
+# ============================================================
+# Java
+# ============================================================
+*.class
+*.ctxt
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+
+# Compiled class files
+*.class
+
+# Package Files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# ============================================================
+# Temporary Files
+# ============================================================
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+*.bak
+*.backup
+*.orig
+*.rej
+*.patch
+*.diff
+
+# ============================================================
+# Test Coverage
+# ============================================================
+.nyc_output/
+coverage/
+*.lcov
+.jacoco/
+jacoco.exec
+jacocoTestReport/
+
+# ============================================================
+# Node (if using frontend tools)
+# ============================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# ============================================================
+# Environment Variables
+# ============================================================
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# ============================================================
+# Secrets & Keys
+# ============================================================
+*.pem
+*.key
+*.cert
+*.jks
+*.p12
+secrets/
+*.secret
+*.private
+
+# ============================================================
+# Documentation Build
+# ============================================================
+docs/_build/
+site/
+
+# ============================================================
+# Maven (if switching from Gradle)
+# ============================================================
+.mvn/
+mvnw
+mvnw.cmd
+pom.xml
+pom.xml.versionsBackup
+
+# ============================================================
+# Docker (if using)
+# ============================================================
+.dockerignore
+docker-compose.override.yml
+
+# ============================================================
+# Miscellaneous
+# ============================================================
+*.pid
+*.seed
+*.pid.lock
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+dist/
+.vercel/
+.serverless/
+.fusebox/
+.dynamodb/
+.tern-port
+.vscode-test
+
+# ============================================================
+# Keep These Files (Important)
+# ============================================================
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+!gradlew
+!gradlew.bat
+!.gitignore
+!README.md
+!LICENSE
+!HELP.md
