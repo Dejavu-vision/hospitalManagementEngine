@@ -1,4 +1,4 @@
-package com.curamatrix.hsm.dto/response;
+package com.curamatrix.hsm.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

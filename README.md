@@ -17,8 +17,8 @@ A comprehensive **Multi-Tenant SaaS** Hospital Management System built with Spri
 **Get running in 5 minutes!** See **[QUICK_START.md](QUICK_START.md)**
 
 ```bash
-# 1. Setup database with multi-tenant schema
-mysql -u root -p < docs/MULTI_TENANT_MIGRATION.sql
+# 1. Setup database with complete multi-tenant schema (ALL-IN-ONE)
+mysql -u root -p < docs/COMPLETE_SAAS_SCHEMA.sql
 
 # 2. Configure password in src/main/resources/application.yml
 
@@ -31,6 +31,9 @@ mysql -u root -p < docs/MULTI_TENANT_MIGRATION.sql
 # Password: admin123
 # Tenant: default-hospital
 ```
+
+**📄 One SQL File:** `docs/COMPLETE_SAAS_SCHEMA.sql` - Complete schema + seed data
+**📖 SQL Reference:** `docs/SQL_QUICK_REFERENCE.md` - What's included
 
 ## 🏥 Multi-Tenant Login
 
