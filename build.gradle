@@ -61,4 +61,5 @@ gitProperties {
 	keys = ['git.branch', 'git.commit.id', 'git.commit.id.abbrev',
 	        'git.commit.message.short', 'git.commit.time', 'git.build.version']
 	dateFormat = "yyyy-MM-dd'T'HH:mmZ"
+	failOnNoGitDirectory = false
 }

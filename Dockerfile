@@ -9,6 +9,10 @@ FROM gradle:8.5-jdk17-alpine AS builder
 
 WORKDIR /app
 
+# Git info build args (passed from GitHub Actions)
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+
 # Copy dependency files first (layer caching)
 COPY build.gradle settings.gradle ./
 COPY gradle ./gradle
@@ -16,8 +20,9 @@ COPY gradle ./gradle
 # Download dependencies (cached unless build.gradle changes)
 RUN gradle dependencies --no-daemon || true
 
-# Copy source code
+# Copy source code and a minimal .git for git-properties plugin
 COPY src ./src
+COPY .git ./.git
 
 # Build the JAR (skip tests in CI — tests run in a separate pipeline stage)
 RUN gradle bootJar --no-daemon -x test
