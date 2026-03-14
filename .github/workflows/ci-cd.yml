@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/curamatrix-hsm
+  IMAGE_NAME: ghcr.io/dejavu-vision/curamatrix-hsm
   EC2_HOST: 13.203.229.244
   EC2_USER: ec2-user
   DB_URL: jdbc:mysql://13.203.229.244:3306/hospitalsystems
@@ -101,18 +101,18 @@ jobs:
           username: ${{ env.EC2_USER }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           script: |
-            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ghcr.io/${{ github.repository_owner }}/curamatrix-hsm:latest
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u prathameshkalburgi --password-stdin
+            docker pull ghcr.io/dejavu-vision/curamatrix-hsm:latest
             docker stop hsm-app 2>/dev/null || true
             docker rm hsm-app 2>/dev/null || true
             docker run -d \
               --name hsm-app \
               --restart unless-stopped \
               -p 8080:8080 \
-              -e SPRING_DATASOURCE_URL="${{ env.DB_URL }}" \
-              -e SPRING_DATASOURCE_USERNAME="${{ env.DB_USERNAME }}" \
+              -e SPRING_DATASOURCE_URL="jdbc:mysql://13.203.229.244:3306/hospitalsystems" \
+              -e SPRING_DATASOURCE_USERNAME="backenduser" \
               -e SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
               -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
               -e SPRING_PROFILES_ACTIVE=prod \
-              ghcr.io/${{ github.repository_owner }}/curamatrix-hsm:latest
+              ghcr.io/dejavu-vision/curamatrix-hsm:latest
             docker image prune -f
