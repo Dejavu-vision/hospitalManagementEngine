@@ -8,6 +8,10 @@ on:
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/curamatrix-hsm
+  EC2_HOST: 13.203.229.244
+  EC2_USER: ec2-user
+  DB_URL: jdbc:mysql://13.203.229.244:3306/hospitalsystems
+  DB_USERNAME: backenduser
 
 jobs:
   # ─── TEST ──────────────────────────────────────────────────────────────────
@@ -88,13 +92,13 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment:
       name: production
-      url: http://${{ secrets.EC2_HOST }}:8080
+      url: http://${{ env.EC2_HOST }}:8080
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
+          host: ${{ env.EC2_HOST }}
+          username: ${{ env.EC2_USER }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           script: |
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -105,8 +109,8 @@ jobs:
               --name hsm-app \
               --restart unless-stopped \
               -p 8080:8080 \
-              -e SPRING_DATASOURCE_URL="${{ secrets.DB_URL }}" \
-              -e SPRING_DATASOURCE_USERNAME="${{ secrets.DB_USERNAME }}" \
+              -e SPRING_DATASOURCE_URL="${{ env.DB_URL }}" \
+              -e SPRING_DATASOURCE_USERNAME="${{ env.DB_USERNAME }}" \
               -e SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
               -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
               -e SPRING_PROFILES_ACTIVE=prod \
