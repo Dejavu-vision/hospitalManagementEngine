@@ -8,9 +8,9 @@ on:
 
 env:
   IMAGE_NAME: ghcr.io/dejavu-vision/curamatrix-hsm
-  EC2_HOST: 13.203.229.244
+  EC2_HOST: 43.204.168.146
   EC2_USER: ec2-user
-  DB_URL: jdbc:mysql://13.203.229.244:3306/hospitalsystems
+  DB_URL: jdbc:mysql://43.204.168.146:3306/hospitalsystems
   DB_USERNAME: backenduser
 
 jobs:
@@ -109,7 +109,7 @@ jobs:
               --name hsm-app \
               --restart unless-stopped \
               -p 8080:8080 \
-              -e SPRING_DATASOURCE_URL="jdbc:mysql://13.203.229.244:3306/hospitalsystems" \
+              -e SPRING_DATASOURCE_URL="jdbc:mysql://43.204.168.146:3306/hospitalsystems" \
               -e SPRING_DATASOURCE_USERNAME="backenduser" \
               -e SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
               -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
