@@ -1,0 +1,512 @@
+{
+  "info": {
+    "name": "CuraMatrix HSM - Multi-Tenant SaaS",
+    "description": "Complete API collection for CuraMatrix Hospital Management System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": { "type": "text/javascript", "exec": [""] }
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const res = pm.response.json();",
+                  "  pm.environment.set('token', res.token);",
+                  "  pm.environment.set('userId', res.userId);",
+                  "  pm.environment.set('tenantId', res.tenantId);",
+                  "  pm.environment.set('tenantKey', res.tenantKey);",
+                  "  pm.environment.set('userRole', res.role);",
+                  "  console.log('Token saved. Role:', res.role);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@hospital1.com\",\n  \"password\": \"admin123\",\n  \"tenantKey\": \"HOSPITAL_001\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏥 Super Admin - Tenants",
+      "item": [
+        {
+          "name": "Register New Hospital (Tenant)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hospitalName\": \"City General Hospital\",\n  \"tenantKey\": \"CITY_GENERAL\",\n  \"adminEmail\": \"admin@citygeneral.com\",\n  \"adminPassword\": \"admin123\",\n  \"adminFullName\": \"Hospital Admin\",\n  \"subscriptionPlan\": \"PROFESSIONAL\",\n  \"subscriptionEndDate\": \"2027-12-31\",\n  \"maxDoctors\": 50,\n  \"maxPatients\": 5000\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants"] }
+          }
+        },
+        {
+          "name": "Get All Tenants",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants"] }
+          }
+        },
+        {
+          "name": "Get Tenant By ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants/1", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants", "1"] }
+          }
+        },
+        {
+          "name": "Update Tenant",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hospitalName\": \"City General Hospital Updated\",\n  \"tenantKey\": \"CITY_GENERAL\",\n  \"subscriptionPlan\": \"ENTERPRISE\",\n  \"subscriptionEndDate\": \"2028-12-31\",\n  \"maxDoctors\": 100,\n  \"maxPatients\": 10000\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants/1", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants", "1"] }
+          }
+        },
+        {
+          "name": "Suspend Tenant",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants/1/suspend", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants", "1", "suspend"] }
+          }
+        },
+        {
+          "name": "Activate Tenant",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants/1/activate", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants", "1", "activate"] }
+          }
+        },
+        {
+          "name": "Get Tenant Stats",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants/1/stats", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants", "1", "stats"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👤 Admin - User Management",
+      "item": [
+        {
+          "name": "Create Doctor",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('doctorId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Dr. John Smith\",\n  \"email\": \"dr.john@hospital.com\",\n  \"password\": \"doctor123\",\n  \"phone\": \"9876543210\",\n  \"role\": \"ROLE_DOCTOR\",\n  \"specialization\": \"Cardiology\",\n  \"qualification\": \"MBBS, MD\",\n  \"experience\": 10,\n  \"consultationFee\": 500.00,\n  \"departmentId\": 1\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/admin/users", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users"] }
+          }
+        },
+        {
+          "name": "Create Receptionist",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Jane Doe\",\n  \"email\": \"jane.reception@hospital.com\",\n  \"password\": \"reception123\",\n  \"phone\": \"9876543211\",\n  \"role\": \"ROLE_RECEPTIONIST\",\n  \"shift\": \"MORNING\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/admin/users", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users"] }
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/admin/users", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users"] }
+          }
+        },
+        {
+          "name": "Get User By ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/admin/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users", "{{userId}}"] }
+          }
+        },
+        {
+          "name": "Deactivate User",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/api/admin/users/{{userId}}/deactivate", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users", "{{userId}}", "deactivate"] }
+          }
+        },
+        {
+          "name": "Activate User",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/api/admin/users/{{userId}}/activate", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users", "{{userId}}", "activate"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏢 Departments",
+      "item": [
+        {
+          "name": "Get All Departments",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/departments", "host": ["{{baseUrl}}"], "path": ["api", "departments"] }
+          }
+        },
+        {
+          "name": "Get Department By ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/departments/1", "host": ["{{baseUrl}}"], "path": ["api", "departments", "1"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧑‍⚕️ Patients",
+      "item": [
+        {
+          "name": "Register Patient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('patientId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Rahul\",\n  \"lastName\": \"Sharma\",\n  \"email\": \"rahul.sharma@email.com\",\n  \"phone\": \"9876543210\",\n  \"dateOfBirth\": \"1990-05-15\",\n  \"gender\": \"MALE\",\n  \"bloodGroup\": \"B_POSITIVE\",\n  \"address\": \"123 Main Street, Mumbai\",\n  \"emergencyContactName\": \"Priya Sharma\",\n  \"emergencyContactPhone\": \"9876543211\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/patients", "host": ["{{baseUrl}}"], "path": ["api", "patients"] }
+          }
+        },
+        {
+          "name": "Search Patients",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients?search=rahul&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients"],
+              "query": [
+                { "key": "search", "value": "rahul" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Patients",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Patient By ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/patients/{{patientId}}", "host": ["{{baseUrl}}"], "path": ["api", "patients", "{{patientId}}"] }
+          }
+        },
+        {
+          "name": "Update Patient",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Rahul\",\n  \"lastName\": \"Sharma\",\n  \"email\": \"rahul.updated@email.com\",\n  \"phone\": \"9876543210\",\n  \"dateOfBirth\": \"1990-05-15\",\n  \"gender\": \"MALE\",\n  \"bloodGroup\": \"B_POSITIVE\",\n  \"address\": \"456 New Street, Mumbai\",\n  \"emergencyContactName\": \"Priya Sharma\",\n  \"emergencyContactPhone\": \"9876543211\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/patients/{{patientId}}", "host": ["{{baseUrl}}"], "path": ["api", "patients", "{{patientId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📅 Appointments",
+      "item": [
+        {
+          "name": "Book Appointment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('appointmentId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"appointmentDate\": \"2026-03-20\",\n  \"appointmentTime\": \"10:00\",\n  \"type\": \"SCHEDULED\",\n  \"notes\": \"Regular checkup\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/appointments", "host": ["{{baseUrl}}"], "path": ["api", "appointments"] }
+          }
+        },
+        {
+          "name": "Walk-In Appointment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('appointmentId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"notes\": \"Walk-in patient\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/appointments/walk-in", "host": ["{{baseUrl}}"], "path": ["api", "appointments", "walk-in"] }
+          }
+        },
+        {
+          "name": "Get Appointments",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "date", "value": "2026-03-20", "disabled": true },
+                { "key": "doctorId", "value": "1", "disabled": true },
+                { "key": "status", "value": "SCHEDULED", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Available Slots",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/doctor/{{doctorId}}/slots?date=2026-03-20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "doctor", "{{doctorId}}", "slots"],
+              "query": [{ "key": "date", "value": "2026-03-20" }]
+            }
+          }
+        },
+        {
+          "name": "Get Today's Queue (Doctor)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/appointments/doctor/{{doctorId}}/today", "host": ["{{baseUrl}}"], "path": ["api", "appointments", "doctor", "{{doctorId}}", "today"] }
+          }
+        },
+        {
+          "name": "Update Appointment Status",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{appointmentId}}/status?status=COMPLETED",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "{{appointmentId}}", "status"],
+              "query": [{ "key": "status", "value": "COMPLETED" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🩺 Diagnosis",
+      "item": [
+        {
+          "name": "Create Diagnosis",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('diagnosisId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointmentId\": {{appointmentId}},\n  \"chiefComplaint\": \"Chest pain and shortness of breath\",\n  \"symptoms\": \"Chest tightness, mild fever, fatigue\",\n  \"diagnosis\": \"Acute Bronchitis\",\n  \"notes\": \"Patient advised rest and medication\",\n  \"severity\": \"MODERATE\",\n  \"followUpDate\": \"2026-03-27\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/diagnoses", "host": ["{{baseUrl}}"], "path": ["api", "diagnoses"] }
+          }
+        },
+        {
+          "name": "Get Diagnosis By ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/diagnoses/{{diagnosisId}}", "host": ["{{baseUrl}}"], "path": ["api", "diagnoses", "{{diagnosisId}}"] }
+          }
+        },
+        {
+          "name": "Get Diagnosis By Appointment",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/diagnoses/appointment/{{appointmentId}}", "host": ["{{baseUrl}}"], "path": ["api", "diagnoses", "appointment", "{{appointmentId}}"] }
+          }
+        },
+        {
+          "name": "Update Diagnosis",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointmentId\": {{appointmentId}},\n  \"chiefComplaint\": \"Chest pain\",\n  \"symptoms\": \"Chest tightness, fever\",\n  \"diagnosis\": \"Acute Bronchitis - Updated\",\n  \"notes\": \"Patient improving\",\n  \"severity\": \"MILD\",\n  \"followUpDate\": \"2026-04-03\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/diagnoses/{{diagnosisId}}", "host": ["{{baseUrl}}"], "path": ["api", "diagnoses", "{{diagnosisId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💊 Prescriptions",
+      "item": [
+        {
+          "name": "Add Prescriptions",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"diagnosisId\": {{diagnosisId}},\n  \"items\": [\n    {\n      \"medicineId\": 1,\n      \"dosage\": \"500mg\",\n      \"frequency\": \"Twice daily\",\n      \"duration\": \"5 days\",\n      \"instructions\": \"Take after meals\"\n    },\n    {\n      \"medicineId\": 2,\n      \"dosage\": \"10mg\",\n      \"frequency\": \"Once daily\",\n      \"duration\": \"3 days\",\n      \"instructions\": \"Take before sleep\"\n    }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/prescriptions", "host": ["{{baseUrl}}"], "path": ["api", "prescriptions"] }
+          }
+        },
+        {
+          "name": "Get Prescriptions By Diagnosis",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/prescriptions/diagnosis/{{diagnosisId}}", "host": ["{{baseUrl}}"], "path": ["api", "prescriptions", "diagnosis", "{{diagnosisId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💉 Medicines",
+      "item": [
+        {
+          "name": "Search Medicines",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/medicines/search?query=parac",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "medicines", "search"],
+              "query": [{ "key": "query", "value": "parac" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "❤️ Health",
+      "item": [
+        {
+          "name": "Actuator Health",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] }
+          }
+        },
+        {
+          "name": "Actuator Info",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/info", "host": ["{{baseUrl}}"], "path": ["actuator", "info"] }
+          }
+        }
+      ]
+    }
+  ]
+}

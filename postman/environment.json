@@ -1,0 +1,18 @@
+{
+  "id": "curamatrix-hsm-saas-env",
+  "name": "CuraMatrix HSM - SaaS",
+  "values": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "default", "enabled": true },
+    { "key": "baseUrlProd", "value": "http://43.204.168.146:8080", "type": "default", "enabled": true },
+    { "key": "token", "value": "", "type": "secret", "enabled": true },
+    { "key": "userId", "value": "", "type": "default", "enabled": true },
+    { "key": "userRole", "value": "", "type": "default", "enabled": true },
+    { "key": "tenantId", "value": "", "type": "default", "enabled": true },
+    { "key": "tenantKey", "value": "HOSPITAL_001", "type": "default", "enabled": true },
+    { "key": "doctorId", "value": "1", "type": "default", "enabled": true },
+    { "key": "patientId", "value": "", "type": "default", "enabled": true },
+    { "key": "appointmentId", "value": "", "type": "default", "enabled": true },
+    { "key": "diagnosisId", "value": "", "type": "default", "enabled": true }
+  ],
+  "_postman_variable_scope": "environment"
+}

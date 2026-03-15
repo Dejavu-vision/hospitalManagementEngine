@@ -22,7 +22,6 @@ RUN gradle dependencies --no-daemon || true
 
 # Copy source code and a minimal .git for git-properties plugin
 COPY src ./src
-COPY .git ./.git
 
 # Build the JAR (skip tests in CI — tests run in a separate pipeline stage)
 RUN gradle bootJar --no-daemon -x test
