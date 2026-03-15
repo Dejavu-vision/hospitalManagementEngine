@@ -109,6 +109,9 @@ jobs:
               --name hsm-app \
               --restart unless-stopped \
               -p 8080:8080 \
+              --log-opt max-size=50m \
+              --log-opt max-file=3 \
+              -v /home/ec2-user/hsm-logs:/app/logs \
               -e SPRING_DATASOURCE_URL="jdbc:mysql://43.204.168.146:3306/hospitalsystems" \
               -e SPRING_DATASOURCE_USERNAME="backenduser" \
               -e SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
@@ -116,3 +119,19 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=prod \
               ghcr.io/dejavu-vision/curamatrix-hsm:latest
             docker image prune -f
+
+      - name: Wait for app to be healthy
+        run: |
+          echo "Waiting for app to start..."
+          for i in $(seq 1 24); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://43.204.168.146:8080/actuator/health || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "App is UP and healthy!"
+              curl -s http://43.204.168.146:8080/actuator/health | python3 -m json.tool
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "App did not become healthy in time. Fetching container logs..."
+          exit 1

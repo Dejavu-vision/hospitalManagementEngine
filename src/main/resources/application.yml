@@ -21,6 +21,15 @@ jwt:
 server:
   port: 8080
 
+logging:
+  file:
+    path: /app/logs
+  logback:
+    rollingpolicy:
+      file-name-pattern: /app/logs/hsm-%d{yyyy-MM-dd}.log
+      max-history: 30
+      clean-history-on-start: false
+
 springdoc:
   api-docs:
     path: /v3/api-docs
