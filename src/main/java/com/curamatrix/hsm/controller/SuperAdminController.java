@@ -1,6 +1,7 @@
 package com.curamatrix.hsm.controller;
 
 import com.curamatrix.hsm.dto.request.TenantRegistrationRequest;
+import com.curamatrix.hsm.dto.request.AdminPasswordResetRequest;
 import com.curamatrix.hsm.dto.response.TenantResponse;
 import com.curamatrix.hsm.service.TenantManagementService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -70,5 +71,14 @@ public class SuperAdminController {
     public ResponseEntity<Object> getTenantStats(@PathVariable Long id) {
         Object stats = tenantManagementService.getTenantStats(id);
         return ResponseEntity.ok(stats);
+    }
+
+    @PutMapping("/{id}/admin/password")
+    public ResponseEntity<Void> resetTenantAdminPassword(
+            @PathVariable Long id,
+            @Valid @RequestBody AdminPasswordResetRequest request) {
+        log.info("Resetting admin password for tenant: {}", id);
+        tenantManagementService.resetTenantAdminPassword(id, request);
+        return ResponseEntity.noContent().build();
     }
 }

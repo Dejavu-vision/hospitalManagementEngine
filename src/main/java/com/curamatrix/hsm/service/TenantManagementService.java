@@ -1,6 +1,7 @@
 package com.curamatrix.hsm.service;
 
 import com.curamatrix.hsm.dto.request.TenantRegistrationRequest;
+import com.curamatrix.hsm.dto.request.AdminPasswordResetRequest;
 import com.curamatrix.hsm.dto.response.TenantResponse;
 import com.curamatrix.hsm.entity.Role;
 import com.curamatrix.hsm.entity.Tenant;
@@ -166,6 +167,25 @@ public class TenantManagementService {
         stats.put("isActive", tenant.getIsActive());
 
         return stats;
+    }
+
+    @Transactional
+    public void resetTenantAdminPassword(Long tenantId, AdminPasswordResetRequest request) {
+        tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("Tenant not found with id: " + tenantId));
+
+        List<User> tenantUsers = userRepository.findAllByTenantId(tenantId);
+        User adminUser = tenantUsers.stream()
+                .filter(user -> user.getRoles().stream().anyMatch(role -> role.getName() == RoleName.ROLE_ADMIN))
+                .filter(user -> request.getAdminEmail() == null || request.getAdminEmail().isBlank()
+                        || user.getEmail().equalsIgnoreCase(request.getAdminEmail()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Admin user not found for tenant id: " + tenantId));
+
+        adminUser.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(adminUser);
+
+        log.info("Admin password reset for tenant: {}, admin email: {}", tenantId, adminUser.getEmail());
     }
 
     private TenantResponse mapToResponse(Tenant tenant) {

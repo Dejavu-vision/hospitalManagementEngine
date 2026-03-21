@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CuraMatrix HSM — Super Admin</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --muted: #9ca3af;
+      --text: #e5e7eb;
+      --accent: #22c55e;
+      --accent-2: #3b82f6;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+      --border: #1f2937;
+      --chip: #0b1220;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji", "Segoe UI Symbol";
+      min-height: 100%;
+    }
+    a { color: var(--accent-2); text-decoration: none; }
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0 16px;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: radial-gradient(100% 100% at 70% 0%, #22c55e 0%, #3b82f6 60%, #0ea5e9 100%);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 8px 30px rgba(16,185,129,0.18);
+    }
+    .title { font-weight: 700; letter-spacing: 0.2px; }
+    .subtitle { color: var(--muted); font-size: 12px; }
+    .panel {
+      background: rgba(17,24,39,0.8);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+    .pane {
+      padding: 16px;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 16px; }
+    .grow { flex: 1 1 320px; }
+    .muted { color: var(--muted); }
+    .hidden { display: none !important; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--chip); border: 1px solid var(--border);
+      color: var(--muted); padding: 6px 8px; border-radius: 8px; font-size: 12px;
+    }
+    .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-size: 12px; color: var(--muted); }
+    .field input, .field select, .field textarea {
+      background: #0b1220;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      outline: none;
+    }
+    .field textarea { min-height: 72px; resize: vertical; }
+    .btn {
+      background: linear-gradient(180deg, rgba(34,197,94,0.12), rgba(34,197,94,0.08));
+      color: var(--text);
+      border: 1px solid rgba(34,197,94,0.35);
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.05s ease, background 0.15s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn.secondary {
+      background: linear-gradient(180deg, rgba(59,130,246,0.12), rgba(59,130,246,0.08));
+      border-color: rgba(59,130,246,0.35);
+    }
+    .btn.warn {
+      background: linear-gradient(180deg, rgba(245,158,11,0.12), rgba(245,158,11,0.08));
+      border-color: rgba(245,158,11,0.35);
+    }
+    .btn.danger {
+      background: linear-gradient(180deg, rgba(239,68,68,0.12), rgba(239,68,68,0.08));
+      border-color: rgba(239,68,68,0.35);
+    }
+    .btn.ghost {
+      background: transparent;
+      border-color: var(--border);
+    }
+    .toolbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border-spacing: 0;
+      font-size: 14px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th { color: var(--muted); font-weight: 600; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .section-title {
+      font-weight: 600; letter-spacing: 0.3px; margin: 0 0 6px 0;
+    }
+    .notice {
+      font-size: 13px; color: var(--muted);
+      padding: 10px 12px; background: #0b1220; border: 1px solid var(--border); border-radius: 8px;
+    }
+    .status-ok { color: var(--accent); }
+    .status-bad { color: var(--danger); }
+    .status-warn { color: var(--warn); }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+    @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+    footer { color: var(--muted); font-size: 12px; padding: 16px 0; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <div class="title">CuraMatrix HSM</div>
+          <div class="subtitle">Super Admin Console</div>
+        </div>
+      </div>
+      <div class="controls">
+        <span id="authStatus" class="chip">Not authenticated</span>
+        <button id="btnLogout" class="btn ghost hidden">Log out</button>
+      </div>
+    </header>
+
+    <section id="loginSection" class="panel pane">
+      <div class="row">
+        <div class="grow">
+          <h3 class="section-title">Sign in</h3>
+          <p class="muted" style="margin-top: 0;">
+            Use a Super Admin account. Token is stored only in this tab (memory) for minimal footprint.
+          </p>
+          <div class="grid-2" style="margin-top: 8px;">
+            <div class="field">
+              <label for="email">Email</label>
+              <input id="email" type="email" placeholder="superadmin@curamatrix.com" autocomplete="username">
+            </div>
+            <div class="field">
+              <label for="password">Password</label>
+              <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+            </div>
+            <div class="field">
+              <label for="tenantKey">Tenant Key</label>
+              <input id="tenantKey" type="text" placeholder="default-hospital" value="default-hospital">
+            </div>
+            <div style="display:flex; align-items:flex-end;">
+              <button id="btnLogin" class="btn" style="width: 100%;">Sign in</button>
+            </div>
+          </div>
+          <div id="loginMsg" class="notice" style="margin-top: 12px;">Default tenant for super admin is <b>default-hospital</b>.</div>
+        </div>
+        <div class="grow">
+          <h3 class="section-title">Environment</h3>
+          <div class="notice">
+            Base URL: <span id="baseUrlText"></span><br>
+            Swagger: <a href="/swagger-ui.html" target="_blank">/swagger-ui.html</a><br>
+            API: <code>/api/*</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="appSection" class="panel hidden">
+      <div class="toolbar">
+        <div class="controls">
+          <span class="chip">Role: <strong>SUPER_ADMIN</strong></span>
+          <span id="tokenExpiryChip" class="chip">Expires: —</span>
+        </div>
+        <div class="controls">
+          <button id="btnReload" class="btn secondary">Reload</button>
+          <button id="btnOpenCreate" class="btn">Register Hospital</button>
+        </div>
+      </div>
+      <div class="pane">
+        <div id="tenantsPanel">
+          <h3 class="section-title">Hospitals</h3>
+          <div class="notice" id="listMsg" style="margin-bottom: 10px;">Loading…</div>
+          <div style="overflow:auto; border: 1px solid var(--border); border-radius: 8px;">
+            <table id="tenantsTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Tenant Key</th>
+                  <th>Hospital</th>
+                  <th>Plan</th>
+                  <th>Status</th>
+                  <th>Dates</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="createSection" class="panel hidden" style="margin-top: 16px;">
+      <div class="toolbar">
+        <div class="section-title">Register New Hospital</div>
+        <div class="controls">
+          <button id="btnCloseCreate" class="btn ghost">Close</button>
+          <button id="btnCreate" class="btn">Create</button>
+        </div>
+      </div>
+      <div class="pane">
+        <div class="grid-2">
+          <div class="field">
+            <label for="c_tenantKey">Tenant Key</label>
+            <input id="c_tenantKey" type="text" placeholder="apollo-mumbai">
+          </div>
+          <div class="field">
+            <label for="c_hospitalName">Hospital Name</label>
+            <input id="c_hospitalName" type="text" placeholder="Apollo Hospital Mumbai">
+          </div>
+          <div class="field">
+            <label for="c_subscriptionPlan">Subscription Plan</label>
+            <select id="c_subscriptionPlan">
+              <option value="BASIC">BASIC</option>
+              <option value="STANDARD">STANDARD</option>
+              <option value="PREMIUM">PREMIUM</option>
+              <option value="PROFESSIONAL">PROFESSIONAL</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="c_contactEmail">Contact Email</label>
+            <input id="c_contactEmail" type="email" placeholder="admin@apollo.com">
+          </div>
+          <div class="field">
+            <label for="c_contactPhone">Contact Phone</label>
+            <input id="c_contactPhone" type="text" placeholder="9876543210">
+          </div>
+          <div class="field">
+            <label for="c_address">Address</label>
+            <input id="c_address" type="text" placeholder="Mumbai, Maharashtra">
+          </div>
+          <div class="field">
+            <label for="c_logo">Logo URL</label>
+            <input id="c_logo" type="text" placeholder="https://example.com/logo.png">
+          </div>
+          <div class="field">
+            <label for="c_subscriptionStart">Subscription Start</label>
+            <input id="c_subscriptionStart" type="date">
+          </div>
+          <div class="field">
+            <label for="c_subscriptionEnd">Subscription End</label>
+            <input id="c_subscriptionEnd" type="date">
+          </div>
+          <div class="field">
+            <label for="c_adminFullName">Admin Full Name</label>
+            <input id="c_adminFullName" type="text" placeholder="John Doe">
+          </div>
+          <div class="field">
+            <label for="c_adminEmail">Admin Email</label>
+            <input id="c_adminEmail" type="email" placeholder="admin@apollo.com">
+          </div>
+          <div class="field">
+            <label for="c_adminPhone">Admin Phone</label>
+            <input id="c_adminPhone" type="text" placeholder="9876543210">
+          </div>
+          <div class="field">
+            <label for="c_adminPassword">Admin Password</label>
+            <input id="c_adminPassword" type="password" placeholder="securepassword">
+          </div>
+        </div>
+        <div id="createMsg" class="notice" style="margin-top: 10px;">Provide details and click Create.</div>
+      </div>
+    </section>
+
+    <footer>
+      Lightweight Super Admin UI — served statically by Spring Boot.
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+      const $ = (id) => document.getElementById(id);
+      const baseUrl = window.location.origin;
+      $("baseUrlText").textContent = baseUrl;
+
+      const state = {
+        token: null,
+        tokenExpiry: null,
+      };
+
+      function setAuthUI() {
+        if (state.token) {
+          $("authStatus").textContent = "Authenticated";
+          $("authStatus").classList.remove("chip");
+          $("authStatus").classList.add("chip");
+          $("btnLogout").classList.remove("hidden");
+          $("loginSection").classList.add("hidden");
+          $("appSection").classList.remove("hidden");
+          $("tokenExpiryChip").textContent = "Expires: " + (state.tokenExpiry ? new Date(state.tokenExpiry).toLocaleString() : "—");
+        } else {
+          $("authStatus").textContent = "Not authenticated";
+          $("btnLogout").classList.add("hidden");
+          $("loginSection").classList.remove("hidden");
+          $("appSection").classList.add("hidden");
+        }
+      }
+
+      async function api(path, { method = "GET", body, auth = true } = {}) {
+        const headers = { "Content-Type": "application/json" };
+        if (auth && state.token) headers["Authorization"] = "Bearer " + state.token;
+        const res = await fetch(baseUrl + path, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        if (!res.ok) {
+          let msg = res.status + " " + res.statusText;
+          try {
+            const data = await res.json();
+            msg = data.message || data.error || JSON.stringify(data);
+          } catch (_) {}
+          throw new Error(msg);
+        }
+        if (res.status === 204) return null;
+        const text = await res.text();
+        if (!text) return null;
+        try { return JSON.parse(text); } catch { return text; }
+      }
+
+      function row(actions) {
+        const tr = document.createElement("tr");
+        actions.forEach((cell) => {
+          const td = document.createElement("td");
+          if (cell instanceof Node) {
+            td.appendChild(cell);
+          } else {
+            td.innerHTML = cell;
+          }
+          tr.appendChild(td);
+        });
+        return tr;
+      }
+
+      function btn(label, cls, onClick, title) {
+        const b = document.createElement("button");
+        b.className = "btn " + (cls || "");
+        b.textContent = label;
+        if (title) b.title = title;
+        b.addEventListener("click", onClick);
+        return b;
+      }
+
+      function setMsg(id, text, kind) {
+        const el = $(id);
+        el.textContent = text;
+        el.classList.remove("status-ok","status-bad","status-warn");
+        if (kind === "ok") el.classList.add("status-ok");
+        if (kind === "bad") el.classList.add("status-bad");
+        if (kind === "warn") el.classList.add("status-warn");
+      }
+
+      async function handleLogin() {
+        const email = $("email").value.trim();
+        const password = $("password").value;
+        const tenantKey = $("tenantKey").value.trim() || "default-hospital";
+        setMsg("loginMsg", "Signing in…", "warn");
+        try {
+          const data = await api("/api/auth/login", {
+            method: "POST",
+            auth: false,
+            body: { email, password, tenantKey }
+          });
+          if (!data || !data.token) throw new Error("No token in response");
+          state.token = data.token;
+          state.tokenExpiry = data.expiresIn ? (Date.now() + Number(data.expiresIn)) : null;
+          setAuthUI();
+          await loadTenants();
+          setMsg("loginMsg", "Signed in as " + (data.fullName || email), "ok");
+        } catch (e) {
+          setMsg("loginMsg", "Login failed: " + e.message, "bad");
+        }
+      }
+
+      async function loadTenants() {
+        setMsg("listMsg", "Loading…", "warn");
+        const tbody = $("tenantsTable").querySelector("tbody");
+        tbody.innerHTML = "";
+        try {
+          const tenants = await api("/api/super-admin/tenants", { method: "GET" });
+          if (!Array.isArray(tenants) || tenants.length === 0) {
+            setMsg("listMsg", "No hospitals found.", "warn");
+            return;
+          }
+          setMsg("listMsg", tenants.length + " hospitals loaded.", "ok");
+          tenants.forEach((t) => {
+            const status = (t.active === false || t.suspended === true) ? '<span class="status-bad">Suspended</span>' : '<span class="status-ok">Active</span>';
+            const dates = [
+              t.subscriptionStart ? ("Start: " + t.subscriptionStart) : "",
+              t.subscriptionEnd ? ("End: " + t.subscriptionEnd) : ""
+            ].filter(Boolean).join("<br>");
+            const actionsCell = document.createElement("div");
+            actionsCell.style.display = "flex";
+            actionsCell.style.gap = "6px";
+            actionsCell.style.flexWrap = "wrap";
+
+            actionsCell.appendChild(btn("View", "ghost", async () => {
+              try {
+                const d = await api("/api/super-admin/tenants/" + t.id);
+                alert(JSON.stringify(d, null, 2));
+              } catch (e) {
+                alert("Failed: " + e.message);
+              }
+            }));
+            actionsCell.appendChild(btn("Stats", "secondary", async () => {
+              try {
+                const d = await api(`/api/super-admin/tenants/${t.id}/stats`);
+                alert(JSON.stringify(d, null, 2));
+              } catch (e) {
+                alert("Failed: " + e.message);
+              }
+            }));
+            if (t.suspended || t.active === false) {
+              actionsCell.appendChild(btn("Activate", "", async () => {
+                if (!confirm("Activate hospital?")) return;
+                try {
+                  await api(`/api/super-admin/tenants/${t.id}/activate`, { method: "PUT" });
+                  await loadTenants();
+                } catch (e) {
+                  alert("Failed: " + e.message);
+                }
+              }));
+            } else {
+              actionsCell.appendChild(btn("Suspend", "warn", async () => {
+                if (!confirm("Suspend hospital?")) return;
+                try {
+                  await api(`/api/super-admin/tenants/${t.id}/suspend`, { method: "PUT" });
+                  await loadTenants();
+                } catch (e) {
+                  alert("Failed: " + e.message);
+                }
+              }));
+            }
+            actionsCell.appendChild(btn("Edit", "", async () => {
+              const name = prompt("Hospital name", t.hospitalName || "");
+              if (name == null) return;
+              const plan = prompt("Plan (BASIC/STANDARD/PREMIUM/PROFESSIONAL)", t.subscriptionPlan || "STANDARD");
+              if (plan == null) return;
+              try {
+                await api(`/api/super-admin/tenants/${t.id}`, {
+                  method: "PUT",
+                  body: {
+                    hospitalName: name,
+                    subscriptionPlan: plan
+                  }
+                });
+                await loadTenants();
+              } catch (e) {
+                alert("Failed: " + e.message);
+              }
+            }));
+            actionsCell.appendChild(btn("Reset Admin Password", "danger", async () => {
+              const adminEmail = prompt("Admin email for this hospital (leave blank to auto-detect)", "");
+              if (adminEmail === null) return;
+              const newPassword = prompt("New password");
+              if (newPassword === null) return;
+              if (!newPassword.trim()) {
+                alert("Password cannot be empty.");
+                return;
+              }
+              if (!confirm("Reset admin password now?")) return;
+              try {
+                await api(`/api/super-admin/tenants/${t.id}/admin/password`, {
+                  method: "PUT",
+                  body: {
+                    adminEmail: adminEmail.trim() || null,
+                    newPassword: newPassword
+                  }
+                });
+                alert("Admin password reset successful.");
+              } catch (e) {
+                alert("Failed: " + e.message);
+              }
+            }));
+
+            tbody.appendChild(row([
+              String(t.id ?? ""),
+              `<code>${t.tenantKey || ""}</code>`,
+              t.hospitalName || "",
+              `<span class="chip">${t.subscriptionPlan || ""}</span>`,
+              status,
+              dates || "—",
+              actionsCell
+            ]));
+          });
+        } catch (e) {
+          setMsg("listMsg", "Failed to load: " + e.message, "bad");
+        }
+      }
+
+      function openCreate(open) {
+        if (open) {
+          $("createSection").classList.remove("hidden");
+          window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+        } else {
+          $("createSection").classList.add("hidden");
+        }
+      }
+
+      async function handleCreate() {
+        const body = {
+          tenantKey: $("c_tenantKey").value.trim(),
+          hospitalName: $("c_hospitalName").value.trim(),
+          subscriptionPlan: $("c_subscriptionPlan").value,
+          subscriptionStart: $("c_subscriptionStart").value || null,
+          subscriptionEnd: $("c_subscriptionEnd").value || null,
+          contactEmail: $("c_contactEmail").value.trim() || null,
+          contactPhone: $("c_contactPhone").value.trim() || null,
+          address: $("c_address").value.trim() || null,
+          logo: $("c_logo").value.trim() || null,
+          adminFullName: $("c_adminFullName").value.trim(),
+          adminEmail: $("c_adminEmail").value.trim(),
+          adminPhone: $("c_adminPhone").value.trim() || null,
+          adminPassword: $("c_adminPassword").value
+        };
+        setMsg("createMsg", "Creating…", "warn");
+        try {
+          if (!body.tenantKey || !body.hospitalName || !body.adminEmail || !body.adminPassword) {
+            throw new Error("tenantKey, hospitalName, adminEmail, adminPassword are required");
+          }
+          const res = await api("/api/super-admin/tenants", { method: "POST", body });
+          setMsg("createMsg", "Created tenant ID " + (res?.id ?? "(unknown)") + ".", "ok");
+          openCreate(false);
+          await loadTenants();
+        } catch (e) {
+          setMsg("createMsg", "Failed: " + e.message, "bad");
+        }
+      }
+
+      // Event wiring
+      $("btnLogin").addEventListener("click", handleLogin);
+      $("password").addEventListener("keydown", (e) => { if (e.key === "Enter") handleLogin(); });
+      $("btnLogout").addEventListener("click", () => {
+        state.token = null; state.tokenExpiry = null; setAuthUI();
+      });
+      $("btnReload").addEventListener("click", loadTenants);
+      $("btnOpenCreate").addEventListener("click", () => openCreate(true));
+      $("btnCloseCreate").addEventListener("click", () => openCreate(false));
+      $("btnCreate").addEventListener("click", handleCreate);
+
+      // Initial UI
+      setAuthUI();
+    })();
+  </script>
+</body>
+</html>
+

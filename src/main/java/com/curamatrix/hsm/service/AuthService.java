@@ -11,9 +11,11 @@ import com.curamatrix.hsm.repository.TenantRepository;
 import com.curamatrix.hsm.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -45,16 +47,26 @@ public class AuthService {
                     "Subscription has expired. Please renew to continue using the service.");
         }
 
+        // Verify user exists first to provide clear login errors
+        User existingUser = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("Email is not correct"));
+
         // Authenticate user
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+        } catch (BadCredentialsException e) {
+            throw new RuntimeException("Wrong password");
+        } catch (AuthenticationException e) {
+            throw new RuntimeException("Authentication failed");
+        }
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         
         // Get user and verify tenant
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User user = existingUser;
 
         if (!user.getTenantId().equals(tenant.getId())) {
             throw new RuntimeException("User does not belong to this hospital");
