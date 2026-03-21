@@ -17,7 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
 @io.swagger.v3.oas.annotations.tags.Tag(name = "2. Admin - User Management", description = "User creation and management (Admin only)")
 public class AdminController {
 

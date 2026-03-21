@@ -136,6 +136,12 @@
     .status-warn { color: var(--warn); }
     .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
     @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+    .page-chip {
+      display: inline-block; padding: 4px 8px; margin: 2px;
+      background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3);
+      border-radius: 6px; font-size: 12px; color: var(--accent-2);
+    }
+    .page-chip.active { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.3); color: var(--accent); }
     footer { color: var(--muted); font-size: 12px; padding: 16px 0; text-align: center; }
   </style>
 </head>
@@ -201,6 +207,7 @@
         <div class="controls">
           <button id="btnReload" class="btn secondary">Reload</button>
           <button id="btnOpenCreate" class="btn">Register Hospital</button>
+          <button id="btnOpenAccess" class="btn secondary">Access Control</button>
         </div>
       </div>
       <div class="pane">
@@ -224,6 +231,117 @@
             </table>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- Access Control Panel (Simplified: Pages only, no permissions) -->
+    <section id="accessSection" class="panel hidden" style="margin-top: 16px;">
+      <div class="toolbar">
+        <div class="section-title">Access Control — Page-Based</div>
+        <div class="controls">
+          <button id="btnCloseAccess" class="btn ghost">Close</button>
+        </div>
+      </div>
+      <div class="pane">
+
+        <!-- Row 1: User Access Lookup + User Page Overrides -->
+        <div class="row">
+          <div class="grow">
+            <h4 class="section-title">Lookup User Access</h4>
+            <div class="controls">
+              <div class="field">
+                <label for="a_userId">User ID</label>
+                <input id="a_userId" type="number" placeholder="e.g. 10">
+              </div>
+              <button id="btnGetUserAccess" class="btn">Get Access</button>
+            </div>
+            <div id="a_userAccessMsg" class="notice" style="margin-top: 8px;">Enter user ID and click Get Access.</div>
+            <div style="overflow:auto; border: 1px solid var(--border); border-radius: 8px; margin-top: 10px;">
+              <table>
+                <thead><tr><th>Roles</th><th>Effective Pages</th></tr></thead>
+                <tbody><tr><td id="a_roles">—</td><td id="a_pages">—</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="grow">
+            <h4 class="section-title">Set User Extra Pages</h4>
+            <p class="muted" style="margin:0 0 6px;">Add extra pages beyond what the user's role provides. This <b>replaces</b> any existing user-specific overrides.</p>
+            <div class="controls">
+              <div class="field" style="flex:1;">
+                <label for="a_userPageKeys">Page Keys (comma separated)</label>
+                <input id="a_userPageKeys" type="text" placeholder="e.g. ADMIN_USERS,DOCTOR_PRESCRIPTION">
+              </div>
+              <button id="btnSetUserPages" class="btn">Set Pages</button>
+            </div>
+            <div class="notice" id="a_userPagesMsg" style="margin-top: 8px;">Enter user ID on the left, then set extra pages here.</div>
+            <div class="controls" style="margin-top: 8px;">
+              <button id="btnResetUserPages" class="btn warn">Reset to Role Defaults</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Role → Pages Mapping -->
+        <div class="row" style="margin-top: 14px;">
+          <div class="grow">
+            <h4 class="section-title">Role → Pages Mapping</h4>
+            <p class="muted" style="margin:0 0 6px;">Define which pages each role gets by default. This <b>replaces</b> all page assignments for the role.</p>
+            <div class="controls">
+              <div class="field">
+                <label for="a_role">Role</label>
+                <select id="a_role">
+                  <option value="ROLE_ADMIN">ROLE_ADMIN</option>
+                  <option value="ROLE_DOCTOR">ROLE_DOCTOR</option>
+                  <option value="ROLE_RECEPTIONIST">ROLE_RECEPTIONIST</option>
+                  <option value="ROLE_SUPER_ADMIN">ROLE_SUPER_ADMIN</option>
+                </select>
+              </div>
+              <button id="btnGetRolePages" class="btn secondary">Load</button>
+            </div>
+            <div class="notice" id="a_roleMsg" style="margin-top: 8px;">Select a role and click Load to see current pages.</div>
+            <div class="controls" style="margin-top: 8px;">
+              <div class="field" style="flex:1;">
+                <label for="a_rolePageKeys">Page Keys (comma separated)</label>
+                <input id="a_rolePageKeys" type="text" placeholder="e.g. ADMIN_DASHBOARD,ADMIN_USERS">
+              </div>
+              <button id="btnSetRolePages" class="btn">Save Role Pages</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: All Pages (CRUD) -->
+        <div class="row" style="margin-top: 14px;">
+          <div class="grow">
+            <h4 class="section-title">All Pages</h4>
+            <div class="controls" style="margin-bottom: 8px;">
+              <button id="btnRefreshPages" class="btn secondary">Refresh Pages</button>
+            </div>
+            <div class="notice" id="a_pageListMsg">Click Refresh Pages to load.</div>
+            <div style="overflow:auto; border: 1px solid var(--border); border-radius: 8px; margin-top: 8px;">
+              <table id="a_pagesTable">
+                <thead><tr><th>Page Key</th><th>Route</th><th>Display Name</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <h4 class="section-title" style="margin-top: 14px;">Add / Update Page</h4>
+            <div class="controls">
+              <div class="field">
+                <label for="a_pageKey">Page Key</label>
+                <input id="a_pageKey" type="text" placeholder="e.g. REPORT_DASHBOARD">
+              </div>
+              <div class="field" style="flex:1;">
+                <label for="a_route">Route</label>
+                <input id="a_route" type="text" placeholder="/admin/reports">
+              </div>
+              <div class="field" style="flex:1;">
+                <label for="a_displayName">Display Name</label>
+                <input id="a_displayName" type="text" placeholder="Reports Dashboard">
+              </div>
+              <button id="btnUpsertPage" class="btn">Save Page</button>
+            </div>
+            <div class="notice" id="a_pageMsg" style="margin-top: 8px;">Create or update a page definition.</div>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -316,11 +434,11 @@
         tokenExpiry: null,
       };
 
+      /* ── Helpers ──────────────────────────────────────────────── */
+
       function setAuthUI() {
         if (state.token) {
           $("authStatus").textContent = "Authenticated";
-          $("authStatus").classList.remove("chip");
-          $("authStatus").classList.add("chip");
           $("btnLogout").classList.remove("hidden");
           $("loginSection").classList.add("hidden");
           $("appSection").classList.remove("hidden");
@@ -330,6 +448,8 @@
           $("btnLogout").classList.add("hidden");
           $("loginSection").classList.remove("hidden");
           $("appSection").classList.add("hidden");
+          $("accessSection").classList.add("hidden");
+          $("createSection").classList.add("hidden");
         }
       }
 
@@ -387,6 +507,8 @@
         if (kind === "warn") el.classList.add("status-warn");
       }
 
+      /* ── Login ────────────────────────────────────────────────── */
+
       async function handleLogin() {
         const email = $("email").value.trim();
         const password = $("password").value;
@@ -408,6 +530,8 @@
           setMsg("loginMsg", "Login failed: " + e.message, "bad");
         }
       }
+
+      /* ── Tenants ──────────────────────────────────────────────── */
 
       async function loadTenants() {
         setMsg("listMsg", "Loading…", "warn");
@@ -525,6 +649,8 @@
         }
       }
 
+      /* ── Create Hospital ──────────────────────────────────────── */
+
       function openCreate(open) {
         if (open) {
           $("createSection").classList.remove("hidden");
@@ -564,16 +690,198 @@
         }
       }
 
-      // Event wiring
+      /* ── Access Control (Simplified: Pages only) ──────────────── */
+
+      function openAccess(open) {
+        if (open) {
+          $("accessSection").classList.remove("hidden");
+          window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+        } else {
+          $("accessSection").classList.add("hidden");
+        }
+      }
+
+      // --- User Access Lookup ---
+      async function getUserAccess() {
+        const userId = Number($("a_userId").value);
+        if (!userId) { setMsg("a_userAccessMsg", "Enter a valid user ID.", "warn"); return; }
+        setMsg("a_userAccessMsg", "Loading…", "warn");
+        $("a_roles").textContent = "—";
+        $("a_pages").textContent = "—";
+        try {
+          const d = await api(`/api/admin/access/users/${userId}`);
+          const roles = (d.roles || []).join(", ");
+          $("a_roles").textContent = roles || "—";
+
+          // Render pages as chips
+          const pagesCell = $("a_pages");
+          pagesCell.innerHTML = "";
+          const pages = d.pages || [];
+          if (pages.length === 0) {
+            pagesCell.textContent = "—";
+          } else {
+            pages.forEach((p) => {
+              const chip = document.createElement("span");
+              chip.className = "page-chip active";
+              chip.textContent = p.pageKey;
+              chip.title = p.displayName + " (" + p.route + ")";
+              pagesCell.appendChild(chip);
+            });
+          }
+          setMsg("a_userAccessMsg", "Loaded. User has " + pages.length + " effective page(s).", "ok");
+        } catch (e) {
+          setMsg("a_userAccessMsg", "Failed: " + e.message, "bad");
+        }
+      }
+
+      // --- Set User Extra Pages ---
+      async function setUserPages() {
+        const userId = Number($("a_userId").value);
+        if (!userId) { setMsg("a_userPagesMsg", "Enter a valid user ID on the left first.", "warn"); return; }
+        const pageKeys = ($("a_userPageKeys").value || "").split(",").map(s => s.trim()).filter(Boolean);
+        if (pageKeys.length === 0) { setMsg("a_userPagesMsg", "Provide at least one page key.", "warn"); return; }
+        setMsg("a_userPagesMsg", "Applying…", "warn");
+        try {
+          await api(`/api/admin/access/users/${userId}/pages`, { method: "PUT", body: pageKeys });
+          setMsg("a_userPagesMsg", "Saved. " + pageKeys.length + " extra page(s) assigned.", "ok");
+          await getUserAccess(); // Refresh
+        } catch (e) {
+          setMsg("a_userPagesMsg", "Failed: " + e.message, "bad");
+        }
+      }
+
+      // --- Reset User Pages to Role Defaults ---
+      async function resetUserPages() {
+        const userId = Number($("a_userId").value);
+        if (!userId) { setMsg("a_userPagesMsg", "Enter a valid user ID on the left first.", "warn"); return; }
+        if (!confirm("Remove all extra page overrides for user " + userId + "? They will revert to role defaults.")) return;
+        setMsg("a_userPagesMsg", "Resetting…", "warn");
+        try {
+          await api(`/api/admin/access/users/${userId}/pages`, { method: "DELETE" });
+          setMsg("a_userPagesMsg", "Reset to role defaults.", "ok");
+          await getUserAccess(); // Refresh
+        } catch (e) {
+          setMsg("a_userPagesMsg", "Failed: " + e.message, "bad");
+        }
+      }
+
+      // --- Load Role Pages ---
+      async function getRolePages() {
+        const role = $("a_role").value;
+        if (!role) return;
+        setMsg("a_roleMsg", "Loading pages for " + role + "…", "warn");
+        try {
+          const pageKeys = await api(`/api/admin/access/roles/${role}/pages`);
+          const keys = Array.isArray(pageKeys) ? pageKeys : [...(pageKeys || [])];
+          $("a_rolePageKeys").value = keys.join(", ");
+          setMsg("a_roleMsg", role + " has " + keys.length + " page(s): " + (keys.join(", ") || "none"), "ok");
+        } catch (e) {
+          setMsg("a_roleMsg", "Failed: " + e.message, "bad");
+        }
+      }
+
+      // --- Save Role Pages ---
+      async function setRolePages() {
+        const role = $("a_role").value;
+        const pageKeys = ($("a_rolePageKeys").value || "").split(",").map(s => s.trim()).filter(Boolean);
+        if (!role) { setMsg("a_roleMsg", "Select a role.", "warn"); return; }
+        if (pageKeys.length === 0) {
+          if (!confirm("This will remove ALL pages from " + role + ". Continue?")) return;
+        }
+        setMsg("a_roleMsg", "Saving…", "warn");
+        try {
+          await api(`/api/admin/access/roles/${role}/pages`, { method: "PUT", body: pageKeys });
+          setMsg("a_roleMsg", "Saved " + pageKeys.length + " page(s) for " + role + ".", "ok");
+        } catch (e) {
+          setMsg("a_roleMsg", "Failed: " + e.message, "bad");
+        }
+      }
+
+      // --- Refresh All Pages ---
+      async function refreshPages() {
+        setMsg("a_pageListMsg", "Loading pages…", "warn");
+        const tbody = $("a_pagesTable").querySelector("tbody");
+        tbody.innerHTML = "";
+        try {
+          const list = await api("/api/admin/access/pages");
+          (list || []).forEach((p) => {
+            const actions = document.createElement("div");
+            actions.className = "controls";
+            actions.appendChild(btn("Edit", "ghost", () => {
+              $("a_pageKey").value = p.pageKey || "";
+              $("a_route").value = p.route || "";
+              $("a_displayName").value = p.displayName || "";
+              window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+            }));
+            if (p.active) {
+              actions.appendChild(btn("Deactivate", "danger", async () => {
+                if (!confirm("Soft-delete page " + p.pageKey + "?")) return;
+                try {
+                  await api(`/api/admin/access/pages/${encodeURIComponent(p.pageKey)}`, { method: "DELETE" });
+                  await refreshPages();
+                } catch (e) {
+                  alert("Failed: " + e.message);
+                }
+              }));
+            }
+            tbody.appendChild(row([
+              `<code>${p.pageKey || ""}</code>`,
+              p.route || "",
+              p.displayName || "",
+              p.active ? '<span class="status-ok">Active</span>' : '<span class="status-warn">Inactive</span>',
+              actions
+            ]));
+          });
+          setMsg("a_pageListMsg", (list || []).length + " page(s) loaded.", "ok");
+        } catch (e) {
+          setMsg("a_pageListMsg", "Failed: " + e.message, "bad");
+        }
+      }
+
+      // --- Upsert Page ---
+      async function upsertPage() {
+        const pageKey = $("a_pageKey").value.trim();
+        const route = $("a_route").value.trim();
+        const displayName = $("a_displayName").value.trim();
+        if (!pageKey || !route || !displayName) { setMsg("a_pageMsg", "All fields are required.", "warn"); return; }
+        setMsg("a_pageMsg", "Saving…", "warn");
+        try {
+          await api(`/api/admin/access/pages`, { method: "POST", body: { pageKey, route, displayName } });
+          setMsg("a_pageMsg", "Page '" + pageKey + "' saved.", "ok");
+          $("a_pageKey").value = "";
+          $("a_route").value = "";
+          $("a_displayName").value = "";
+          await refreshPages();
+        } catch (e) {
+          setMsg("a_pageMsg", "Failed: " + e.message, "bad");
+        }
+      }
+
+      /* ── Event Wiring ─────────────────────────────────────────── */
+
+      // Login
       $("btnLogin").addEventListener("click", handleLogin);
       $("password").addEventListener("keydown", (e) => { if (e.key === "Enter") handleLogin(); });
       $("btnLogout").addEventListener("click", () => {
         state.token = null; state.tokenExpiry = null; setAuthUI();
       });
+
+      // Tenants
       $("btnReload").addEventListener("click", loadTenants);
       $("btnOpenCreate").addEventListener("click", () => openCreate(true));
       $("btnCloseCreate").addEventListener("click", () => openCreate(false));
       $("btnCreate").addEventListener("click", handleCreate);
+
+      // Access Control
+      $("btnOpenAccess").addEventListener("click", () => openAccess(true));
+      $("btnCloseAccess").addEventListener("click", () => openAccess(false));
+      $("btnGetUserAccess").addEventListener("click", getUserAccess);
+      $("btnSetUserPages").addEventListener("click", setUserPages);
+      $("btnResetUserPages").addEventListener("click", resetUserPages);
+      $("btnGetRolePages").addEventListener("click", getRolePages);
+      $("btnSetRolePages").addEventListener("click", setRolePages);
+      $("btnRefreshPages").addEventListener("click", refreshPages);
+      $("btnUpsertPage").addEventListener("click", upsertPage);
 
       // Initial UI
       setAuthUI();
@@ -581,4 +889,3 @@
   </script>
 </body>
 </html>
-

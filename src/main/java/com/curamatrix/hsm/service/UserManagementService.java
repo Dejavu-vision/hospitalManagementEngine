@@ -29,6 +29,7 @@ public class UserManagementService {
     private final ReceptionistRepository receptionistRepository;
     private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AccessControlService accessControlService;
 
     @Transactional
     public UserResponse createUser(CreateUserRequest request) {
@@ -56,6 +57,12 @@ public class UserManagementService {
 
         user = userRepository.save(user);
         log.info("User created: {} with role: {}", user.getEmail(), request.getRole());
+
+        // Apply extra page access (if provided during creation)
+        Set<String> extraPages = request.getAllowedPageKeys();
+        if (extraPages != null && !extraPages.isEmpty()) {
+            accessControlService.setUserPages(user.getId(), user.getTenantId(), extraPages, user.getId());
+        }
 
         // Create role-specific profile
         if (request.getRole() == RoleName.ROLE_DOCTOR) {

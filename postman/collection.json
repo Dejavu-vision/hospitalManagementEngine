@@ -3,21 +3,32 @@
     "name": "CuraMatrix HSM - Multi-Tenant SaaS",
     "description": "Complete API collection for CuraMatrix Hospital Management System",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "version": "2.0.0"
+    "version": "3.0.0"
   },
   "auth": {
     "type": "bearer",
-    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
   },
   "event": [
     {
       "listen": "prerequest",
-      "script": { "type": "text/javascript", "exec": [""] }
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
     }
   ],
   "item": [
     {
-      "name": "🔐 Authentication",
+      "name": "\ud83d\udd10 Authentication",
       "item": [
         {
           "name": "Login",
@@ -34,91 +45,196 @@
                   "  pm.environment.set('tenantId', res.tenantId);",
                   "  pm.environment.set('tenantKey', res.tenantKey);",
                   "  pm.environment.set('userRole', res.role);",
-                  "  console.log('Token saved. Role:', res.role);",
+                  "  console.log('Token saved. Role:', res.role, 'Pages:', res.pageKeys);",
                   "}"
                 ]
               }
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"admin@hospital1.com\",\n  \"password\": \"admin123\",\n  \"tenantKey\": \"HOSPITAL_001\"\n}"
             },
-            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
           }
         }
       ]
     },
     {
-      "name": "🏥 Super Admin - Tenants",
+      "name": "\ud83c\udfe5 Super Admin - Tenants",
       "item": [
         {
           "name": "Register New Hospital (Tenant)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"hospitalName\": \"City General Hospital\",\n  \"tenantKey\": \"CITY_GENERAL\",\n  \"adminEmail\": \"admin@citygeneral.com\",\n  \"adminPassword\": \"admin123\",\n  \"adminFullName\": \"Hospital Admin\",\n  \"subscriptionPlan\": \"PROFESSIONAL\",\n  \"subscriptionEndDate\": \"2027-12-31\",\n  \"maxDoctors\": 50,\n  \"maxPatients\": 5000\n}"
             },
-            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/super-admin/tenants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "super-admin",
+                "tenants"
+              ]
+            }
           }
         },
         {
           "name": "Get All Tenants",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/super-admin/tenants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "super-admin",
+                "tenants"
+              ]
+            }
           }
         },
         {
           "name": "Get Tenant By ID",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants/1", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants", "1"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/super-admin/tenants/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "super-admin",
+                "tenants",
+                "1"
+              ]
+            }
           }
         },
         {
           "name": "Update Tenant",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"hospitalName\": \"City General Hospital Updated\",\n  \"tenantKey\": \"CITY_GENERAL\",\n  \"subscriptionPlan\": \"ENTERPRISE\",\n  \"subscriptionEndDate\": \"2028-12-31\",\n  \"maxDoctors\": 100,\n  \"maxPatients\": 10000\n}"
             },
-            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants/1", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants", "1"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/super-admin/tenants/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "super-admin",
+                "tenants",
+                "1"
+              ]
+            }
           }
         },
         {
           "name": "Suspend Tenant",
           "request": {
             "method": "PUT",
-            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants/1/suspend", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants", "1", "suspend"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/super-admin/tenants/1/suspend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "super-admin",
+                "tenants",
+                "1",
+                "suspend"
+              ]
+            }
           }
         },
         {
           "name": "Activate Tenant",
           "request": {
             "method": "PUT",
-            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants/1/activate", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants", "1", "activate"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/super-admin/tenants/1/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "super-admin",
+                "tenants",
+                "1",
+                "activate"
+              ]
+            }
           }
         },
         {
           "name": "Get Tenant Stats",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/api/super-admin/tenants/1/stats", "host": ["{{baseUrl}}"], "path": ["api", "super-admin", "tenants", "1", "stats"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/super-admin/tenants/1/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "super-admin",
+                "tenants",
+                "1",
+                "stats"
+              ]
+            }
           }
         }
       ]
     },
     {
-      "name": "👤 Admin - User Management",
+      "name": "\ud83d\udc64 Admin - User Management",
       "item": [
         {
           "name": "Create Doctor",
@@ -137,77 +253,211 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fullName\": \"Dr. John Smith\",\n  \"email\": \"dr.john@hospital.com\",\n  \"password\": \"doctor123\",\n  \"phone\": \"9876543210\",\n  \"role\": \"ROLE_DOCTOR\",\n  \"specialization\": \"Cardiology\",\n  \"qualification\": \"MBBS, MD\",\n  \"experience\": 10,\n  \"consultationFee\": 500.00,\n  \"departmentId\": 1\n}"
             },
-            "url": { "raw": "{{baseUrl}}/api/admin/users", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Doctor with Extra Pages",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('doctorId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Dr. Senior Specialist\",\n  \"email\": \"dr.senior@hospital.com\",\n  \"password\": \"doctor123\",\n  \"phone\": \"9876543299\",\n  \"role\": \"ROLE_DOCTOR\",\n  \"specialization\": \"Neurology\",\n  \"qualification\": \"MBBS, DM\",\n  \"experience\": 15,\n  \"consultationFee\": 1000.00,\n  \"departmentId\": 1,\n  \"allowedPageKeys\": [\"ADMIN_USERS\", \"ADMIN_DASHBOARD\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users"
+              ]
+            }
           }
         },
         {
           "name": "Create Receptionist",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fullName\": \"Jane Doe\",\n  \"email\": \"jane.reception@hospital.com\",\n  \"password\": \"reception123\",\n  \"phone\": \"9876543211\",\n  \"role\": \"ROLE_RECEPTIONIST\",\n  \"shift\": \"MORNING\"\n}"
             },
-            "url": { "raw": "{{baseUrl}}/api/admin/users", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users"
+              ]
+            }
           }
         },
         {
           "name": "Get All Users",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/api/admin/users", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users"
+              ]
+            }
           }
         },
         {
           "name": "Get User By ID",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/api/admin/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users", "{{userId}}"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users",
+                "{{userId}}"
+              ]
+            }
           }
         },
         {
           "name": "Deactivate User",
           "request": {
             "method": "PUT",
-            "url": { "raw": "{{baseUrl}}/api/admin/users/{{userId}}/deactivate", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users", "{{userId}}", "deactivate"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/{{userId}}/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users",
+                "{{userId}}",
+                "deactivate"
+              ]
+            }
           }
         },
         {
           "name": "Activate User",
           "request": {
             "method": "PUT",
-            "url": { "raw": "{{baseUrl}}/api/admin/users/{{userId}}/activate", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users", "{{userId}}", "activate"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/{{userId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users",
+                "{{userId}}",
+                "activate"
+              ]
+            }
           }
         }
       ]
     },
     {
-      "name": "🏢 Departments",
+      "name": "\ud83c\udfe2 Departments",
       "item": [
         {
           "name": "Get All Departments",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/api/departments", "host": ["{{baseUrl}}"], "path": ["api", "departments"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/departments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "departments"
+              ]
+            }
           }
         },
         {
           "name": "Get Department By ID",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/api/departments/1", "host": ["{{baseUrl}}"], "path": ["api", "departments", "1"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/departments/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "departments",
+                "1"
+              ]
+            }
           }
         }
       ]
     },
     {
-      "name": "🧑‍⚕️ Patients",
+      "name": "\ud83e\uddd1\u200d\u2695\ufe0f Patients",
       "item": [
         {
           "name": "Register Patient",
@@ -226,12 +476,26 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"firstName\": \"Rahul\",\n  \"lastName\": \"Sharma\",\n  \"email\": \"rahul.sharma@email.com\",\n  \"phone\": \"9876543210\",\n  \"dateOfBirth\": \"1990-05-15\",\n  \"gender\": \"MALE\",\n  \"bloodGroup\": \"B_POSITIVE\",\n  \"address\": \"123 Main Street, Mumbai\",\n  \"emergencyContactName\": \"Priya Sharma\",\n  \"emergencyContactPhone\": \"9876543211\"\n}"
             },
-            "url": { "raw": "{{baseUrl}}/api/patients", "host": ["{{baseUrl}}"], "path": ["api", "patients"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            }
           }
         },
         {
@@ -240,12 +504,26 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/patients?search=rahul&page=0&size=20",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "patients"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ],
               "query": [
-                { "key": "search", "value": "rahul" },
-                { "key": "page", "value": "0" },
-                { "key": "size", "value": "20" }
+                {
+                  "key": "search",
+                  "value": "rahul"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
               ]
             }
           }
@@ -256,11 +534,22 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/patients?page=0&size=20",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "patients"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ],
               "query": [
-                { "key": "page", "value": "0" },
-                { "key": "size", "value": "20" }
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
               ]
             }
           }
@@ -269,25 +558,50 @@
           "name": "Get Patient By ID",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/api/patients/{{patientId}}", "host": ["{{baseUrl}}"], "path": ["api", "patients", "{{patientId}}"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/{{patientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "{{patientId}}"
+              ]
+            }
           }
         },
         {
           "name": "Update Patient",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"firstName\": \"Rahul\",\n  \"lastName\": \"Sharma\",\n  \"email\": \"rahul.updated@email.com\",\n  \"phone\": \"9876543210\",\n  \"dateOfBirth\": \"1990-05-15\",\n  \"gender\": \"MALE\",\n  \"bloodGroup\": \"B_POSITIVE\",\n  \"address\": \"456 New Street, Mumbai\",\n  \"emergencyContactName\": \"Priya Sharma\",\n  \"emergencyContactPhone\": \"9876543211\"\n}"
             },
-            "url": { "raw": "{{baseUrl}}/api/patients/{{patientId}}", "host": ["{{baseUrl}}"], "path": ["api", "patients", "{{patientId}}"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/{{patientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "{{patientId}}"
+              ]
+            }
           }
         }
       ]
     },
     {
-      "name": "📅 Appointments",
+      "name": "\ud83d\udcc5 Appointments",
       "item": [
         {
           "name": "Book Appointment",
@@ -306,12 +620,26 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"appointmentDate\": \"2026-03-20\",\n  \"appointmentTime\": \"10:00\",\n  \"type\": \"SCHEDULED\",\n  \"notes\": \"Regular checkup\"\n}"
             },
-            "url": { "raw": "{{baseUrl}}/api/appointments", "host": ["{{baseUrl}}"], "path": ["api", "appointments"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ]
+            }
           }
         },
         {
@@ -331,12 +659,27 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"notes\": \"Walk-in patient\"\n}"
             },
-            "url": { "raw": "{{baseUrl}}/api/appointments/walk-in", "host": ["{{baseUrl}}"], "path": ["api", "appointments", "walk-in"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/walk-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments",
+                "walk-in"
+              ]
+            }
           }
         },
         {
@@ -345,14 +688,37 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/appointments?page=0&size=20",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "appointments"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ],
               "query": [
-                { "key": "page", "value": "0" },
-                { "key": "size", "value": "20" },
-                { "key": "date", "value": "2026-03-20", "disabled": true },
-                { "key": "doctorId", "value": "1", "disabled": true },
-                { "key": "status", "value": "SCHEDULED", "disabled": true }
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "date",
+                  "value": "2026-03-20",
+                  "disabled": true
+                },
+                {
+                  "key": "doctorId",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "SCHEDULED",
+                  "disabled": true
+                }
               ]
             }
           }
@@ -363,9 +729,22 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/appointments/doctor/{{doctorId}}/slots?date=2026-03-20",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "appointments", "doctor", "{{doctorId}}", "slots"],
-              "query": [{ "key": "date", "value": "2026-03-20" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments",
+                "doctor",
+                "{{doctorId}}",
+                "slots"
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2026-03-20"
+                }
+              ]
             }
           }
         },
@@ -373,7 +752,19 @@
           "name": "Get Today's Queue (Doctor)",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/api/appointments/doctor/{{doctorId}}/today", "host": ["{{baseUrl}}"], "path": ["api", "appointments", "doctor", "{{doctorId}}", "today"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/doctor/{{doctorId}}/today",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments",
+                "doctor",
+                "{{doctorId}}",
+                "today"
+              ]
+            }
           }
         },
         {
@@ -382,16 +773,28 @@
             "method": "PUT",
             "url": {
               "raw": "{{baseUrl}}/api/appointments/{{appointmentId}}/status?status=COMPLETED",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "appointments", "{{appointmentId}}", "status"],
-              "query": [{ "key": "status", "value": "COMPLETED" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments",
+                "{{appointmentId}}",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "COMPLETED"
+                }
+              ]
             }
           }
         }
       ]
     },
     {
-      "name": "🩺 Diagnosis",
+      "name": "\ud83e\ude7a Diagnosis",
       "item": [
         {
           "name": "Create Diagnosis",
@@ -410,68 +813,143 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"appointmentId\": {{appointmentId}},\n  \"chiefComplaint\": \"Chest pain and shortness of breath\",\n  \"symptoms\": \"Chest tightness, mild fever, fatigue\",\n  \"diagnosis\": \"Acute Bronchitis\",\n  \"notes\": \"Patient advised rest and medication\",\n  \"severity\": \"MODERATE\",\n  \"followUpDate\": \"2026-03-27\"\n}"
             },
-            "url": { "raw": "{{baseUrl}}/api/diagnoses", "host": ["{{baseUrl}}"], "path": ["api", "diagnoses"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/diagnoses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "diagnoses"
+              ]
+            }
           }
         },
         {
           "name": "Get Diagnosis By ID",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/api/diagnoses/{{diagnosisId}}", "host": ["{{baseUrl}}"], "path": ["api", "diagnoses", "{{diagnosisId}}"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/diagnoses/{{diagnosisId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "diagnoses",
+                "{{diagnosisId}}"
+              ]
+            }
           }
         },
         {
           "name": "Get Diagnosis By Appointment",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/api/diagnoses/appointment/{{appointmentId}}", "host": ["{{baseUrl}}"], "path": ["api", "diagnoses", "appointment", "{{appointmentId}}"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/diagnoses/appointment/{{appointmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "diagnoses",
+                "appointment",
+                "{{appointmentId}}"
+              ]
+            }
           }
         },
         {
           "name": "Update Diagnosis",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"appointmentId\": {{appointmentId}},\n  \"chiefComplaint\": \"Chest pain\",\n  \"symptoms\": \"Chest tightness, fever\",\n  \"diagnosis\": \"Acute Bronchitis - Updated\",\n  \"notes\": \"Patient improving\",\n  \"severity\": \"MILD\",\n  \"followUpDate\": \"2026-04-03\"\n}"
             },
-            "url": { "raw": "{{baseUrl}}/api/diagnoses/{{diagnosisId}}", "host": ["{{baseUrl}}"], "path": ["api", "diagnoses", "{{diagnosisId}}"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/diagnoses/{{diagnosisId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "diagnoses",
+                "{{diagnosisId}}"
+              ]
+            }
           }
         }
       ]
     },
     {
-      "name": "💊 Prescriptions",
+      "name": "\ud83d\udc8a Prescriptions",
       "item": [
         {
           "name": "Add Prescriptions",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"diagnosisId\": {{diagnosisId}},\n  \"items\": [\n    {\n      \"medicineId\": 1,\n      \"dosage\": \"500mg\",\n      \"frequency\": \"Twice daily\",\n      \"duration\": \"5 days\",\n      \"instructions\": \"Take after meals\"\n    },\n    {\n      \"medicineId\": 2,\n      \"dosage\": \"10mg\",\n      \"frequency\": \"Once daily\",\n      \"duration\": \"3 days\",\n      \"instructions\": \"Take before sleep\"\n    }\n  ]\n}"
             },
-            "url": { "raw": "{{baseUrl}}/api/prescriptions", "host": ["{{baseUrl}}"], "path": ["api", "prescriptions"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/prescriptions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "prescriptions"
+              ]
+            }
           }
         },
         {
           "name": "Get Prescriptions By Diagnosis",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/api/prescriptions/diagnosis/{{diagnosisId}}", "host": ["{{baseUrl}}"], "path": ["api", "prescriptions", "diagnosis", "{{diagnosisId}}"] }
+            "url": {
+              "raw": "{{baseUrl}}/api/prescriptions/diagnosis/{{diagnosisId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "prescriptions",
+                "diagnosis",
+                "{{diagnosisId}}"
+              ]
+            }
           }
         }
       ]
     },
     {
-      "name": "💉 Medicines",
+      "name": "\ud83d\udc89 Medicines",
       "item": [
         {
           "name": "Search Medicines",
@@ -479,32 +957,797 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/medicines/search?query=parac",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "medicines", "search"],
-              "query": [{ "key": "query", "value": "parac" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "medicines",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "parac"
+                }
+              ]
             }
           }
         }
       ]
     },
     {
-      "name": "❤️ Health",
+      "name": "\u2764\ufe0f Health",
       "item": [
         {
           "name": "Actuator Health",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] }
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            }
           }
         },
         {
           "name": "Actuator Info",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/actuator/info", "host": ["{{baseUrl}}"], "path": ["actuator", "info"] }
+            "url": {
+              "raw": "{{baseUrl}}/actuator/info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "info"
+              ]
+            }
           }
+        }
+      ]
+    },
+    {
+      "name": "\ud83d\udd10 Access Control (Page-Based)",
+      "description": "Simplified page-based access control: /api/admin/access/** and /api/me/access. No permissions layer — just pages assigned to roles and users.",
+      "item": [
+        {
+          "name": "Me - Get My Access",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/me/access",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "access"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const res = pm.response.json();",
+                  "pm.test('Has roles', function () { pm.expect(res.roles).to.be.an('array'); });",
+                  "pm.test('Has pages', function () { pm.expect(res.pages).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin - Get User Access",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/access/users/{{targetUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "access",
+                "users",
+                "{{targetUserId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const res = pm.response.json();",
+                  "pm.test('Has userId', function () { pm.expect(res.userId).to.be.a('number'); });",
+                  "pm.test('Has roles', function () { pm.expect(res.roles).to.be.an('array'); });",
+                  "pm.test('Has pages', function () { pm.expect(res.pages).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin - Set User Extra Pages",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  \"ADMIN_USERS\",\n  \"ADMIN_DASHBOARD\"\n]"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/access/users/{{targetUserId}}/pages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "access",
+                "users",
+                "{{targetUserId}}",
+                "pages"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin - Reset User Pages (Role Defaults)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/access/users/{{targetUserId}}/pages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "access",
+                "users",
+                "{{targetUserId}}",
+                "pages"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin - Get Role Pages",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/access/roles/ROLE_DOCTOR/pages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "access",
+                "roles",
+                "ROLE_DOCTOR",
+                "pages"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Returns array of page keys', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin - Set Role Pages (DOCTOR)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  \"DOCTOR_DASHBOARD\",\n  \"DOCTOR_APPOINTMENTS\",\n  \"DOCTOR_DIAGNOSIS\",\n  \"DOCTOR_PRESCRIPTION\",\n  \"MEDICINE_SEARCH\"\n]"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/access/roles/ROLE_DOCTOR/pages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "access",
+                "roles",
+                "ROLE_DOCTOR",
+                "pages"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin - Set Role Pages (RECEPTIONIST)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  \"RECEPTION_DASHBOARD\",\n  \"RECEPTION_PATIENTS\",\n  \"RECEPTION_APPOINTMENTS\",\n  \"RECEPTION_BILLING\",\n  \"MEDICINE_SEARCH\"\n]"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/access/roles/ROLE_RECEPTIONIST/pages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "access",
+                "roles",
+                "ROLE_RECEPTIONIST",
+                "pages"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin - Get All Pages",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/access/pages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "access",
+                "pages"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Returns array of pages', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin - Upsert Page",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pageKey\": \"REPORT_DASHBOARD\",\n  \"route\": \"/admin/reports\",\n  \"displayName\": \"Reports Dashboard\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/access/pages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "access",
+                "pages"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin - Soft Delete Page",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/access/pages/REPORT_DASHBOARD",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "access",
+                "pages",
+                "REPORT_DASHBOARD"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario - Admin Can Access RBAC APIs",
+          "item": [
+            {
+              "name": "Step 1: Login as Admin",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) { const r = pm.response.json(); pm.environment.set('token', r.token); pm.environment.set('targetUserId', r.userId); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Step 2: Verify Me Access (200)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/me/access",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "me",
+                    "access"
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Admin me/access is 200', function () { pm.response.to.have.status(200); });",
+                      "const res = pm.response.json();",
+                      "pm.test('Has pages array', function () { pm.expect(res.pages).to.be.an('array'); });"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Scenario - Doctor Forbidden on Admin Access (403)",
+          "item": [
+            {
+              "name": "Step 1: Login as Doctor",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{doctorEmail}}\",\n  \"password\": \"{{doctorPassword}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) { const r = pm.response.json(); pm.environment.set('token', r.token); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Step 2: Try Admin Access Endpoint (expect 403)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/access/users/{{targetUserId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "access",
+                    "users",
+                    "{{targetUserId}}"
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Doctor gets 403', function () { pm.response.to.have.status(403); });"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "\ud83e\uddfe Receptionist Workflows",
+      "description": "Receptionist-focused collection: login, patient registration, appointment booking, billing basics, and access checks.",
+      "item": [
+        {
+          "name": "Login as Receptionist",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{receptionistEmail}}\",\n  \"password\": \"{{receptionistPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Receptionist login success', function () { pm.response.to.have.status(200); });",
+                  "const r = pm.response.json();",
+                  "if (r.token) { pm.environment.set('token', r.token); pm.environment.set('userId', r.userId); pm.environment.set('userRole', r.role); }",
+                  "pm.test('Has pageKeys', function () { pm.expect(r.pageKeys).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get My Access (Receptionist)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/me/access",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "access"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Register Patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ravi\",\n  \"lastName\": \"Patil\",\n  \"email\": \"ravi.patil@email.com\",\n  \"phone\": \"9898989898\",\n  \"dateOfBirth\": \"1992-04-12\",\n  \"gender\": \"MALE\",\n  \"bloodGroup\": \"O_POSITIVE\",\n  \"address\": \"Pune\",\n  \"emergencyContactName\": \"Neha Patil\",\n  \"emergencyContactPhone\": \"9898989800\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) { pm.environment.set('patientId', pm.response.json().id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Book Appointment (Scheduled)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"appointmentDate\": \"2026-04-15\",\n  \"appointmentTime\": \"11:30\",\n  \"type\": \"SCHEDULED\",\n  \"notes\": \"Reception booking\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) { pm.environment.set('appointmentId', pm.response.json().id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Walk-In Appointment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": {{patientId}},\n  \"doctorId\": {{doctorId}},\n  \"notes\": \"Walk-in from receptionist desk\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/walk-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments",
+                "walk-in"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Billing",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointmentId\": {{appointmentId}},\n  \"patientId\": {{patientId}},\n  \"items\": [\n    {\n      \"description\": \"Consultation Fee\",\n      \"amount\": 500.00,\n      \"quantity\": 1,\n      \"itemType\": \"CONSULTATION\"\n    }\n  ],\n  \"discount\": 0,\n  \"tax\": 0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/billings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "billings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Receptionist Forbidden on Admin Access (expect 403)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/access/users/{{targetUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "access",
+                "users",
+                "{{targetUserId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Receptionist gets 403 on admin access APIs', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     }

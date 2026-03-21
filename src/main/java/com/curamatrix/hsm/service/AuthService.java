@@ -5,6 +5,7 @@ import com.curamatrix.hsm.dto.request.LoginRequest;
 import com.curamatrix.hsm.dto.response.LoginResponse;
 import com.curamatrix.hsm.entity.Tenant;
 import com.curamatrix.hsm.entity.User;
+import com.curamatrix.hsm.entity.Role;
 import com.curamatrix.hsm.exception.SubscriptionExpiredException;
 import com.curamatrix.hsm.repository.TenantRepository;
 import com.curamatrix.hsm.repository.UserRepository;
@@ -19,6 +20,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -29,6 +33,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
+    private final AccessControlService accessControlService;
 
     public LoginResponse login(LoginRequest request) {
         // Verify user exists first to provide clear login errors
@@ -48,7 +53,7 @@ public class AuthService {
         }
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        
+
         // Derive tenant from the authenticated user
         User user = existingUser;
         Long tenantId = user.getTenantId();
@@ -66,8 +71,19 @@ public class AuthService {
                     "Subscription has expired. Please renew to continue using the service.");
         }
 
-        // Generate token with tenant information
-        String token = jwtUtil.generateToken(userDetails, tenant.getId(), tenant.getTenantKey());
+        // Compute effective page keys (role pages + user extra pages)
+        Set<String> effectivePageKeys = accessControlService.computeEffectivePageKeys(user);
+        List<String> pageKeys = new ArrayList<>(effectivePageKeys);
+
+        // Build authorities = role names only (no permissions in JWT)
+        List<String> authorities = user.getRoles().stream()
+                .map(Role::getName)
+                .map(Enum::name)
+                .toList();
+
+        // Generate token with tenant + page claims
+        String token = jwtUtil.generateToken(userDetails, tenant.getId(), tenant.getTenantKey(),
+                authorities, pageKeys);
 
         String role = user.getRoles().stream()
                 .findFirst()
@@ -88,6 +104,7 @@ public class AuthService {
                 .hospitalName(tenant.getHospitalName())
                 .subscriptionPlan(tenant.getSubscriptionPlan())
                 .subscriptionExpiry(tenant.getSubscriptionEnd().toString())
+                .pageKeys(pageKeys)
                 .build();
     }
 }

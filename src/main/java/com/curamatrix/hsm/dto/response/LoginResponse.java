@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -16,11 +18,14 @@ public class LoginResponse {
     private String fullName;
     private String role;
     private Long expiresIn;
-    
+
     // Multi-tenant fields
     private Long tenantId;
     private String tenantKey;
     private String hospitalName;
     private String subscriptionPlan;
     private String subscriptionExpiry;
+
+    // Simplified: only page keys (no permissions)
+    private List<String> pageKeys;
 }

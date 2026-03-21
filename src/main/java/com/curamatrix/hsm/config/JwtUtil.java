@@ -11,6 +11,7 @@ import jakarta.annotation.PostConstruct;
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -43,16 +44,29 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
+    /**
+     * Simplified token: authorities (role names) + page keys. No permissions.
+     */
+    public String generateToken(UserDetails userDetails,
+                                Long tenantId,
+                                String tenantKey,
+                                List<String> authorities,
+                                List<String> pageKeys) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("tenantId", tenantId);
+        claims.put("tenantKey", tenantKey);
+        claims.put("authorities", authorities);
+        claims.put("pages", pageKeys);
+        return createToken(claims, userDetails.getUsername());
+    }
+
+    /**
+     * Basic token with tenant info only (backward compat).
+     */
     public String generateToken(UserDetails userDetails, Long tenantId, String tenantKey) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("tenantId", tenantId);
         claims.put("tenantKey", tenantKey);
-        return createToken(claims, userDetails.getUsername());
-    }
-
-    public String generateToken(UserDetails userDetails) {
-        // For backward compatibility - will be deprecated
-        Map<String, Object> claims = new HashMap<>();
         return createToken(claims, userDetails.getUsername());
     }
 
@@ -101,5 +115,9 @@ public class JwtUtil {
 
     public Long getExpirationTime() {
         return expiration;
+    }
+
+    public Claims getAllClaims(String token) {
+        return extractClaims(token);
     }
 }

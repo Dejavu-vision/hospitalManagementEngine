@@ -44,7 +44,7 @@ public class MedicineController {
      *         matches)
      */
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('MEDICINE_SEARCH')")
     public ResponseEntity<List<MedicineSearchDto>> searchMedicines(
             @RequestParam("query") String query) {
         log.info("Medicine search request: query='{}'", query);

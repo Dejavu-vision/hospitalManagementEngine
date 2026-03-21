@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.util.Set;
+
 @Data
 public class CreateUserRequest {
     @NotBlank(message = "Email is required")
@@ -34,4 +36,7 @@ public class CreateUserRequest {
     // Receptionist-specific fields (required if role is ROLE_RECEPTIONIST)
     private String employeeId;
     private String shift;
+
+    // Extra page access (optional — pages beyond what the role provides)
+    private Set<String> allowedPageKeys;
 }
