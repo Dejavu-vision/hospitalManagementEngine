@@ -94,6 +94,23 @@ jobs:
       name: production
       url: http://${{ env.EC2_HOST }}:8080
     steps:
+      - name: Validate required production secrets
+        run: |
+          if [ -z "${{ secrets.DB_PASSWORD }}" ]; then
+            echo "ERROR: GitHub secret DB_PASSWORD is missing/blank."
+            exit 1
+          fi
+          if [ -z "${{ secrets.JWT_SECRET }}" ]; then
+            echo "ERROR: GitHub secret JWT_SECRET is missing/blank."
+            exit 1
+          fi
+          if [ "${#JWT_SECRET_VALUE}" -lt 32 ]; then
+            echo "ERROR: JWT_SECRET must be at least 32 characters."
+            exit 1
+          fi
+        env:
+          JWT_SECRET_VALUE: ${{ secrets.JWT_SECRET }}
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:

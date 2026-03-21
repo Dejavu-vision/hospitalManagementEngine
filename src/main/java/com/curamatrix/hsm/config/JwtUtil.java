@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
@@ -21,6 +22,22 @@ public class JwtUtil {
 
     @Value("${jwt.expiration:86400000}") // 24 hours
     private Long expiration;
+
+    @Value("${spring.profiles.active:}")
+    private String activeProfiles;
+
+    @PostConstruct
+    public void validateSecretOnStartup() {
+        boolean isProd = activeProfiles != null && activeProfiles.contains("prod");
+        if (isProd) {
+            if (secret == null || secret.trim().isEmpty()) {
+                throw new IllegalStateException("JWT_SECRET is missing/blank. Set environment variable JWT_SECRET to a strong 256-bit+ value when running with 'prod' profile.");
+            }
+            if (secret.length() < 32) {
+                throw new IllegalStateException("JWT_SECRET is too short. Must be at least 32 characters (256 bits) for HMAC-SHA algorithms when running with 'prod' profile.");
+            }
+        }
+    }
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());
