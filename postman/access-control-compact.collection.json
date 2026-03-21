@@ -1,0 +1,345 @@
+{
+  "info": {
+    "name": "CuraMatrix HSM – Access Control (Page-Based)",
+    "description": "Compact collection for the simplified page-based access control system.\nNo permissions layer — just pages assigned to roles and users.\n\nEndpoints:\n  /api/me/access\n  /api/admin/access/users/{userId}\n  /api/admin/access/users/{userId}/pages\n  /api/admin/access/roles/{roleName}/pages\n  /api/admin/access/pages\n  /api/admin/access/pages/{pageKey}",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "3.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Login (Admin)",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\",\n  \"tenantKey\": \"{{tenantKey}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "if (pm.response.code === 200) {",
+            "  const r = pm.response.json();",
+            "  pm.environment.set('token', r.token);",
+            "  pm.environment.set('userId', r.userId);",
+            "  console.log('Pages:', r.pageKeys);",
+            "}"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Me – Get My Access",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/me/access",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "me", "access"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const r = pm.response.json();",
+            "pm.test('Has roles', () => pm.expect(r.roles).to.be.an('array'));",
+            "pm.test('Has pages', () => pm.expect(r.pages).to.be.an('array'));"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Get User Access",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/users/{{targetUserId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "users", "{{targetUserId}}"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const r = pm.response.json();",
+            "pm.test('Has userId', () => pm.expect(r.userId).to.be.a('number'));",
+            "pm.test('Has pages', () => pm.expect(r.pages).to.be.an('array'));"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Set User Extra Pages",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "[\"ADMIN_USERS\", \"ADMIN_DASHBOARD\"]"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/users/{{targetUserId}}/pages",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "users", "{{targetUserId}}", "pages"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Reset User Pages (Role Defaults)",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/users/{{targetUserId}}/pages",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "users", "{{targetUserId}}", "pages"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Deny Page for User",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/users/{{targetUserId}}/pages/DOCTOR_PATIENTS/deny",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "users", "{{targetUserId}}", "pages", "DOCTOR_PATIENTS", "deny"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Restore Denied Page for User",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/users/{{targetUserId}}/pages/DOCTOR_PATIENTS/deny",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "users", "{{targetUserId}}", "pages", "DOCTOR_PATIENTS", "deny"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Get User Granted Pages",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/users/{{targetUserId}}/pages/granted",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "users", "{{targetUserId}}", "pages", "granted"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Array of granted page keys', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Get User Denied Pages",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/users/{{targetUserId}}/pages/denied",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "users", "{{targetUserId}}", "pages", "denied"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Array of denied page keys', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Get Role Pages",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/roles/ROLE_DOCTOR/pages",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "roles", "ROLE_DOCTOR", "pages"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Array of page keys', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Set Role Pages (DOCTOR)",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "[\"DOCTOR_DASHBOARD\", \"DOCTOR_APPOINTMENTS\", \"DOCTOR_DIAGNOSIS\", \"DOCTOR_PRESCRIPTION\", \"MEDICINE_SEARCH\"]"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/roles/ROLE_DOCTOR/pages",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "roles", "ROLE_DOCTOR", "pages"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Set Role Pages (RECEPTIONIST)",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "[\"RECEPTION_DASHBOARD\", \"RECEPTION_PATIENTS\", \"RECEPTION_APPOINTMENTS\", \"RECEPTION_BILLING\", \"MEDICINE_SEARCH\"]"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/roles/ROLE_RECEPTIONIST/pages",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "roles", "ROLE_RECEPTIONIST", "pages"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Get All Pages",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/pages",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "pages"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Array of pages', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Upsert Page",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pageKey\": \"REPORT_DASHBOARD\",\n  \"route\": \"/admin/reports\",\n  \"displayName\": \"Reports Dashboard\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/pages",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "pages"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"]
+        }
+      }]
+    },
+    {
+      "name": "Admin – Soft Delete Page",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/access/pages/REPORT_DASHBOARD",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "access", "pages", "REPORT_DASHBOARD"]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "type": "text/javascript",
+          "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"]
+        }
+      }]
+    }
+  ]
+}
