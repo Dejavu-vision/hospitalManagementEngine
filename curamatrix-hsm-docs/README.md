@@ -8,6 +8,7 @@ Hospital Management System — Multi-Tenant SaaS Platform
 |---|---|---|
 | [Setup Guide](setup-guide.md) | Everyone | Local setup, DB, run the app |
 | [API Flow Guide](api-flow.md) | Everyone | End-to-end API execution walkthrough |
+| [Tenant Guide](tenant-guide.md) | Super Admin / DevOps | Hospital onboarding, subscriptions, isolation |
 | [Backend Guide](backend-guide.md) | Backend Engineers | Architecture, entities, services, JWT |
 | [Frontend Guide](frontend-guide.md) | Frontend Engineers | All endpoints, request/response, auth |
 | [Product Guide](product-guide.md) | Product / QA | Roles, workflows, business rules |
