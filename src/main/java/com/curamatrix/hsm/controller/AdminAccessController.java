@@ -59,6 +59,76 @@ public class AdminAccessController {
         return ResponseEntity.noContent().build();
     }
 
+    // ─── Single page add / remove ───────────────────────────────
+
+    @PostMapping("/users/{userId}/pages/{pageKey}")
+    public ResponseEntity<Void> addSingleUserPage(@PathVariable Long userId,
+                                                  @PathVariable String pageKey,
+                                                  Authentication authentication) {
+        User actor = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+        accessControlService.addUserPage(userId, pageKey, actor.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/users/{userId}/pages/{pageKey}")
+    public ResponseEntity<Void> removeSingleUserPage(@PathVariable Long userId,
+                                                     @PathVariable String pageKey,
+                                                     Authentication authentication) {
+        User actor = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+        accessControlService.removeUserPage(userId, pageKey, actor.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Page keys explicitly GRANTED (extra pages beyond role defaults). */
+    @GetMapping("/users/{userId}/pages/extra")
+    public ResponseEntity<Set<String>> getUserExtraPages(@PathVariable Long userId) {
+        return ResponseEntity.ok(accessControlService.getUserExtraPageKeys(userId));
+    }
+
+    /** Alias for /extra — same data, clearer name. */
+    @GetMapping("/users/{userId}/pages/granted")
+    public ResponseEntity<Set<String>> getUserGrantedPages(@PathVariable Long userId) {
+        return ResponseEntity.ok(accessControlService.getUserExtraPageKeys(userId));
+    }
+
+    /** Page keys explicitly DENIED (blocked from role defaults) for this user. */
+    @GetMapping("/users/{userId}/pages/denied")
+    public ResponseEntity<Set<String>> getUserDeniedPages(@PathVariable Long userId) {
+        return ResponseEntity.ok(accessControlService.getUserDeniedPageKeys(userId));
+    }
+
+    // ─── Explicit deny / restore endpoints ───────────────────────
+
+    /**
+     * Deny a specific page for a user (blocks a role-default page).
+     * Equivalent to DELETE /users/{userId}/pages/{pageKey} when the page is role-default,
+     * but provided as a dedicated endpoint for clarity.
+     */
+    @PostMapping("/users/{userId}/pages/{pageKey}/deny")
+    public ResponseEntity<Void> denyUserPage(@PathVariable Long userId,
+                                             @PathVariable String pageKey,
+                                             Authentication authentication) {
+        User actor = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+        accessControlService.removeUserPage(userId, pageKey, actor.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Restore a denied page (removes the DENY record, re-enabling role-default access).
+     */
+    @DeleteMapping("/users/{userId}/pages/{pageKey}/deny")
+    public ResponseEntity<Void> restoreDeniedPage(@PathVariable Long userId,
+                                                  @PathVariable String pageKey,
+                                                  Authentication authentication) {
+        User actor = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+        accessControlService.restoreDeniedPage(userId, pageKey, actor.getId());
+        return ResponseEntity.noContent().build();
+    }
+
     // ─── Role → Pages mapping ───────────────────────────────────
 
     @GetMapping("/roles/{roleName}/pages")

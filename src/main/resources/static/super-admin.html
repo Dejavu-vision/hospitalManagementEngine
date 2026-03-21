@@ -8,6 +8,7 @@
     :root {
       --bg: #0f172a;
       --panel: #111827;
+      --surface: #1a2332;
       --muted: #9ca3af;
       --text: #e5e7eb;
       --accent: #22c55e;
@@ -17,132 +18,177 @@
       --border: #1f2937;
       --chip: #0b1220;
     }
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      margin: 0;
-      padding: 0;
       background: linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji", "Segoe UI Symbol";
-      min-height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      font-size: 14px;
     }
     a { color: var(--accent-2); text-decoration: none; }
-    .container {
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: 16px;
-    }
+    .container { max-width: 1320px; margin: 0 auto; padding: 12px 16px; }
+
+    /* ── Header ─────────────────────────────────────────── */
     header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 12px 0 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 10px 0 14px; flex-wrap: wrap;
     }
-    .brand {
-      display: flex; align-items: center; gap: 10px;
-    }
+    .brand { display: flex; align-items: center; gap: 10px; }
     .logo {
-      width: 32px; height: 32px; border-radius: 8px;
+      width: 30px; height: 30px; border-radius: 8px;
       background: radial-gradient(100% 100% at 70% 0%, #22c55e 0%, #3b82f6 60%, #0ea5e9 100%);
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 8px 30px rgba(16,185,129,0.18);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 6px 20px rgba(16,185,129,0.18);
     }
-    .title { font-weight: 700; letter-spacing: 0.2px; }
-    .subtitle { color: var(--muted); font-size: 12px; }
+    .title { font-weight: 700; font-size: 15px; letter-spacing: 0.2px; }
+    .subtitle { color: var(--muted); font-size: 11px; }
+
+    /* ── Shared ──────────────────────────────────────────── */
     .panel {
-      background: rgba(17,24,39,0.8);
+      background: rgba(17,24,39,0.85);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.03);
-    }
-    .pane {
-      padding: 16px;
-    }
-    .row { display: flex; flex-wrap: wrap; gap: 16px; }
-    .grow { flex: 1 1 320px; }
-    .muted { color: var(--muted); }
-    .hidden { display: none !important; }
-    .chip {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: var(--chip); border: 1px solid var(--border);
-      color: var(--muted); padding: 6px 8px; border-radius: 8px; font-size: 12px;
-    }
-    .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .field { display: flex; flex-direction: column; gap: 6px; }
-    .field label { font-size: 12px; color: var(--muted); }
-    .field input, .field select, .field textarea {
-      background: #0b1220;
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      outline: none;
-    }
-    .field textarea { min-height: 72px; resize: vertical; }
-    .btn {
-      background: linear-gradient(180deg, rgba(34,197,94,0.12), rgba(34,197,94,0.08));
-      color: var(--text);
-      border: 1px solid rgba(34,197,94,0.35);
-      padding: 10px 14px;
       border-radius: 10px;
-      cursor: pointer;
-      transition: transform 0.05s ease, background 0.15s ease;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+    .pane { padding: 14px 16px; }
+    .hidden { display: none !important; }
+    .muted { color: var(--muted); }
+    .row { display: flex; flex-wrap: wrap; gap: 14px; }
+    .grow { flex: 1 1 300px; }
+    .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+    .field input, .field select, .field textarea {
+      background: #0b1220; color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 10px; outline: none; font-size: 13px;
+    }
+    .field input:focus, .field select:focus { border-color: var(--accent-2); }
+    .field textarea { min-height: 60px; resize: vertical; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    @media (max-width: 768px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+    /* ── Buttons ─────────────────────────────────────────── */
+    .btn {
+      background: linear-gradient(180deg, rgba(34,197,94,0.14), rgba(34,197,94,0.08));
+      color: var(--text); border: 1px solid rgba(34,197,94,0.35);
+      padding: 7px 12px; border-radius: 8px; cursor: pointer;
+      transition: transform 0.05s, background 0.15s; font-size: 12px; white-space: nowrap;
     }
     .btn:hover { transform: translateY(-1px); }
     .btn:active { transform: translateY(0); }
-    .btn.secondary {
-      background: linear-gradient(180deg, rgba(59,130,246,0.12), rgba(59,130,246,0.08));
-      border-color: rgba(59,130,246,0.35);
+    .btn.secondary { background: linear-gradient(180deg, rgba(59,130,246,0.14), rgba(59,130,246,0.08)); border-color: rgba(59,130,246,0.35); }
+    .btn.warn { background: linear-gradient(180deg, rgba(245,158,11,0.14), rgba(245,158,11,0.08)); border-color: rgba(245,158,11,0.35); }
+    .btn.danger { background: linear-gradient(180deg, rgba(239,68,68,0.14), rgba(239,68,68,0.08)); border-color: rgba(239,68,68,0.35); }
+    .btn.ghost { background: transparent; border-color: var(--border); }
+    .btn.sm { padding: 5px 8px; font-size: 11px; }
+
+    /* ── Chips ───────────────────────────────────────────── */
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--chip); border: 1px solid var(--border);
+      color: var(--muted); padding: 4px 8px; border-radius: 6px; font-size: 11px;
     }
-    .btn.warn {
-      background: linear-gradient(180deg, rgba(245,158,11,0.12), rgba(245,158,11,0.08));
-      border-color: rgba(245,158,11,0.35);
+    .role-chip {
+      display: inline-block; padding: 3px 7px; margin: 1px;
+      background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 5px; font-size: 11px; color: var(--warn);
     }
-    .btn.danger {
-      background: linear-gradient(180deg, rgba(239,68,68,0.12), rgba(239,68,68,0.08));
-      border-color: rgba(239,68,68,0.35);
+    .page-chip {
+      display: inline-block; padding: 3px 7px; margin: 1px;
+      background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3);
+      border-radius: 5px; font-size: 11px; color: var(--accent-2);
     }
-    .btn.ghost {
-      background: transparent;
-      border-color: var(--border);
+    .page-chip.active { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.3); color: var(--accent); }
+    .page-chip.denied {
+      background: rgba(239,68,68,0.10); border-color: rgba(239,68,68,0.3); color: var(--danger);
+      text-decoration: line-through; opacity: 0.7;
     }
-    .toolbar {
-      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-      padding: 12px 16px; border-bottom: 1px solid var(--border);
+    .page-chip .x-btn {
+      cursor: pointer; margin-left: 3px; font-weight: bold;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      border-spacing: 0;
-      font-size: 14px;
+    .page-chip .restore-btn {
+      cursor: pointer; margin-left: 3px; font-weight: bold; color: var(--accent);
     }
-    th, td {
-      text-align: left;
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
+
+    /* ── Tables ──────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+    tr:hover td { background: rgba(255,255,255,0.015); }
+
+    /* ── Tabs ────────────────────────────────────────────── */
+    .tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+    .tab-btn {
+      padding: 9px 16px; cursor: pointer; font-size: 12px; font-weight: 600;
+      background: transparent; border: none; color: var(--muted);
+      border-bottom: 2px solid transparent; transition: all 0.15s;
     }
-    th { color: var(--muted); font-weight: 600; }
-    tr:hover td { background: rgba(255,255,255,0.02); }
-    .section-title {
-      font-weight: 600; letter-spacing: 0.3px; margin: 0 0 6px 0;
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Inline Expand Panels ───────────────────────────── */
+    .expand-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-top: 10px;
+      overflow: hidden;
+      animation: slideDown 0.2s ease;
     }
+    @keyframes slideDown {
+      from { opacity: 0; max-height: 0; }
+      to { opacity: 1; max-height: 2000px; }
+    }
+    .expand-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+    }
+    .expand-header h4 { font-size: 13px; font-weight: 600; }
+    .expand-body { padding: 14px; }
+
+    /* ── Notice / Status ────────────────────────────────── */
     .notice {
-      font-size: 13px; color: var(--muted);
-      padding: 10px 12px; background: #0b1220; border: 1px solid var(--border); border-radius: 8px;
+      font-size: 12px; color: var(--muted);
+      padding: 8px 10px; background: #0b1220;
+      border: 1px solid var(--border); border-radius: 6px;
     }
     .status-ok { color: var(--accent); }
     .status-bad { color: var(--danger); }
     .status-warn { color: var(--warn); }
-    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
-    @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
-    .page-chip {
-      display: inline-block; padding: 4px 8px; margin: 2px;
-      background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3);
-      border-radius: 6px; font-size: 12px; color: var(--accent-2);
+    .divider { border-top: 1px solid var(--border); margin: 12px 0; }
+    .section-title { font-weight: 600; font-size: 13px; letter-spacing: 0.2px; margin: 0 0 6px; }
+    .toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; flex-wrap: wrap; padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
     }
-    .page-chip.active { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.3); color: var(--accent); }
-    footer { color: var(--muted); font-size: 12px; padding: 16px 0; text-align: center; }
+    footer { color: var(--muted); font-size: 11px; padding: 14px 0; text-align: center; }
+
+    /* ── Tenant Selector ────────────────────────────────── */
+    .tenant-selector {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px;
+      background: rgba(59,130,246,0.06);
+      border: 1px solid rgba(59,130,246,0.2);
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .tenant-selector label { font-size: 12px; font-weight: 600; color: var(--accent-2); white-space: nowrap; }
+    .tenant-selector select {
+      background: #0b1220; color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 6px 10px; font-size: 12px; flex: 1; max-width: 350px;
+    }
+    .tenant-badge {
+      font-size: 11px; padding: 3px 8px;
+      background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.25);
+      border-radius: 5px; color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -157,35 +203,27 @@
       </div>
       <div class="controls">
         <span id="authStatus" class="chip">Not authenticated</span>
-        <button id="btnLogout" class="btn ghost hidden">Log out</button>
+        <button id="btnLogout" class="btn ghost sm hidden">Log out</button>
       </div>
     </header>
 
+    <!-- ═══════════════════════════════════════════════════════════
+         LOGIN
+         ═══════════════════════════════════════════════════════════ -->
     <section id="loginSection" class="panel pane">
       <div class="row">
         <div class="grow">
           <h3 class="section-title">Sign in</h3>
-          <p class="muted" style="margin-top: 0;">
-            Use a Super Admin account. Token is stored only in this tab (memory) for minimal footprint.
+          <p class="muted" style="margin-bottom:8px; font-size:12px;">
+            Use a Super Admin account. Token is stored only in this tab.
           </p>
-          <div class="grid-2" style="margin-top: 8px;">
-            <div class="field">
-              <label for="email">Email</label>
-              <input id="email" type="email" placeholder="superadmin@curamatrix.com" autocomplete="username">
-            </div>
-            <div class="field">
-              <label for="password">Password</label>
-              <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
-            </div>
-            <div class="field">
-              <label for="tenantKey">Tenant Key</label>
-              <input id="tenantKey" type="text" placeholder="default-hospital" value="default-hospital">
-            </div>
-            <div style="display:flex; align-items:flex-end;">
-              <button id="btnLogin" class="btn" style="width: 100%;">Sign in</button>
-            </div>
+          <div class="grid-2">
+            <div class="field"><label>Email</label><input id="email" type="email" placeholder="superadmin@curamatrix.com" autocomplete="username"></div>
+            <div class="field"><label>Password</label><input id="password" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+            <div class="field"><label>Tenant Key</label><input id="tenantKey" type="text" placeholder="default-hospital" value="default-hospital"></div>
+            <div style="display:flex;align-items:flex-end;"><button id="btnLogin" class="btn" style="width:100%;">Sign in</button></div>
           </div>
-          <div id="loginMsg" class="notice" style="margin-top: 12px;">Default tenant for super admin is <b>default-hospital</b>.</div>
+          <div id="loginMsg" class="notice" style="margin-top:8px;">Default tenant for super admin is <b>default-hospital</b>.</div>
         </div>
         <div class="grow">
           <h3 class="section-title">Environment</h3>
@@ -198,65 +236,267 @@
       </div>
     </section>
 
+    <!-- ═══════════════════════════════════════════════════════════
+         MAIN APP
+         ═══════════════════════════════════════════════════════════ -->
     <section id="appSection" class="panel hidden">
       <div class="toolbar">
         <div class="controls">
           <span class="chip">Role: <strong>SUPER_ADMIN</strong></span>
           <span id="tokenExpiryChip" class="chip">Expires: —</span>
         </div>
-        <div class="controls">
-          <button id="btnReload" class="btn secondary">Reload</button>
-          <button id="btnOpenCreate" class="btn">Register Hospital</button>
-          <button id="btnOpenAccess" class="btn secondary">Access Control</button>
-        </div>
       </div>
-      <div class="pane">
-        <div id="tenantsPanel">
-          <h3 class="section-title">Hospitals</h3>
-          <div class="notice" id="listMsg" style="margin-bottom: 10px;">Loading…</div>
-          <div style="overflow:auto; border: 1px solid var(--border); border-radius: 8px;">
-            <table id="tenantsTable">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Tenant Key</th>
-                  <th>Hospital</th>
-                  <th>Plan</th>
-                  <th>Status</th>
-                  <th>Dates</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="tabHospitals">Hospitals</button>
+        <button class="tab-btn" data-tab="tabUsers">User Management</button>
+        <button class="tab-btn" data-tab="tabAccess">Access Control</button>
+      </div>
+
+      <!-- ═══ TAB 1: HOSPITALS ═══════════════════════════════════ -->
+      <div id="tabHospitals" class="tab-content active pane">
+        <div class="controls" style="margin-bottom:8px;">
+          <button id="btnReload" class="btn secondary sm">Reload</button>
+          <button id="btnOpenCreate" class="btn sm">Register Hospital</button>
+        </div>
+        <div class="notice" id="listMsg">Loading…</div>
+        <div style="overflow:auto; border:1px solid var(--border); border-radius:6px; margin-top:8px;">
+          <table id="tenantsTable">
+            <thead><tr><th>ID</th><th>Tenant Key</th><th>Hospital</th><th>Plan</th><th>Status</th><th>Dates</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <!-- Inline: Register Hospital -->
+        <div id="createHospitalPanel" class="expand-panel hidden">
+          <div class="expand-header">
+            <h4>Register New Hospital</h4>
+            <button id="btnCloseCreate" class="btn ghost sm">Close</button>
+          </div>
+          <div class="expand-body">
+            <div class="grid-3">
+              <div class="field"><label>Tenant Key</label><input id="c_tenantKey" type="text" placeholder="apollo-mumbai"></div>
+              <div class="field"><label>Hospital Name</label><input id="c_hospitalName" type="text" placeholder="Apollo Hospital Mumbai"></div>
+              <div class="field"><label>Subscription Plan</label>
+                <select id="c_subscriptionPlan"><option value="BASIC">BASIC</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PROFESSIONAL">PROFESSIONAL</option></select>
+              </div>
+              <div class="field"><label>Contact Email</label><input id="c_contactEmail" type="email" placeholder="admin@apollo.com"></div>
+              <div class="field"><label>Contact Phone</label><input id="c_contactPhone" type="text" placeholder="9876543210"></div>
+              <div class="field"><label>Address</label><input id="c_address" type="text" placeholder="Mumbai, Maharashtra"></div>
+              <div class="field"><label>Logo URL</label><input id="c_logo" type="text" placeholder="https://example.com/logo.png"></div>
+              <div class="field"><label>Subscription Start</label><input id="c_subscriptionStart" type="date"></div>
+              <div class="field"><label>Subscription End</label><input id="c_subscriptionEnd" type="date"></div>
+            </div>
+            <div class="divider"></div>
+            <p class="muted" style="margin-bottom:6px; font-size:12px;">Initial Admin Account</p>
+            <div class="grid-4">
+              <div class="field"><label>Admin Name</label><input id="c_adminFullName" type="text" placeholder="John Doe"></div>
+              <div class="field"><label>Admin Email</label><input id="c_adminEmail" type="email" placeholder="admin@apollo.com"></div>
+              <div class="field"><label>Admin Phone</label><input id="c_adminPhone" type="text" placeholder="9876543210"></div>
+              <div class="field"><label>Admin Password</label><input id="c_adminPassword" type="password" placeholder="securepassword"></div>
+            </div>
+            <div class="controls" style="margin-top:10px; justify-content:flex-end;">
+              <button id="btnCreate" class="btn">Create Hospital</button>
+            </div>
+            <div id="createMsg" class="notice" style="margin-top:8px;">Provide details and click Create.</div>
+          </div>
+        </div>
+
+        <!-- Inline: Edit Hospital -->
+        <div id="editHospitalPanel" class="expand-panel hidden">
+          <div class="expand-header">
+            <h4>Edit Hospital — <span id="eh_name"></span></h4>
+            <button id="btnCloseEditHospital" class="btn ghost sm">Close</button>
+          </div>
+          <div class="expand-body">
+            <input type="hidden" id="eh_id">
+            <div class="grid-3">
+              <div class="field"><label>Hospital Name</label><input id="eh_hospitalName" type="text"></div>
+              <div class="field"><label>Subscription Plan</label>
+                <select id="eh_subscriptionPlan"><option value="BASIC">BASIC</option><option value="STANDARD">STANDARD</option><option value="PREMIUM">PREMIUM</option><option value="PROFESSIONAL">PROFESSIONAL</option></select>
+              </div>
+              <div class="field"><label>Contact Email</label><input id="eh_contactEmail" type="email"></div>
+              <div class="field"><label>Contact Phone</label><input id="eh_contactPhone" type="text"></div>
+              <div class="field"><label>Address</label><input id="eh_address" type="text"></div>
+              <div class="field"><label>Logo URL</label><input id="eh_logo" type="text"></div>
+            </div>
+            <div class="controls" style="margin-top:10px; justify-content:flex-end;">
+              <button id="btnSaveHospital" class="btn">Save Changes</button>
+            </div>
+            <div id="editHospitalMsg" class="notice" style="margin-top:8px;">Edit and save.</div>
           </div>
         </div>
       </div>
-    </section>
 
-    <!-- Access Control Panel (Simplified: Pages only, no permissions) -->
-    <section id="accessSection" class="panel hidden" style="margin-top: 16px;">
-      <div class="toolbar">
-        <div class="section-title">Access Control — Page-Based</div>
-        <div class="controls">
-          <button id="btnCloseAccess" class="btn ghost">Close</button>
+      <!-- ═══ TAB 2: USER MANAGEMENT ═════════════════════════════ -->
+      <div id="tabUsers" class="tab-content pane">
+
+        <!-- Step 1: Select Tenant -->
+        <div class="tenant-selector">
+          <label>Select Hospital / Tenant:</label>
+          <select id="u_tenantSelect"><option value="">— Select a hospital —</option></select>
+          <button id="btnLoadTenantUsers" class="btn sm secondary">Load Users</button>
+          <span id="u_tenantBadge" class="tenant-badge hidden"></span>
+        </div>
+
+        <div class="controls" style="margin-bottom:8px;">
+          <button id="btnOpenCreateUser" class="btn sm">Create User</button>
+          <span id="u_userCount" class="chip hidden">0 users</span>
+        </div>
+        <div class="notice" id="u_listMsg">Select a hospital above, then click "Load Users".</div>
+
+        <!-- Users Table -->
+        <div style="overflow:auto; border:1px solid var(--border); border-radius:6px; margin-top:8px;">
+          <table id="usersTable">
+            <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Roles</th><th>Pages</th><th>Active</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <!-- Inline: Create User -->
+        <div id="createUserPanel" class="expand-panel hidden">
+          <div class="expand-header">
+            <h4>Create New User</h4>
+            <button id="btnCloseCreateUser" class="btn ghost sm">Close</button>
+          </div>
+          <div class="expand-body">
+            <div class="grid-3">
+              <div class="field"><label>Email</label><input id="cu_email" type="email" placeholder="doctor@hospital.com"></div>
+              <div class="field"><label>Password</label><input id="cu_password" type="password" placeholder="securepassword"></div>
+              <div class="field"><label>Full Name</label><input id="cu_fullName" type="text" placeholder="Dr. John Doe"></div>
+              <div class="field"><label>Phone</label><input id="cu_phone" type="text" placeholder="9876543210"></div>
+              <div class="field"><label>Role</label>
+                <select id="cu_role">
+                  <option value="ROLE_ADMIN">ROLE_ADMIN</option>
+                  <option value="ROLE_DOCTOR" selected>ROLE_DOCTOR</option>
+                  <option value="ROLE_RECEPTIONIST">ROLE_RECEPTIONIST</option>
+                </select>
+              </div>
+              <div class="field"><label>Extra Page Keys (optional)</label><input id="cu_pageKeys" type="text" placeholder="ADMIN_USERS,DOCTOR_PRESCRIPTION"></div>
+            </div>
+            <!-- Doctor fields -->
+            <div id="cu_doctorFields" class="hidden">
+              <div class="divider"></div>
+              <p class="muted" style="margin-bottom:6px; font-size:12px;">Doctor-specific fields</p>
+              <div class="grid-3">
+                <div class="field"><label>Department ID</label><input id="cu_departmentId" type="number" placeholder="1"></div>
+                <div class="field"><label>Specialization</label><input id="cu_specialization" type="text" placeholder="Cardiology"></div>
+                <div class="field"><label>License Number</label><input id="cu_licenseNumber" type="text" placeholder="MH12345"></div>
+                <div class="field"><label>Qualification</label><input id="cu_qualification" type="text" placeholder="MBBS, MD"></div>
+                <div class="field"><label>Experience (years)</label><input id="cu_experienceYears" type="number" placeholder="10"></div>
+                <div class="field"><label>Consultation Fee</label><input id="cu_consultationFee" type="number" placeholder="500"></div>
+              </div>
+            </div>
+            <!-- Receptionist fields -->
+            <div id="cu_receptionistFields" class="hidden">
+              <div class="divider"></div>
+              <p class="muted" style="margin-bottom:6px; font-size:12px;">Receptionist-specific fields</p>
+              <div class="grid-3">
+                <div class="field"><label>Employee ID</label><input id="cu_employeeId" type="text" placeholder="REC001"></div>
+                <div class="field"><label>Shift</label>
+                  <select id="cu_shift"><option value="">—</option><option value="MORNING">MORNING</option><option value="AFTERNOON">AFTERNOON</option><option value="NIGHT">NIGHT</option></select>
+                </div>
+              </div>
+            </div>
+            <div class="controls" style="margin-top:10px; justify-content:flex-end;">
+              <button id="btnSubmitCreateUser" class="btn">Create User</button>
+            </div>
+            <div id="cu_msg" class="notice" style="margin-top:8px;">Fill in details and click Create.</div>
+          </div>
+        </div>
+
+        <!-- Inline: User Detail / Manage -->
+        <div id="userDetailPanel" class="expand-panel hidden">
+          <div class="expand-header">
+            <h4>Manage User — <span id="u_detailName"></span> <span id="u_detailId" class="muted"></span></h4>
+            <button id="btnCloseUserDetail" class="btn ghost sm">Close</button>
+          </div>
+          <div class="expand-body">
+            <div class="row">
+              <!-- Left: Edit Profile -->
+              <div class="grow">
+                <h5 class="section-title">Edit Profile</h5>
+                <div class="grid-2">
+                  <div class="field"><label>Full Name</label><input id="u_editName" type="text"></div>
+                  <div class="field"><label>Phone</label><input id="u_editPhone" type="text"></div>
+                  <div class="field"><label>New Password (blank = keep)</label><input id="u_editPassword" type="password" placeholder="••••••••"></div>
+                  <div style="display:flex;align-items:flex-end;"><button id="btnSaveUser" class="btn" style="width:100%;">Save Changes</button></div>
+                </div>
+                <div class="notice" id="u_editMsg" style="margin-top:6px;">Edit and click Save.</div>
+              </div>
+
+              <!-- Right: Role Management -->
+              <div class="grow">
+                <h5 class="section-title">Role Management</h5>
+                <div id="u_currentRoles" style="margin-bottom:6px;">—</div>
+                <div class="controls">
+                  <div class="field">
+                    <label>Add Role</label>
+                    <select id="u_addRoleSelect">
+                      <option value="ROLE_ADMIN">ROLE_ADMIN</option>
+                      <option value="ROLE_DOCTOR">ROLE_DOCTOR</option>
+                      <option value="ROLE_RECEPTIONIST">ROLE_RECEPTIONIST</option>
+                      <option value="ROLE_SUPER_ADMIN">ROLE_SUPER_ADMIN</option>
+                    </select>
+                  </div>
+                  <button id="btnAddRole" class="btn sm">Add</button>
+                </div>
+                <div class="notice" id="u_roleMsg" style="margin-top:6px;">Click the X on a chip to remove a role.</div>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Page Access -->
+            <h5 class="section-title">Page Access — Full Control</h5>
+            <p class="muted" style="margin:0 0 4px; font-size:11px;">
+              <span style="display:inline-block;background:rgba(59,130,246,0.25);color:var(--accent-2);padding:1px 6px;border-radius:4px;font-size:10px;margin-right:4px;">blue ✕</span> = from role (click ✕ to deny)
+              &nbsp;
+              <span style="display:inline-block;background:rgba(34,197,94,0.25);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:10px;margin-right:4px;">green ✕</span> = extra granted (click ✕ to remove)
+              &nbsp;
+              <span style="display:inline-block;background:rgba(239,68,68,0.15);color:var(--danger);padding:1px 6px;border-radius:4px;font-size:10px;text-decoration:line-through;margin-right:4px;">red ↺</span> = denied (click ↺ to restore)
+            </p>
+            <div id="u_currentPages" style="margin-bottom:6px;">—</div>
+            <div class="controls" style="flex-wrap:wrap; gap:6px;">
+              <div class="field" style="flex:1; min-width:200px;">
+                <label>Add Page</label>
+                <select id="u_addPageSelect"><option value="">— loading pages —</option></select>
+              </div>
+              <button id="btnAddSinglePage" class="btn sm">+ Add Page</button>
+              <button id="btnResetPages" class="btn sm warn">Reset All to Defaults</button>
+            </div>
+            <div class="notice" id="u_pageMsg" style="margin-top:6px;">Super Admin has full control — remove any page (even role defaults) or add any page.</div>
+
+            <div class="divider"></div>
+
+            <!-- Audit Log -->
+            <div class="controls" style="margin-bottom:6px;">
+              <h5 class="section-title" style="margin:0;">Audit Log</h5>
+              <button id="btnLoadAudit" class="btn sm secondary">Load</button>
+            </div>
+            <div style="overflow:auto; border:1px solid var(--border); border-radius:6px; max-height:200px;">
+              <table id="auditTable">
+                <thead><tr><th>Time</th><th>Event</th><th>Details</th><th>Changed By</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="pane">
 
-        <!-- Row 1: User Access Lookup + User Page Overrides -->
+      <!-- ═══ TAB 3: ACCESS CONTROL ══════════════════════════════ -->
+      <div id="tabAccess" class="tab-content pane">
+
+        <!-- User Access Lookup -->
         <div class="row">
           <div class="grow">
             <h4 class="section-title">Lookup User Access</h4>
             <div class="controls">
-              <div class="field">
-                <label for="a_userId">User ID</label>
-                <input id="a_userId" type="number" placeholder="e.g. 10">
-              </div>
-              <button id="btnGetUserAccess" class="btn">Get Access</button>
+              <div class="field"><label>User ID</label><input id="a_userId" type="number" placeholder="e.g. 10" style="width:100px;"></div>
+              <button id="btnGetUserAccess" class="btn sm">Get Access</button>
             </div>
-            <div id="a_userAccessMsg" class="notice" style="margin-top: 8px;">Enter user ID and click Get Access.</div>
-            <div style="overflow:auto; border: 1px solid var(--border); border-radius: 8px; margin-top: 10px;">
+            <div id="a_userAccessMsg" class="notice" style="margin-top:6px;">Enter user ID and click Get Access.</div>
+            <div style="overflow:auto; border:1px solid var(--border); border-radius:6px; margin-top:8px;">
               <table>
                 <thead><tr><th>Roles</th><th>Effective Pages</th></tr></thead>
                 <tbody><tr><td id="a_roles">—</td><td id="a_pages">—</td></tr></tbody>
@@ -264,164 +504,86 @@
             </div>
           </div>
           <div class="grow">
-            <h4 class="section-title">Set User Extra Pages</h4>
-            <p class="muted" style="margin:0 0 6px;">Add extra pages beyond what the user's role provides. This <b>replaces</b> any existing user-specific overrides.</p>
+            <h4 class="section-title">Grant Extra Pages</h4>
+            <p class="muted" style="margin:0 0 4px; font-size:11px;">Grant extra pages beyond role defaults. For full control (deny / restore), use the <b>User Management</b> tab.</p>
             <div class="controls">
-              <div class="field" style="flex:1;">
-                <label for="a_userPageKeys">Page Keys (comma separated)</label>
-                <input id="a_userPageKeys" type="text" placeholder="e.g. ADMIN_USERS,DOCTOR_PRESCRIPTION">
-              </div>
-              <button id="btnSetUserPages" class="btn">Set Pages</button>
+              <div class="field" style="flex:1;"><label>Page Keys (comma separated)</label><input id="a_userPageKeys" type="text" placeholder="ADMIN_USERS,DOCTOR_PRESCRIPTION"></div>
+              <button id="btnSetUserPages" class="btn sm">Set Pages</button>
             </div>
-            <div class="notice" id="a_userPagesMsg" style="margin-top: 8px;">Enter user ID on the left, then set extra pages here.</div>
-            <div class="controls" style="margin-top: 8px;">
-              <button id="btnResetUserPages" class="btn warn">Reset to Role Defaults</button>
+            <div class="notice" id="a_userPagesMsg" style="margin-top:6px;">Enter user ID on the left, then set extra pages here.</div>
+            <div class="controls" style="margin-top:6px;">
+              <button id="btnResetUserPages" class="btn sm warn">Reset All Overrides (Grants + Denials)</button>
             </div>
           </div>
         </div>
 
-        <!-- Row 2: Role → Pages Mapping -->
-        <div class="row" style="margin-top: 14px;">
-          <div class="grow">
-            <h4 class="section-title">Role → Pages Mapping</h4>
-            <p class="muted" style="margin:0 0 6px;">Define which pages each role gets by default. This <b>replaces</b> all page assignments for the role.</p>
-            <div class="controls">
-              <div class="field">
-                <label for="a_role">Role</label>
-                <select id="a_role">
-                  <option value="ROLE_ADMIN">ROLE_ADMIN</option>
-                  <option value="ROLE_DOCTOR">ROLE_DOCTOR</option>
-                  <option value="ROLE_RECEPTIONIST">ROLE_RECEPTIONIST</option>
-                  <option value="ROLE_SUPER_ADMIN">ROLE_SUPER_ADMIN</option>
-                </select>
-              </div>
-              <button id="btnGetRolePages" class="btn secondary">Load</button>
-            </div>
-            <div class="notice" id="a_roleMsg" style="margin-top: 8px;">Select a role and click Load to see current pages.</div>
-            <div class="controls" style="margin-top: 8px;">
-              <div class="field" style="flex:1;">
-                <label for="a_rolePageKeys">Page Keys (comma separated)</label>
-                <input id="a_rolePageKeys" type="text" placeholder="e.g. ADMIN_DASHBOARD,ADMIN_USERS">
-              </div>
-              <button id="btnSetRolePages" class="btn">Save Role Pages</button>
-            </div>
-          </div>
-        </div>
+        <div class="divider"></div>
 
-        <!-- Row 3: All Pages (CRUD) -->
-        <div class="row" style="margin-top: 14px;">
-          <div class="grow">
-            <h4 class="section-title">All Pages</h4>
-            <div class="controls" style="margin-bottom: 8px;">
-              <button id="btnRefreshPages" class="btn secondary">Refresh Pages</button>
-            </div>
-            <div class="notice" id="a_pageListMsg">Click Refresh Pages to load.</div>
-            <div style="overflow:auto; border: 1px solid var(--border); border-radius: 8px; margin-top: 8px;">
-              <table id="a_pagesTable">
-                <thead><tr><th>Page Key</th><th>Route</th><th>Display Name</th><th>Status</th><th>Actions</th></tr></thead>
-                <tbody></tbody>
-              </table>
-            </div>
-            <h4 class="section-title" style="margin-top: 14px;">Add / Update Page</h4>
-            <div class="controls">
-              <div class="field">
-                <label for="a_pageKey">Page Key</label>
-                <input id="a_pageKey" type="text" placeholder="e.g. REPORT_DASHBOARD">
-              </div>
-              <div class="field" style="flex:1;">
-                <label for="a_route">Route</label>
-                <input id="a_route" type="text" placeholder="/admin/reports">
-              </div>
-              <div class="field" style="flex:1;">
-                <label for="a_displayName">Display Name</label>
-                <input id="a_displayName" type="text" placeholder="Reports Dashboard">
-              </div>
-              <button id="btnUpsertPage" class="btn">Save Page</button>
-            </div>
-            <div class="notice" id="a_pageMsg" style="margin-top: 8px;">Create or update a page definition.</div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <section id="createSection" class="panel hidden" style="margin-top: 16px;">
-      <div class="toolbar">
-        <div class="section-title">Register New Hospital</div>
+        <!-- Role → Pages Mapping -->
+        <h4 class="section-title">Role → Pages Mapping</h4>
+        <p class="muted" style="margin:0 0 4px; font-size:11px;">Define which pages each role gets by default.</p>
         <div class="controls">
-          <button id="btnCloseCreate" class="btn ghost">Close</button>
-          <button id="btnCreate" class="btn">Create</button>
-        </div>
-      </div>
-      <div class="pane">
-        <div class="grid-2">
-          <div class="field">
-            <label for="c_tenantKey">Tenant Key</label>
-            <input id="c_tenantKey" type="text" placeholder="apollo-mumbai">
-          </div>
-          <div class="field">
-            <label for="c_hospitalName">Hospital Name</label>
-            <input id="c_hospitalName" type="text" placeholder="Apollo Hospital Mumbai">
-          </div>
-          <div class="field">
-            <label for="c_subscriptionPlan">Subscription Plan</label>
-            <select id="c_subscriptionPlan">
-              <option value="BASIC">BASIC</option>
-              <option value="STANDARD">STANDARD</option>
-              <option value="PREMIUM">PREMIUM</option>
-              <option value="PROFESSIONAL">PROFESSIONAL</option>
+          <div class="field"><label>Role</label>
+            <select id="a_role">
+              <option value="ROLE_ADMIN">ROLE_ADMIN</option>
+              <option value="ROLE_DOCTOR">ROLE_DOCTOR</option>
+              <option value="ROLE_RECEPTIONIST">ROLE_RECEPTIONIST</option>
+              <option value="ROLE_SUPER_ADMIN">ROLE_SUPER_ADMIN</option>
             </select>
           </div>
-          <div class="field">
-            <label for="c_contactEmail">Contact Email</label>
-            <input id="c_contactEmail" type="email" placeholder="admin@apollo.com">
+          <button id="btnGetRolePages" class="btn sm secondary">Load</button>
+        </div>
+        <div class="notice" id="a_roleMsg" style="margin-top:6px;">Select a role and click Load.</div>
+        <div class="controls" style="margin-top:6px;">
+          <div class="field" style="flex:1;"><label>Page Keys (comma separated)</label><input id="a_rolePageKeys" type="text" placeholder="ADMIN_DASHBOARD,ADMIN_USERS"></div>
+          <button id="btnSetRolePages" class="btn sm">Save Role Pages</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- All Pages (CRUD) -->
+        <div class="controls" style="margin-bottom:6px;">
+          <h4 class="section-title" style="margin:0;">All Pages</h4>
+          <button id="btnRefreshPages" class="btn sm secondary">Refresh</button>
+        </div>
+        <div class="notice" id="a_pageListMsg">Click Refresh to load.</div>
+        <div style="overflow:auto; border:1px solid var(--border); border-radius:6px; margin-top:6px;">
+          <table id="a_pagesTable">
+            <thead><tr><th>Page Key</th><th>Route</th><th>Display Name</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <!-- Inline: Add/Update Page -->
+        <div id="pageFormPanel" class="expand-panel hidden">
+          <div class="expand-header">
+            <h4 id="pageFormTitle">Add / Update Page</h4>
+            <button id="btnClosePageForm" class="btn ghost sm">Close</button>
           </div>
-          <div class="field">
-            <label for="c_contactPhone">Contact Phone</label>
-            <input id="c_contactPhone" type="text" placeholder="9876543210">
-          </div>
-          <div class="field">
-            <label for="c_address">Address</label>
-            <input id="c_address" type="text" placeholder="Mumbai, Maharashtra">
-          </div>
-          <div class="field">
-            <label for="c_logo">Logo URL</label>
-            <input id="c_logo" type="text" placeholder="https://example.com/logo.png">
-          </div>
-          <div class="field">
-            <label for="c_subscriptionStart">Subscription Start</label>
-            <input id="c_subscriptionStart" type="date">
-          </div>
-          <div class="field">
-            <label for="c_subscriptionEnd">Subscription End</label>
-            <input id="c_subscriptionEnd" type="date">
-          </div>
-          <div class="field">
-            <label for="c_adminFullName">Admin Full Name</label>
-            <input id="c_adminFullName" type="text" placeholder="John Doe">
-          </div>
-          <div class="field">
-            <label for="c_adminEmail">Admin Email</label>
-            <input id="c_adminEmail" type="email" placeholder="admin@apollo.com">
-          </div>
-          <div class="field">
-            <label for="c_adminPhone">Admin Phone</label>
-            <input id="c_adminPhone" type="text" placeholder="9876543210">
-          </div>
-          <div class="field">
-            <label for="c_adminPassword">Admin Password</label>
-            <input id="c_adminPassword" type="password" placeholder="securepassword">
+          <div class="expand-body">
+            <div class="grid-3">
+              <div class="field"><label>Page Key</label><input id="a_pageKey" type="text" placeholder="REPORT_DASHBOARD"></div>
+              <div class="field"><label>Route</label><input id="a_route" type="text" placeholder="/admin/reports"></div>
+              <div class="field"><label>Display Name</label><input id="a_displayName" type="text" placeholder="Reports Dashboard"></div>
+            </div>
+            <div class="controls" style="margin-top:8px; justify-content:flex-end;">
+              <button id="btnUpsertPage" class="btn sm">Save Page</button>
+            </div>
+            <div class="notice" id="a_pageMsg" style="margin-top:6px;">Create or update a page definition.</div>
           </div>
         </div>
-        <div id="createMsg" class="notice" style="margin-top: 10px;">Provide details and click Create.</div>
+        <div class="controls" style="margin-top:8px;">
+          <button id="btnOpenPageForm" class="btn sm">Add New Page</button>
+        </div>
       </div>
     </section>
 
-    <footer>
-      Lightweight Super Admin UI — served statically by Spring Boot.
-    </footer>
+    <footer>CuraMatrix HSM — Super Admin Console</footer>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════════════
+       JAVASCRIPT
+       ═══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
       "use strict";
@@ -432,9 +594,15 @@
       const state = {
         token: null,
         tokenExpiry: null,
+        tenants: [],           // cached tenant list
+        selectedTenantId: null,
+        selectedUserId: null,
+        users: []              // cached user list for selected tenant
       };
 
-      /* ── Helpers ──────────────────────────────────────────────── */
+      /* ══════════════════════════════════════════════════════════
+         HELPERS
+         ══════════════════════════════════════════════════════════ */
 
       function setAuthUI() {
         if (state.token) {
@@ -448,25 +616,16 @@
           $("btnLogout").classList.add("hidden");
           $("loginSection").classList.remove("hidden");
           $("appSection").classList.add("hidden");
-          $("accessSection").classList.add("hidden");
-          $("createSection").classList.add("hidden");
         }
       }
 
       async function api(path, { method = "GET", body, auth = true } = {}) {
         const headers = { "Content-Type": "application/json" };
         if (auth && state.token) headers["Authorization"] = "Bearer " + state.token;
-        const res = await fetch(baseUrl + path, {
-          method,
-          headers,
-          body: body ? JSON.stringify(body) : undefined,
-        });
+        const res = await fetch(baseUrl + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
         if (!res.ok) {
           let msg = res.status + " " + res.statusText;
-          try {
-            const data = await res.json();
-            msg = data.message || data.error || JSON.stringify(data);
-          } catch (_) {}
+          try { const d = await res.json(); msg = d.message || d.error || JSON.stringify(d); } catch (_) {}
           throw new Error(msg);
         }
         if (res.status === 204) return null;
@@ -475,15 +634,11 @@
         try { return JSON.parse(text); } catch { return text; }
       }
 
-      function row(actions) {
+      function row(cells) {
         const tr = document.createElement("tr");
-        actions.forEach((cell) => {
+        cells.forEach((c) => {
           const td = document.createElement("td");
-          if (cell instanceof Node) {
-            td.appendChild(cell);
-          } else {
-            td.innerHTML = cell;
-          }
+          if (c instanceof Node) td.appendChild(c); else td.innerHTML = c;
           tr.appendChild(td);
         });
         return tr;
@@ -491,7 +646,7 @@
 
       function btn(label, cls, onClick, title) {
         const b = document.createElement("button");
-        b.className = "btn " + (cls || "");
+        b.className = "btn sm " + (cls || "");
         b.textContent = label;
         if (title) b.title = title;
         b.addEventListener("click", onClick);
@@ -500,14 +655,54 @@
 
       function setMsg(id, text, kind) {
         const el = $(id);
+        if (!el) return;
         el.textContent = text;
-        el.classList.remove("status-ok","status-bad","status-warn");
+        el.classList.remove("status-ok", "status-bad", "status-warn");
         if (kind === "ok") el.classList.add("status-ok");
         if (kind === "bad") el.classList.add("status-bad");
         if (kind === "warn") el.classList.add("status-warn");
       }
 
-      /* ── Login ────────────────────────────────────────────────── */
+      function renderChips(container, items, cls, onRemove) {
+        container.innerHTML = "";
+        if (!items || items.length === 0) { container.textContent = "—"; return; }
+        items.forEach((item) => {
+          const span = document.createElement("span");
+          span.className = cls;
+          span.textContent = item;
+          if (onRemove) {
+            const x = document.createElement("span");
+            x.textContent = " \u2715";
+            x.style.cursor = "pointer";
+            x.style.marginLeft = "3px";
+            x.addEventListener("click", () => onRemove(item));
+            span.appendChild(x);
+          }
+          container.appendChild(span);
+        });
+      }
+
+      function togglePanel(id, show) {
+        const el = $(id);
+        if (show) el.classList.remove("hidden");
+        else el.classList.add("hidden");
+        if (show) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      /* ── Tabs ──────────────────────────────────────────────── */
+
+      document.querySelectorAll(".tab-btn").forEach((b) => {
+        b.addEventListener("click", () => {
+          document.querySelectorAll(".tab-btn").forEach(x => x.classList.remove("active"));
+          document.querySelectorAll(".tab-content").forEach(x => x.classList.remove("active"));
+          b.classList.add("active");
+          $(b.dataset.tab).classList.add("active");
+        });
+      });
+
+      /* ══════════════════════════════════════════════════════════
+         LOGIN
+         ══════════════════════════════════════════════════════════ */
 
       async function handleLogin() {
         const email = $("email").value.trim();
@@ -515,152 +710,105 @@
         const tenantKey = $("tenantKey").value.trim() || "default-hospital";
         setMsg("loginMsg", "Signing in…", "warn");
         try {
-          const data = await api("/api/auth/login", {
-            method: "POST",
-            auth: false,
-            body: { email, password, tenantKey }
-          });
+          const data = await api("/api/auth/login", { method: "POST", auth: false, body: { email, password, tenantKey } });
           if (!data || !data.token) throw new Error("No token in response");
           state.token = data.token;
           state.tokenExpiry = data.expiresIn ? (Date.now() + Number(data.expiresIn)) : null;
           setAuthUI();
+          // Load pages now that we have a token, so the Add Page dropdown gets options
+          await loadAllAvailablePages();
           await loadTenants();
+          populateTenantDropdowns();
           setMsg("loginMsg", "Signed in as " + (data.fullName || email), "ok");
         } catch (e) {
           setMsg("loginMsg", "Login failed: " + e.message, "bad");
         }
       }
 
-      /* ── Tenants ──────────────────────────────────────────────── */
+      /* ══════════════════════════════════════════════════════════
+         TAB 1: HOSPITALS
+         ══════════════════════════════════════════════════════════ */
 
       async function loadTenants() {
         setMsg("listMsg", "Loading…", "warn");
         const tbody = $("tenantsTable").querySelector("tbody");
         tbody.innerHTML = "";
         try {
-          const tenants = await api("/api/super-admin/tenants", { method: "GET" });
-          if (!Array.isArray(tenants) || tenants.length === 0) {
-            setMsg("listMsg", "No hospitals found.", "warn");
-            return;
-          }
-          setMsg("listMsg", tenants.length + " hospitals loaded.", "ok");
-          tenants.forEach((t) => {
-            const status = (t.active === false || t.suspended === true) ? '<span class="status-bad">Suspended</span>' : '<span class="status-ok">Active</span>';
-            const dates = [
-              t.subscriptionStart ? ("Start: " + t.subscriptionStart) : "",
-              t.subscriptionEnd ? ("End: " + t.subscriptionEnd) : ""
-            ].filter(Boolean).join("<br>");
-            const actionsCell = document.createElement("div");
-            actionsCell.style.display = "flex";
-            actionsCell.style.gap = "6px";
-            actionsCell.style.flexWrap = "wrap";
+          const tenants = await api("/api/super-admin/tenants");
+          state.tenants = Array.isArray(tenants) ? tenants : [];
+          if (state.tenants.length === 0) { setMsg("listMsg", "No hospitals found.", "warn"); return; }
+          setMsg("listMsg", state.tenants.length + " hospital(s) loaded.", "ok");
 
-            actionsCell.appendChild(btn("View", "ghost", async () => {
-              try {
-                const d = await api("/api/super-admin/tenants/" + t.id);
-                alert(JSON.stringify(d, null, 2));
-              } catch (e) {
-                alert("Failed: " + e.message);
-              }
+          state.tenants.forEach((t) => {
+            const status = (t.active === false || t.suspended === true)
+              ? '<span class="status-bad">Suspended</span>'
+              : '<span class="status-ok">Active</span>';
+            const dates = [
+              t.subscriptionStart ? "Start: " + t.subscriptionStart : "",
+              t.subscriptionEnd ? "End: " + t.subscriptionEnd : ""
+            ].filter(Boolean).join("<br>") || "—";
+
+            const actions = document.createElement("div");
+            actions.className = "controls";
+
+            actions.appendChild(btn("View", "ghost", async () => {
+              try { alert(JSON.stringify(await api("/api/super-admin/tenants/" + t.id), null, 2)); } catch (e) { alert("Error: " + e.message); }
             }));
-            actionsCell.appendChild(btn("Stats", "secondary", async () => {
-              try {
-                const d = await api(`/api/super-admin/tenants/${t.id}/stats`);
-                alert(JSON.stringify(d, null, 2));
-              } catch (e) {
-                alert("Failed: " + e.message);
-              }
+            actions.appendChild(btn("Stats", "secondary", async () => {
+              try { alert(JSON.stringify(await api("/api/super-admin/tenants/" + t.id + "/stats"), null, 2)); } catch (e) { alert("Error: " + e.message); }
             }));
+            actions.appendChild(btn("Edit", "", () => openEditHospital(t)));
+
             if (t.suspended || t.active === false) {
-              actionsCell.appendChild(btn("Activate", "", async () => {
-                if (!confirm("Activate hospital?")) return;
-                try {
-                  await api(`/api/super-admin/tenants/${t.id}/activate`, { method: "PUT" });
-                  await loadTenants();
-                } catch (e) {
-                  alert("Failed: " + e.message);
-                }
+              actions.appendChild(btn("Activate", "", async () => {
+                if (!confirm("Activate this hospital?")) return;
+                try { await api("/api/super-admin/tenants/" + t.id + "/activate", { method: "PUT" }); await loadTenants(); populateTenantDropdowns(); } catch (e) { alert("Error: " + e.message); }
               }));
             } else {
-              actionsCell.appendChild(btn("Suspend", "warn", async () => {
-                if (!confirm("Suspend hospital?")) return;
-                try {
-                  await api(`/api/super-admin/tenants/${t.id}/suspend`, { method: "PUT" });
-                  await loadTenants();
-                } catch (e) {
-                  alert("Failed: " + e.message);
-                }
+              actions.appendChild(btn("Suspend", "warn", async () => {
+                if (!confirm("Suspend this hospital?")) return;
+                try { await api("/api/super-admin/tenants/" + t.id + "/suspend", { method: "PUT" }); await loadTenants(); populateTenantDropdowns(); } catch (e) { alert("Error: " + e.message); }
               }));
             }
-            actionsCell.appendChild(btn("Edit", "", async () => {
-              const name = prompt("Hospital name", t.hospitalName || "");
-              if (name == null) return;
-              const plan = prompt("Plan (BASIC/STANDARD/PREMIUM/PROFESSIONAL)", t.subscriptionPlan || "STANDARD");
-              if (plan == null) return;
-              try {
-                await api(`/api/super-admin/tenants/${t.id}`, {
-                  method: "PUT",
-                  body: {
-                    hospitalName: name,
-                    subscriptionPlan: plan
-                  }
-                });
-                await loadTenants();
-              } catch (e) {
-                alert("Failed: " + e.message);
-              }
-            }));
-            actionsCell.appendChild(btn("Reset Admin Password", "danger", async () => {
-              const adminEmail = prompt("Admin email for this hospital (leave blank to auto-detect)", "");
+
+            actions.appendChild(btn("Reset Pwd", "danger", async () => {
+              const adminEmail = prompt("Admin email (blank = auto-detect)", "");
               if (adminEmail === null) return;
               const newPassword = prompt("New password");
-              if (newPassword === null) return;
-              if (!newPassword.trim()) {
-                alert("Password cannot be empty.");
-                return;
-              }
-              if (!confirm("Reset admin password now?")) return;
-              try {
-                await api(`/api/super-admin/tenants/${t.id}/admin/password`, {
-                  method: "PUT",
-                  body: {
-                    adminEmail: adminEmail.trim() || null,
-                    newPassword: newPassword
-                  }
-                });
-                alert("Admin password reset successful.");
-              } catch (e) {
-                alert("Failed: " + e.message);
-              }
+              if (!newPassword) { alert("Password required."); return; }
+              if (!confirm("Reset admin password?")) return;
+              try { await api("/api/super-admin/tenants/" + t.id + "/admin/password", { method: "PUT", body: { adminEmail: adminEmail.trim() || null, newPassword } }); alert("Password reset."); } catch (e) { alert("Error: " + e.message); }
             }));
 
             tbody.appendChild(row([
               String(t.id ?? ""),
-              `<code>${t.tenantKey || ""}</code>`,
+              '<code>' + (t.tenantKey || "") + '</code>',
               t.hospitalName || "",
-              `<span class="chip">${t.subscriptionPlan || ""}</span>`,
-              status,
-              dates || "—",
-              actionsCell
+              '<span class="chip">' + (t.subscriptionPlan || "") + '</span>',
+              status, dates, actions
             ]));
           });
         } catch (e) {
-          setMsg("listMsg", "Failed to load: " + e.message, "bad");
+          setMsg("listMsg", "Failed: " + e.message, "bad");
         }
       }
 
-      /* ── Create Hospital ──────────────────────────────────────── */
-
-      function openCreate(open) {
-        if (open) {
-          $("createSection").classList.remove("hidden");
-          window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-        } else {
-          $("createSection").classList.add("hidden");
-        }
+      function populateTenantDropdowns() {
+        const sel = $("u_tenantSelect");
+        const current = sel.value;
+        sel.innerHTML = '<option value="">— Select a hospital —</option>';
+        state.tenants.forEach((t) => {
+          const opt = document.createElement("option");
+          opt.value = t.id;
+          opt.textContent = t.hospitalName + " (" + t.tenantKey + ") — ID: " + t.id;
+          sel.appendChild(opt);
+        });
+        if (current) sel.value = current;
       }
 
-      async function handleCreate() {
+      /* ── Create Hospital ──────────────────────────────────── */
+
+      async function handleCreateHospital() {
         const body = {
           tenantKey: $("c_tenantKey").value.trim(),
           hospitalName: $("c_hospitalName").value.trim(),
@@ -676,215 +824,620 @@
           adminPhone: $("c_adminPhone").value.trim() || null,
           adminPassword: $("c_adminPassword").value
         };
+        if (!body.tenantKey || !body.hospitalName || !body.adminEmail || !body.adminPassword) {
+          setMsg("createMsg", "tenantKey, hospitalName, adminEmail, adminPassword required.", "warn"); return;
+        }
         setMsg("createMsg", "Creating…", "warn");
         try {
-          if (!body.tenantKey || !body.hospitalName || !body.adminEmail || !body.adminPassword) {
-            throw new Error("tenantKey, hospitalName, adminEmail, adminPassword are required");
-          }
           const res = await api("/api/super-admin/tenants", { method: "POST", body });
-          setMsg("createMsg", "Created tenant ID " + (res?.id ?? "(unknown)") + ".", "ok");
-          openCreate(false);
+          setMsg("createMsg", "Created tenant ID " + (res?.id ?? "?") + ".", "ok");
+          togglePanel("createHospitalPanel", false);
           await loadTenants();
+          populateTenantDropdowns();
         } catch (e) {
           setMsg("createMsg", "Failed: " + e.message, "bad");
         }
       }
 
-      /* ── Access Control (Simplified: Pages only) ──────────────── */
+      /* ── Edit Hospital ────────────────────────────────────── */
 
-      function openAccess(open) {
-        if (open) {
-          $("accessSection").classList.remove("hidden");
-          window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-        } else {
-          $("accessSection").classList.add("hidden");
+      function openEditHospital(t) {
+        togglePanel("createHospitalPanel", false);
+        $("eh_id").value = t.id;
+        $("eh_name").textContent = t.hospitalName;
+        $("eh_hospitalName").value = t.hospitalName || "";
+        $("eh_subscriptionPlan").value = t.subscriptionPlan || "STANDARD";
+        $("eh_contactEmail").value = t.contactEmail || "";
+        $("eh_contactPhone").value = t.contactPhone || "";
+        $("eh_address").value = t.address || "";
+        $("eh_logo").value = t.logo || "";
+        setMsg("editHospitalMsg", "Edit and save.", "");
+        togglePanel("editHospitalPanel", true);
+      }
+
+      async function handleSaveHospital() {
+        const id = $("eh_id").value;
+        const body = {
+          hospitalName: $("eh_hospitalName").value.trim(),
+          subscriptionPlan: $("eh_subscriptionPlan").value,
+          contactEmail: $("eh_contactEmail").value.trim() || null,
+          contactPhone: $("eh_contactPhone").value.trim() || null,
+          address: $("eh_address").value.trim() || null,
+          logo: $("eh_logo").value.trim() || null
+        };
+        setMsg("editHospitalMsg", "Saving…", "warn");
+        try {
+          await api("/api/super-admin/tenants/" + id, { method: "PUT", body });
+          setMsg("editHospitalMsg", "Saved.", "ok");
+          togglePanel("editHospitalPanel", false);
+          await loadTenants();
+          populateTenantDropdowns();
+        } catch (e) {
+          setMsg("editHospitalMsg", "Failed: " + e.message, "bad");
         }
       }
 
-      // --- User Access Lookup ---
+      /* ══════════════════════════════════════════════════════════
+         TAB 2: USER MANAGEMENT (tenant-scoped)
+         ══════════════════════════════════════════════════════════ */
+
+      async function loadTenantUsers() {
+        const tenantId = $("u_tenantSelect").value;
+        if (!tenantId) { setMsg("u_listMsg", "Please select a hospital first.", "warn"); return; }
+        state.selectedTenantId = Number(tenantId);
+        state.selectedUserId = null;
+        togglePanel("userDetailPanel", false);
+        togglePanel("createUserPanel", false);
+
+        const tenant = state.tenants.find(t => t.id == tenantId);
+        $("u_tenantBadge").textContent = tenant ? tenant.hospitalName : "Tenant " + tenantId;
+        $("u_tenantBadge").classList.remove("hidden");
+
+        setMsg("u_listMsg", "Loading users…", "warn");
+        const tbody = $("usersTable").querySelector("tbody");
+        tbody.innerHTML = "";
+
+        try {
+          const users = await api("/api/admin/users?tenantId=" + tenantId);
+          state.users = Array.isArray(users) ? users : [];
+          if (state.users.length === 0) { setMsg("u_listMsg", "No users found for this hospital.", "warn"); $("u_userCount").classList.add("hidden"); return; }
+          setMsg("u_listMsg", state.users.length + " user(s) loaded.", "ok");
+          $("u_userCount").textContent = state.users.length + " users";
+          $("u_userCount").classList.remove("hidden");
+
+          state.users.forEach((u) => {
+            const rolesCell = document.createElement("span");
+            (u.roles || [u.role]).forEach(r => {
+              const c = document.createElement("span"); c.className = "role-chip"; c.textContent = r; rolesCell.appendChild(c);
+            });
+
+            const pagesCell = document.createElement("span");
+            const pks = u.pageKeys || [];
+            if (pks.length <= 3) {
+              pks.forEach(pk => { const c = document.createElement("span"); c.className = "page-chip active"; c.textContent = pk; pagesCell.appendChild(c); });
+            } else {
+              for (let i = 0; i < 2; i++) { const c = document.createElement("span"); c.className = "page-chip active"; c.textContent = pks[i]; pagesCell.appendChild(c); }
+              const more = document.createElement("span"); more.className = "page-chip"; more.textContent = "+" + (pks.length - 2) + " more"; more.title = pks.join(", "); pagesCell.appendChild(more);
+            }
+
+            const activeStatus = u.isActive ? '<span class="status-ok">Active</span>' : '<span class="status-bad">Inactive</span>';
+
+            const actions = document.createElement("div");
+            actions.className = "controls";
+            actions.appendChild(btn("Manage", "secondary", () => selectUser(u)));
+            if (u.isActive) {
+              actions.appendChild(btn("Deactivate", "warn", async () => {
+                if (!confirm("Deactivate " + u.email + "?")) return;
+                try { await api("/api/admin/users/" + u.id + "/deactivate", { method: "PUT" }); await loadTenantUsers(); } catch (e) { alert("Error: " + e.message); }
+              }));
+            } else {
+              actions.appendChild(btn("Activate", "", async () => {
+                try { await api("/api/admin/users/" + u.id + "/activate", { method: "PUT" }); await loadTenantUsers(); } catch (e) { alert("Error: " + e.message); }
+              }));
+            }
+            actions.appendChild(btn("Delete", "danger", async () => {
+              if (!confirm("Soft-delete " + u.email + "? (deactivate + clear page overrides)")) return;
+              try { await api("/api/admin/users/" + u.id, { method: "DELETE" }); await loadTenantUsers(); } catch (e) { alert("Error: " + e.message); }
+            }));
+
+            tbody.appendChild(row([
+              String(u.id), u.fullName || "", u.email || "", u.phone || "—",
+              rolesCell, pagesCell, activeStatus, actions
+            ]));
+          });
+        } catch (e) {
+          setMsg("u_listMsg", "Failed: " + e.message, "bad");
+        }
+      }
+
+      /* ── Select User (inline detail) ──────────────────────── */
+
+      function selectUser(u) {
+        togglePanel("createUserPanel", false);
+        state.selectedUserId = u.id;
+        $("u_detailName").textContent = u.fullName || u.email;
+        $("u_detailId").textContent = "(ID: " + u.id + ")";
+        $("u_editName").value = u.fullName || "";
+        $("u_editPhone").value = u.phone || "";
+        $("u_editPassword").value = "";
+        setMsg("u_editMsg", "Edit and click Save.", "");
+        setMsg("u_roleMsg", "", "");
+        setMsg("u_pageMsg", "", "");
+
+        // Roles with remove
+        const roles = u.roles || [u.role];
+        renderChips($("u_currentRoles"), roles, "role-chip", async (roleName) => {
+          if (!confirm("Remove role " + roleName + "?")) return;
+          try {
+            const updated = await api("/api/admin/users/" + u.id + "/roles/" + roleName, { method: "DELETE" });
+            setMsg("u_roleMsg", "Role " + roleName + " removed.", "ok");
+            selectUser(updated);
+            await loadTenantUsers();
+          } catch (e) { setMsg("u_roleMsg", "Failed: " + e.message, "bad"); }
+        });
+
+        // Pages — fetch role-default, granted, denied and render all chips
+        // (loadUserPageChips also refreshes the Add Page dropdown)
+        loadUserPageChips(u.id);
+
+        // Clear audit
+        $("auditTable").querySelector("tbody").innerHTML = "";
+
+        togglePanel("userDetailPanel", true);
+      }
+
+      /* ── Save User Edit ───────────────────────────────────── */
+
+      async function saveUserEdit() {
+        if (!state.selectedUserId) return;
+        const body = {};
+        const name = $("u_editName").value.trim();
+        const phone = $("u_editPhone").value.trim();
+        const pw = $("u_editPassword").value;
+        if (name) body.fullName = name;
+        if (phone) body.phone = phone;
+        if (pw) body.password = pw;
+        if (Object.keys(body).length === 0) { setMsg("u_editMsg", "Nothing to update.", "warn"); return; }
+        setMsg("u_editMsg", "Saving…", "warn");
+        try {
+          const updated = await api("/api/admin/users/" + state.selectedUserId, { method: "PUT", body });
+          setMsg("u_editMsg", "Saved.", "ok");
+          selectUser(updated);
+          await loadTenantUsers();
+        } catch (e) { setMsg("u_editMsg", "Failed: " + e.message, "bad"); }
+      }
+
+      /* ── Add Role ─────────────────────────────────────────── */
+
+      async function addRoleToUser() {
+        if (!state.selectedUserId) return;
+        const roleName = $("u_addRoleSelect").value;
+        setMsg("u_roleMsg", "Adding…", "warn");
+        try {
+          const updated = await api("/api/admin/users/" + state.selectedUserId + "/roles/" + roleName, { method: "POST" });
+          setMsg("u_roleMsg", "Role " + roleName + " added.", "ok");
+          selectUser(updated);
+          await loadTenantUsers();
+        } catch (e) { setMsg("u_roleMsg", "Failed: " + e.message, "bad"); }
+      }
+
+      /* ── Page Access (GRANT / DENY / Restore) ────────────── */
+
+      // Cache all available pages for the dropdown
+      state.allAvailablePages = [];
+
+      async function loadAllAvailablePages() {
+        try {
+          state.allAvailablePages = await api("/api/admin/access/pages");
+        } catch (e) { state.allAvailablePages = []; }
+      }
+
+      function loadAddPageDropdown(currentPageKeys) {
+        const sel = $("u_addPageSelect");
+        sel.innerHTML = '<option value="">— select a page to add —</option>';
+        const current = new Set(currentPageKeys || []);
+        (state.allAvailablePages || []).forEach(p => {
+          if (!current.has(p.pageKey)) {
+            const opt = document.createElement("option");
+            opt.value = p.pageKey;
+            opt.textContent = p.pageKey + " — " + (p.displayName || p.route || "");
+            sel.appendChild(opt);
+          }
+        });
+      }
+
+      async function loadUserPageChips(userId) {
+        const container = $("u_currentPages");
+        container.innerHTML = '<span class="muted" style="font-size:11px;">Loading…</span>';
+        try {
+          // 1. Fetch role-default page keys for this user's roles
+          const userInfo = state.users.find(u => u.id === userId);
+          const roles = userInfo ? (userInfo.roles || [userInfo.role]) : [];
+          const rolePageSets = await Promise.all(
+            roles.map(r => api("/api/admin/access/roles/" + r + "/pages").catch(() => []))
+          );
+          const rolePageKeys = new Set();
+          rolePageSets.forEach(keys => (keys || []).forEach(k => rolePageKeys.add(k)));
+
+          // 2. Fetch explicitly GRANTED (extra) page keys
+          const grantedKeys = await api("/api/admin/access/users/" + userId + "/pages/granted").catch(() => []);
+          const grantedSet = new Set(grantedKeys || []);
+
+          // 3. Fetch explicitly DENIED page keys
+          const deniedKeys = await api("/api/admin/access/users/" + userId + "/pages/denied").catch(() => []);
+          const deniedSet = new Set(deniedKeys || []);
+
+          // 4. Build the full list: active role pages + granted extras + denied pages (shown as struck-through)
+          container.innerHTML = "";
+          let hasChips = false;
+
+          // 4a. Role-default pages (active = not denied)
+          rolePageKeys.forEach(pk => {
+            if (deniedSet.has(pk)) return; // will render in denied section
+            hasChips = true;
+            const chip = document.createElement("span");
+            chip.className = "page-chip"; // blue = role-default
+            chip.textContent = pk;
+            chip.title = "From role — click ✕ to deny this page";
+            const x = document.createElement("span");
+            x.className = "x-btn";
+            x.textContent = " \u2715";
+            x.title = "Deny this role-default page";
+            x.addEventListener("click", () => denySinglePage(pk));
+            chip.appendChild(x);
+            container.appendChild(chip);
+          });
+
+          // 4b. Extra granted pages (green)
+          grantedSet.forEach(pk => {
+            if (rolePageKeys.has(pk)) return; // already shown as role page
+            hasChips = true;
+            const chip = document.createElement("span");
+            chip.className = "page-chip active"; // green = extra granted
+            chip.textContent = pk;
+            chip.title = "Extra granted — click ✕ to remove";
+            const x = document.createElement("span");
+            x.className = "x-btn";
+            x.textContent = " \u2715";
+            x.title = "Remove extra granted page";
+            x.addEventListener("click", () => removeSinglePage(pk));
+            chip.appendChild(x);
+            container.appendChild(chip);
+          });
+
+          // 4c. Denied pages (red, strikethrough, with restore button)
+          deniedSet.forEach(pk => {
+            hasChips = true;
+            const chip = document.createElement("span");
+            chip.className = "page-chip denied"; // red strikethrough
+            chip.textContent = pk;
+            chip.title = "Denied — click ↺ to restore";
+            const r = document.createElement("span");
+            r.className = "restore-btn";
+            r.textContent = " \u21BA";
+            r.title = "Restore this page (remove denial)";
+            r.addEventListener("click", () => restoreSinglePage(pk));
+            chip.appendChild(r);
+            container.appendChild(chip);
+          });
+
+          if (!hasChips) { container.textContent = "— no pages —"; }
+
+          // Update the dropdown to exclude pages the user already has access to
+          const allCurrentKeys = [...rolePageKeys].filter(k => !deniedSet.has(k)).concat([...grantedSet]);
+          loadAddPageDropdown(allCurrentKeys);
+
+        } catch (e) {
+          container.textContent = "Error loading pages";
+          console.error("loadUserPageChips error:", e);
+        }
+      }
+
+      /* Add a page as GRANT (extra access) */
+      async function addSinglePage() {
+        if (!state.selectedUserId) return;
+        const pageKey = $("u_addPageSelect").value;
+        if (!pageKey) { setMsg("u_pageMsg", "Select a page from the dropdown first.", "warn"); return; }
+        setMsg("u_pageMsg", "Granting " + pageKey + "…", "warn");
+        try {
+          await api("/api/admin/access/users/" + state.selectedUserId + "/pages/" + pageKey, { method: "POST" });
+          setMsg("u_pageMsg", "Granted: " + pageKey, "ok");
+          const updated = await api("/api/admin/users/" + state.selectedUserId);
+          selectUser(updated);
+          await loadTenantUsers();
+        } catch (e) { setMsg("u_pageMsg", "Failed: " + e.message, "bad"); }
+      }
+
+      /* Remove an extra GRANT page */
+      async function removeSinglePage(pageKey) {
+        if (!state.selectedUserId) return;
+        if (!confirm("Remove extra granted page: " + pageKey + "?")) return;
+        setMsg("u_pageMsg", "Removing grant for " + pageKey + "…", "warn");
+        try {
+          await api("/api/admin/access/users/" + state.selectedUserId + "/pages/" + pageKey, { method: "DELETE" });
+          setMsg("u_pageMsg", "Removed grant: " + pageKey, "ok");
+          const updated = await api("/api/admin/users/" + state.selectedUserId);
+          selectUser(updated);
+          await loadTenantUsers();
+        } catch (e) { setMsg("u_pageMsg", "Failed: " + e.message, "bad"); }
+      }
+
+      /* Deny a role-default page (creates DENY record) */
+      async function denySinglePage(pageKey) {
+        if (!state.selectedUserId) return;
+        if (!confirm("Deny page \"" + pageKey + "\"? This will block access even though the role provides it.")) return;
+        setMsg("u_pageMsg", "Denying " + pageKey + "…", "warn");
+        try {
+          await api("/api/admin/access/users/" + state.selectedUserId + "/pages/" + pageKey + "/deny", { method: "POST" });
+          setMsg("u_pageMsg", "Denied: " + pageKey, "ok");
+          const updated = await api("/api/admin/users/" + state.selectedUserId);
+          selectUser(updated);
+          await loadTenantUsers();
+        } catch (e) { setMsg("u_pageMsg", "Failed: " + e.message, "bad"); }
+      }
+
+      /* Restore a denied page (removes DENY record) */
+      async function restoreSinglePage(pageKey) {
+        if (!state.selectedUserId) return;
+        if (!confirm("Restore page \"" + pageKey + "\"? This will re-enable role-default access.")) return;
+        setMsg("u_pageMsg", "Restoring " + pageKey + "…", "warn");
+        try {
+          await api("/api/admin/access/users/" + state.selectedUserId + "/pages/" + pageKey + "/deny", { method: "DELETE" });
+          setMsg("u_pageMsg", "Restored: " + pageKey, "ok");
+          const updated = await api("/api/admin/users/" + state.selectedUserId);
+          selectUser(updated);
+          await loadTenantUsers();
+        } catch (e) { setMsg("u_pageMsg", "Failed: " + e.message, "bad"); }
+      }
+
+      /* Reset ALL overrides (grants + denials) back to pure role defaults */
+      async function resetExtraPages() {
+        if (!state.selectedUserId) return;
+        if (!confirm("Remove ALL page overrides (grants + denials)? Revert to pure role defaults.")) return;
+        setMsg("u_pageMsg", "Resetting…", "warn");
+        try {
+          await api("/api/admin/access/users/" + state.selectedUserId + "/pages", { method: "DELETE" });
+          setMsg("u_pageMsg", "Reset to role defaults — all grants and denials cleared.", "ok");
+          const updated = await api("/api/admin/users/" + state.selectedUserId);
+          selectUser(updated);
+          await loadTenantUsers();
+        } catch (e) { setMsg("u_pageMsg", "Failed: " + e.message, "bad"); }
+      }
+
+      /* ── Audit Log ────────────────────────────────────────── */
+
+      async function loadAuditLog() {
+        if (!state.selectedUserId) return;
+        const tbody = $("auditTable").querySelector("tbody");
+        tbody.innerHTML = "";
+        try {
+          const logs = await api("/api/admin/users/" + state.selectedUserId + "/audit");
+          if (!Array.isArray(logs) || logs.length === 0) {
+            tbody.appendChild(row(["—", "No audit records", "—", "—"])); return;
+          }
+          logs.forEach((l) => {
+            tbody.appendChild(row([
+              l.createdAt ? new Date(l.createdAt).toLocaleString() : "—",
+              '<code>' + (l.eventType || "") + '</code>',
+              l.details || "—",
+              String(l.changedByUserId ?? "—")
+            ]));
+          });
+        } catch (e) { tbody.appendChild(row(["Error", e.message, "—", "—"])); }
+      }
+
+      /* ── Create User (inline) ─────────────────────────────── */
+
+      function openCreateUser() {
+        if (!state.selectedTenantId) { setMsg("u_listMsg", "Select a hospital first.", "warn"); return; }
+        togglePanel("userDetailPanel", false);
+        $("cu_email").value = ""; $("cu_password").value = ""; $("cu_fullName").value = "";
+        $("cu_phone").value = ""; $("cu_pageKeys").value = "";
+        $("cu_role").value = "ROLE_DOCTOR";
+        toggleDoctorFields();
+        setMsg("cu_msg", "Fill in details and click Create.", "");
+        togglePanel("createUserPanel", true);
+      }
+
+      function toggleDoctorFields() {
+        const role = $("cu_role").value;
+        $("cu_doctorFields").classList.toggle("hidden", role !== "ROLE_DOCTOR");
+        $("cu_receptionistFields").classList.toggle("hidden", role !== "ROLE_RECEPTIONIST");
+      }
+
+      async function submitCreateUser() {
+        const body = {
+          email: $("cu_email").value.trim(),
+          password: $("cu_password").value,
+          fullName: $("cu_fullName").value.trim(),
+          phone: $("cu_phone").value.trim() || null,
+          role: $("cu_role").value
+        };
+        const pageKeys = ($("cu_pageKeys").value || "").split(",").map(s => s.trim()).filter(Boolean);
+        if (pageKeys.length > 0) body.allowedPageKeys = pageKeys;
+
+        if (body.role === "ROLE_DOCTOR") {
+          body.departmentId = Number($("cu_departmentId").value) || null;
+          body.specialization = $("cu_specialization").value.trim() || null;
+          body.licenseNumber = $("cu_licenseNumber").value.trim() || null;
+          body.qualification = $("cu_qualification").value.trim() || null;
+          body.experienceYears = Number($("cu_experienceYears").value) || null;
+          body.consultationFee = Number($("cu_consultationFee").value) || null;
+        } else if (body.role === "ROLE_RECEPTIONIST") {
+          body.employeeId = $("cu_employeeId").value.trim() || null;
+          body.shift = $("cu_shift").value || null;
+        }
+
+        if (!body.email || !body.password || !body.fullName) { setMsg("cu_msg", "Email, password, and full name required.", "warn"); return; }
+        setMsg("cu_msg", "Creating…", "warn");
+        try {
+          const res = await api("/api/admin/users", { method: "POST", body });
+          setMsg("cu_msg", "Created: " + res.email + " (ID: " + res.id + ")", "ok");
+          togglePanel("createUserPanel", false);
+          await loadTenantUsers();
+        } catch (e) { setMsg("cu_msg", "Failed: " + e.message, "bad"); }
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         TAB 3: ACCESS CONTROL
+         ══════════════════════════════════════════════════════════ */
+
       async function getUserAccess() {
         const userId = Number($("a_userId").value);
         if (!userId) { setMsg("a_userAccessMsg", "Enter a valid user ID.", "warn"); return; }
         setMsg("a_userAccessMsg", "Loading…", "warn");
-        $("a_roles").textContent = "—";
-        $("a_pages").textContent = "—";
+        $("a_roles").textContent = "—"; $("a_pages").textContent = "—";
         try {
-          const d = await api(`/api/admin/access/users/${userId}`);
-          const roles = (d.roles || []).join(", ");
-          $("a_roles").textContent = roles || "—";
-
-          // Render pages as chips
-          const pagesCell = $("a_pages");
-          pagesCell.innerHTML = "";
+          const d = await api("/api/admin/access/users/" + userId);
+          $("a_roles").textContent = (d.roles || []).join(", ") || "—";
+          const pagesCell = $("a_pages"); pagesCell.innerHTML = "";
           const pages = d.pages || [];
-          if (pages.length === 0) {
-            pagesCell.textContent = "—";
-          } else {
-            pages.forEach((p) => {
-              const chip = document.createElement("span");
-              chip.className = "page-chip active";
-              chip.textContent = p.pageKey;
-              chip.title = p.displayName + " (" + p.route + ")";
-              pagesCell.appendChild(chip);
-            });
-          }
-          setMsg("a_userAccessMsg", "Loaded. User has " + pages.length + " effective page(s).", "ok");
-        } catch (e) {
-          setMsg("a_userAccessMsg", "Failed: " + e.message, "bad");
-        }
+          if (pages.length === 0) { pagesCell.textContent = "—"; }
+          else { pages.forEach((p) => { const chip = document.createElement("span"); chip.className = "page-chip active"; chip.textContent = p.pageKey; chip.title = p.displayName + " (" + p.route + ")"; pagesCell.appendChild(chip); }); }
+          setMsg("a_userAccessMsg", "User has " + pages.length + " effective page(s).", "ok");
+        } catch (e) { setMsg("a_userAccessMsg", "Failed: " + e.message, "bad"); }
       }
 
-      // --- Set User Extra Pages ---
       async function setUserPages() {
         const userId = Number($("a_userId").value);
-        if (!userId) { setMsg("a_userPagesMsg", "Enter a valid user ID on the left first.", "warn"); return; }
+        if (!userId) { setMsg("a_userPagesMsg", "Enter a user ID on the left first.", "warn"); return; }
         const pageKeys = ($("a_userPageKeys").value || "").split(",").map(s => s.trim()).filter(Boolean);
         if (pageKeys.length === 0) { setMsg("a_userPagesMsg", "Provide at least one page key.", "warn"); return; }
         setMsg("a_userPagesMsg", "Applying…", "warn");
         try {
-          await api(`/api/admin/access/users/${userId}/pages`, { method: "PUT", body: pageKeys });
-          setMsg("a_userPagesMsg", "Saved. " + pageKeys.length + " extra page(s) assigned.", "ok");
-          await getUserAccess(); // Refresh
-        } catch (e) {
-          setMsg("a_userPagesMsg", "Failed: " + e.message, "bad");
-        }
+          await api("/api/admin/access/users/" + userId + "/pages", { method: "PUT", body: pageKeys });
+          setMsg("a_userPagesMsg", pageKeys.length + " extra page(s) assigned.", "ok");
+          await getUserAccess();
+        } catch (e) { setMsg("a_userPagesMsg", "Failed: " + e.message, "bad"); }
       }
 
-      // --- Reset User Pages to Role Defaults ---
       async function resetUserPages() {
         const userId = Number($("a_userId").value);
-        if (!userId) { setMsg("a_userPagesMsg", "Enter a valid user ID on the left first.", "warn"); return; }
-        if (!confirm("Remove all extra page overrides for user " + userId + "? They will revert to role defaults.")) return;
+        if (!userId) { setMsg("a_userPagesMsg", "Enter a user ID on the left first.", "warn"); return; }
+        if (!confirm("Remove all extra page overrides for user " + userId + "?")) return;
         setMsg("a_userPagesMsg", "Resetting…", "warn");
         try {
-          await api(`/api/admin/access/users/${userId}/pages`, { method: "DELETE" });
+          await api("/api/admin/access/users/" + userId + "/pages", { method: "DELETE" });
           setMsg("a_userPagesMsg", "Reset to role defaults.", "ok");
-          await getUserAccess(); // Refresh
-        } catch (e) {
-          setMsg("a_userPagesMsg", "Failed: " + e.message, "bad");
-        }
+          await getUserAccess();
+        } catch (e) { setMsg("a_userPagesMsg", "Failed: " + e.message, "bad"); }
       }
 
-      // --- Load Role Pages ---
       async function getRolePages() {
         const role = $("a_role").value;
         if (!role) return;
-        setMsg("a_roleMsg", "Loading pages for " + role + "…", "warn");
+        setMsg("a_roleMsg", "Loading…", "warn");
         try {
-          const pageKeys = await api(`/api/admin/access/roles/${role}/pages`);
+          const pageKeys = await api("/api/admin/access/roles/" + role + "/pages");
           const keys = Array.isArray(pageKeys) ? pageKeys : [...(pageKeys || [])];
           $("a_rolePageKeys").value = keys.join(", ");
-          setMsg("a_roleMsg", role + " has " + keys.length + " page(s): " + (keys.join(", ") || "none"), "ok");
-        } catch (e) {
-          setMsg("a_roleMsg", "Failed: " + e.message, "bad");
-        }
+          setMsg("a_roleMsg", role + " has " + keys.length + " page(s).", "ok");
+        } catch (e) { setMsg("a_roleMsg", "Failed: " + e.message, "bad"); }
       }
 
-      // --- Save Role Pages ---
       async function setRolePages() {
         const role = $("a_role").value;
         const pageKeys = ($("a_rolePageKeys").value || "").split(",").map(s => s.trim()).filter(Boolean);
         if (!role) { setMsg("a_roleMsg", "Select a role.", "warn"); return; }
-        if (pageKeys.length === 0) {
-          if (!confirm("This will remove ALL pages from " + role + ". Continue?")) return;
-        }
+        if (pageKeys.length === 0 && !confirm("Remove ALL pages from " + role + "?")) return;
         setMsg("a_roleMsg", "Saving…", "warn");
         try {
-          await api(`/api/admin/access/roles/${role}/pages`, { method: "PUT", body: pageKeys });
+          await api("/api/admin/access/roles/" + role + "/pages", { method: "PUT", body: pageKeys });
           setMsg("a_roleMsg", "Saved " + pageKeys.length + " page(s) for " + role + ".", "ok");
-        } catch (e) {
-          setMsg("a_roleMsg", "Failed: " + e.message, "bad");
-        }
+        } catch (e) { setMsg("a_roleMsg", "Failed: " + e.message, "bad"); }
       }
 
-      // --- Refresh All Pages ---
       async function refreshPages() {
-        setMsg("a_pageListMsg", "Loading pages…", "warn");
-        const tbody = $("a_pagesTable").querySelector("tbody");
-        tbody.innerHTML = "";
+        setMsg("a_pageListMsg", "Loading…", "warn");
+        const tbody = $("a_pagesTable").querySelector("tbody"); tbody.innerHTML = "";
         try {
           const list = await api("/api/admin/access/pages");
           (list || []).forEach((p) => {
-            const actions = document.createElement("div");
-            actions.className = "controls";
+            const actions = document.createElement("div"); actions.className = "controls";
             actions.appendChild(btn("Edit", "ghost", () => {
-              $("a_pageKey").value = p.pageKey || "";
-              $("a_route").value = p.route || "";
-              $("a_displayName").value = p.displayName || "";
-              window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+              $("a_pageKey").value = p.pageKey || ""; $("a_route").value = p.route || ""; $("a_displayName").value = p.displayName || "";
+              togglePanel("pageFormPanel", true);
             }));
             if (p.active) {
               actions.appendChild(btn("Deactivate", "danger", async () => {
                 if (!confirm("Soft-delete page " + p.pageKey + "?")) return;
-                try {
-                  await api(`/api/admin/access/pages/${encodeURIComponent(p.pageKey)}`, { method: "DELETE" });
-                  await refreshPages();
-                } catch (e) {
-                  alert("Failed: " + e.message);
-                }
+                try { await api("/api/admin/access/pages/" + encodeURIComponent(p.pageKey), { method: "DELETE" }); await refreshPages(); } catch (e) { alert("Error: " + e.message); }
               }));
             }
             tbody.appendChild(row([
-              `<code>${p.pageKey || ""}</code>`,
-              p.route || "",
-              p.displayName || "",
+              '<code>' + (p.pageKey || "") + '</code>', p.route || "", p.displayName || "",
               p.active ? '<span class="status-ok">Active</span>' : '<span class="status-warn">Inactive</span>',
               actions
             ]));
           });
           setMsg("a_pageListMsg", (list || []).length + " page(s) loaded.", "ok");
-        } catch (e) {
-          setMsg("a_pageListMsg", "Failed: " + e.message, "bad");
-        }
+        } catch (e) { setMsg("a_pageListMsg", "Failed: " + e.message, "bad"); }
       }
 
-      // --- Upsert Page ---
       async function upsertPage() {
-        const pageKey = $("a_pageKey").value.trim();
-        const route = $("a_route").value.trim();
-        const displayName = $("a_displayName").value.trim();
-        if (!pageKey || !route || !displayName) { setMsg("a_pageMsg", "All fields are required.", "warn"); return; }
+        const pageKey = $("a_pageKey").value.trim(), route = $("a_route").value.trim(), displayName = $("a_displayName").value.trim();
+        if (!pageKey || !route || !displayName) { setMsg("a_pageMsg", "All fields required.", "warn"); return; }
         setMsg("a_pageMsg", "Saving…", "warn");
         try {
-          await api(`/api/admin/access/pages`, { method: "POST", body: { pageKey, route, displayName } });
+          await api("/api/admin/access/pages", { method: "POST", body: { pageKey, route, displayName } });
           setMsg("a_pageMsg", "Page '" + pageKey + "' saved.", "ok");
-          $("a_pageKey").value = "";
-          $("a_route").value = "";
-          $("a_displayName").value = "";
+          $("a_pageKey").value = ""; $("a_route").value = ""; $("a_displayName").value = "";
+          togglePanel("pageFormPanel", false);
           await refreshPages();
-        } catch (e) {
-          setMsg("a_pageMsg", "Failed: " + e.message, "bad");
-        }
+        } catch (e) { setMsg("a_pageMsg", "Failed: " + e.message, "bad"); }
       }
 
-      /* ── Event Wiring ─────────────────────────────────────────── */
+      /* ══════════════════════════════════════════════════════════
+         EVENT WIRING
+         ══════════════════════════════════════════════════════════ */
 
       // Login
       $("btnLogin").addEventListener("click", handleLogin);
       $("password").addEventListener("keydown", (e) => { if (e.key === "Enter") handleLogin(); });
-      $("btnLogout").addEventListener("click", () => {
-        state.token = null; state.tokenExpiry = null; setAuthUI();
-      });
+      $("btnLogout").addEventListener("click", () => { state.token = null; state.tokenExpiry = null; setAuthUI(); });
 
-      // Tenants
-      $("btnReload").addEventListener("click", loadTenants);
-      $("btnOpenCreate").addEventListener("click", () => openCreate(true));
-      $("btnCloseCreate").addEventListener("click", () => openCreate(false));
-      $("btnCreate").addEventListener("click", handleCreate);
+      // Hospitals
+      $("btnReload").addEventListener("click", async () => { await loadTenants(); populateTenantDropdowns(); });
+      $("btnOpenCreate").addEventListener("click", () => { togglePanel("editHospitalPanel", false); togglePanel("createHospitalPanel", true); });
+      $("btnCloseCreate").addEventListener("click", () => togglePanel("createHospitalPanel", false));
+      $("btnCreate").addEventListener("click", handleCreateHospital);
+      $("btnCloseEditHospital").addEventListener("click", () => togglePanel("editHospitalPanel", false));
+      $("btnSaveHospital").addEventListener("click", handleSaveHospital);
+
+      // User Management
+      $("btnLoadTenantUsers").addEventListener("click", loadTenantUsers);
+      $("u_tenantSelect").addEventListener("change", () => {
+        // Auto-load when tenant changes
+        if ($("u_tenantSelect").value) loadTenantUsers();
+      });
+      $("btnOpenCreateUser").addEventListener("click", openCreateUser);
+      $("btnCloseCreateUser").addEventListener("click", () => togglePanel("createUserPanel", false));
+      $("btnSubmitCreateUser").addEventListener("click", submitCreateUser);
+      $("cu_role").addEventListener("change", toggleDoctorFields);
+      $("btnCloseUserDetail").addEventListener("click", () => { togglePanel("userDetailPanel", false); state.selectedUserId = null; });
+      $("btnSaveUser").addEventListener("click", saveUserEdit);
+      $("btnAddRole").addEventListener("click", addRoleToUser);
+      $("btnAddSinglePage").addEventListener("click", addSinglePage);
+      $("btnResetPages").addEventListener("click", resetExtraPages);
+      $("btnLoadAudit").addEventListener("click", loadAuditLog);
 
       // Access Control
-      $("btnOpenAccess").addEventListener("click", () => openAccess(true));
-      $("btnCloseAccess").addEventListener("click", () => openAccess(false));
       $("btnGetUserAccess").addEventListener("click", getUserAccess);
       $("btnSetUserPages").addEventListener("click", setUserPages);
       $("btnResetUserPages").addEventListener("click", resetUserPages);
       $("btnGetRolePages").addEventListener("click", getRolePages);
       $("btnSetRolePages").addEventListener("click", setRolePages);
       $("btnRefreshPages").addEventListener("click", refreshPages);
+      $("btnOpenPageForm").addEventListener("click", () => {
+        $("a_pageKey").value = ""; $("a_route").value = ""; $("a_displayName").value = "";
+        togglePanel("pageFormPanel", true);
+      });
+      $("btnClosePageForm").addEventListener("click", () => togglePanel("pageFormPanel", false));
       $("btnUpsertPage").addEventListener("click", upsertPage);
 
-      // Initial UI
+      // Init
       setAuthUI();
+      loadAllAvailablePages(); // pre-load page list for the "Add Extra Page" dropdown
     })();
   </script>
 </body>
