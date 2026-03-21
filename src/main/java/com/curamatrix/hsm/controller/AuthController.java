@@ -30,7 +30,7 @@ public class AuthController {
     @PostMapping("/login")
     @Operation(
         summary = "User Login",
-        description = "Authenticate user and receive JWT token. Use this token for all subsequent API calls.",
+        description = "Authenticate using email and password. Tenant is auto-detected from the user's account.",
         responses = {
             @ApiResponse(responseCode = "200", description = "Login successful, JWT token returned"),
             @ApiResponse(responseCode = "401", description = "Invalid credentials", content = @Content)

@@ -6,7 +6,6 @@ import com.curamatrix.hsm.dto.response.LoginResponse;
 import com.curamatrix.hsm.entity.Tenant;
 import com.curamatrix.hsm.entity.User;
 import com.curamatrix.hsm.exception.SubscriptionExpiredException;
-import com.curamatrix.hsm.exception.TenantNotFoundException;
 import com.curamatrix.hsm.repository.TenantRepository;
 import com.curamatrix.hsm.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,21 +31,6 @@ public class AuthService {
     private final TenantRepository tenantRepository;
 
     public LoginResponse login(LoginRequest request) {
-        // Validate tenant
-        Tenant tenant = tenantRepository.findByTenantKey(request.getTenantKey())
-                .orElseThrow(() -> new TenantNotFoundException("Invalid tenant key: " + request.getTenantKey()));
-
-        // Check if tenant is active
-        if (!tenant.getIsActive()) {
-            throw new RuntimeException("Hospital account is suspended. Please contact support.");
-        }
-
-        // Check subscription expiry
-        if (tenant.getSubscriptionEnd().isBefore(LocalDate.now())) {
-            throw new SubscriptionExpiredException(
-                    "Subscription has expired. Please renew to continue using the service.");
-        }
-
         // Verify user exists first to provide clear login errors
         User existingUser = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Email is not correct"));
@@ -65,11 +49,21 @@ public class AuthService {
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         
-        // Get user and verify tenant
+        // Derive tenant from the authenticated user
         User user = existingUser;
+        Long tenantId = user.getTenantId();
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("Tenant not found for user"));
 
-        if (!user.getTenantId().equals(tenant.getId())) {
-            throw new RuntimeException("User does not belong to this hospital");
+        // Check if tenant is active
+        if (!tenant.getIsActive()) {
+            throw new RuntimeException("Hospital account is suspended. Please contact support.");
+        }
+
+        // Check subscription expiry
+        if (tenant.getSubscriptionEnd().isBefore(LocalDate.now())) {
+            throw new SubscriptionExpiredException(
+                    "Subscription has expired. Please renew to continue using the service.");
         }
 
         // Generate token with tenant information
