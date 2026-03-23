@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Phase 1 — Database Schema</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+  --text:#e6edf3;--text2:#8b949e;--text3:#3d444d;
+  --blue:#58a6ff;--blue-bg:rgba(88,166,255,0.1);
+  --green:#3fb950;--green-bg:rgba(63,185,80,0.1);
+  --purple:#bc8cff;--purple-bg:rgba(188,140,255,0.1);
+  --amber:#d29922;--amber-bg:rgba(210,153,34,0.1);
+  --red:#f85149;--red-bg:rgba(248,81,73,0.1);
+  --teal:#39d353;--teal-bg:rgba(57,211,83,0.08);
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Outfit',system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;}
+.page{max-width:1080px;margin:0 auto;padding:40px 20px 80px;}
+.header{margin-bottom:40px;}
+.eyebrow{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.14em;margin-bottom:10px;}
+h1{font-size:32px;font-weight:700;letter-spacing:-0.02em;color:var(--text);}
+h1 span{color:var(--blue);}
+.header p{color:var(--text2);font-size:13px;margin-top:8px;}
+
+.tabs{display:flex;gap:2px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:4px;width:fit-content;margin-bottom:32px;flex-wrap:wrap;}
+.tab{font-family:var(--sans);font-size:12px;font-weight:600;padding:7px 18px;border-radius:7px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.tab:hover{color:var(--text);}
+.tab.active{background:var(--bg2);color:var(--text);}
+
+.panel{display:none;}
+.panel.active{display:block;}
+
+.table-block{margin-bottom:32px;}
+.table-name{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.tname{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--blue);}
+.tname-desc{font-size:12px;color:var(--text2);}
+
+table{width:100%;border-collapse:collapse;border:1px solid var(--border2);border-radius:10px;overflow:hidden;}
+th{background:var(--bg3);padding:10px 14px;text-align:left;font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid var(--border2);}
+td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,0.02);}
+
+.col-name{font-family:var(--mono);font-weight:600;color:var(--text);}
+.col-type{font-family:var(--mono);font-size:11px;color:var(--purple);}
+.col-null{font-size:11px;}
+.null-no{color:var(--red);font-family:var(--mono);}
+.null-yes{color:var(--text3);font-family:var(--mono);}
+.col-default{font-family:var(--mono);font-size:11px;color:var(--amber);}
+.col-notes{font-size:11px;color:var(--text2);}
+
+.badge{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:3px;}
+.b-pk{background:rgba(210,153,34,0.2);color:var(--amber);}
+.b-fk{background:rgba(88,166,255,0.15);color:var(--blue);}
+.b-idx{background:rgba(63,185,80,0.15);color:var(--green);}
+.b-uniq{background:rgba(188,140,255,0.15);color:var(--purple);}
+.b-enc{background:rgba(248,81,73,0.15);color:var(--red);}
+
+pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px;overflow-x:auto;font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--text);}
+.kw{color:var(--blue);}
+.str{color:var(--amber);}
+.cmt{color:var(--text3);}
+.fn{color:var(--purple);}
+.type{color:var(--green);}
+
+.erd-note{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px 20px;margin-bottom:20px;font-size:12px;color:var(--text2);line-height:1.7;}
+.erd-note strong{color:var(--text);}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="header">
+  <div class="eyebrow">Phase 1 · Module 1 · Handoff Doc 01</div>
+  <h1>Database <span>Schema</span></h1>
+  <p>5 tables for Phase 1. Column definitions, types, constraints, indexes, and SQL migrations.</p>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="show('overview')">Overview</button>
+  <button class="tab" onclick="show('users')">users</button>
+  <button class="tab" onclick="show('hospitals')">hospitals</button>
+  <button class="tab" onclick="show('invites')">invites</button>
+  <button class="tab" onclick="show('settings')">settings</button>
+  <button class="tab" onclick="show('audit')">audit_logs</button>
+  <button class="tab" onclick="show('sql')">SQL migrations</button>
+</div>
+
+<!-- OVERVIEW -->
+<div class="panel active" id="tab-overview">
+<div class="erd-note">
+  <strong>Multi-tenancy model:</strong> Shared database with <code style="font-family:var(--mono);background:var(--bg3);padding:1px 5px;border-radius:3px;">hospital_id</code> column scoping. Every staff-facing query is automatically scoped to the user's hospital via middleware. Super admin queries have no scope restriction.<br/><br/>
+  <strong>Encryption:</strong> Fields marked <span class="badge b-enc">ENC</span> are AES-256-GCM encrypted at the application layer before storage. The DB stores ciphertext. Decryption happens in the service layer only.<br/><br/>
+  <strong>Audit log:</strong> The <code style="font-family:var(--mono);background:var(--bg3);padding:1px 5px;border-radius:3px;">audit_logs</code> table is append-only. The application DB user has NO UPDATE or DELETE privilege on this table.
+</div>
+
+<div class="table-block">
+<div class="table-name"><span class="tname">users</span><span class="tname-desc">All staff + super admin accounts</span></div>
+<table>
+<tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th><th>Notes</th></tr>
+<tr><td class="col-name">id</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">gen_random_uuid()</td><td class="col-notes"><span class="badge b-pk">PK</span></td></tr>
+<tr><td class="col-name">email</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-uniq">UNIQUE</span><span class="badge b-enc">ENC</span>Stored encrypted. Index on hash of email for lookup.</td></tr>
+<tr><td class="col-name">email_hash</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-idx">IDX</span>SHA-256 of lowercase email. Used for unique lookup without decrypting.</td></tr>
+<tr><td class="col-name">password_hash</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes">argon2id hash. Never plain text.</td></tr>
+<tr><td class="col-name">first_name</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr>
+<tr><td class="col-name">last_name</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr>
+<tr><td class="col-name">phone</td><td class="col-type">TEXT</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-enc">ENC</span>Optional. Encrypted if stored.</td></tr>
+<tr><td class="col-name">role</td><td class="col-type">ENUM</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes">super_admin | admin | doctor | receptionist | lab_tech | pharmacist | nurse</td></tr>
+<tr><td class="col-name">hospital_id</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-fk">FK → hospitals.id</span><span class="badge b-idx">IDX</span>NULL for super_admin only.</td></tr>
+<tr><td class="col-name">status</td><td class="col-type">ENUM</td><td class="col-null null-no">NOT NULL</td><td class="col-default">'invited'</td><td class="col-notes">invited | active | deactivated</td></tr>
+<tr><td class="col-name">last_login_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">Updated on every successful login.</td></tr>
+<tr><td class="col-name">created_by</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-fk">FK → users.id</span>Who invited this user.</td></tr>
+<tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes"></td></tr>
+<tr><td class="col-name">updated_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes">Auto-update via trigger.</td></tr>
+</table>
+</div>
+
+<div class="table-block">
+<div class="table-name"><span class="tname">hospitals</span><span class="tname-desc">Hospital / branch records</span></div>
+<table>
+<tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th><th>Notes</th></tr>
+<tr><td class="col-name">id</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">gen_random_uuid()</td><td class="col-notes"><span class="badge b-pk">PK</span></td></tr>
+<tr><td class="col-name">name</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr>
+<tr><td class="col-name">address</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-enc">ENC</span>Full address encrypted.</td></tr>
+<tr><td class="col-name">city</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes">Plain — used for display/filter.</td></tr>
+<tr><td class="col-name">branch_code</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-uniq">UNIQUE</span>Short code e.g. MUM-001.</td></tr>
+<tr><td class="col-name">phone</td><td class="col-type">TEXT</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">Hospital contact number.</td></tr>
+<tr><td class="col-name">plan</td><td class="col-type">ENUM</td><td class="col-null null-no">NOT NULL</td><td class="col-default">'basic'</td><td class="col-notes">basic | pro | enterprise</td></tr>
+<tr><td class="col-name">status</td><td class="col-type">ENUM</td><td class="col-null null-no">NOT NULL</td><td class="col-default">'pending'</td><td class="col-notes">pending | active | inactive</td></tr>
+<tr><td class="col-name">created_by</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-fk">FK → users.id</span>Super admin who created it.</td></tr>
+<tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes"></td></tr>
+<tr><td class="col-name">updated_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes"></td></tr>
+</table>
+</div>
+
+<div class="table-block">
+<div class="table-name"><span class="tname">invites</span><span class="tname-desc">Staff invites + password reset tokens</span></div>
+<table>
+<tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th><th>Notes</th></tr>
+<tr><td class="col-name">id</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">gen_random_uuid()</td><td class="col-notes"><span class="badge b-pk">PK</span></td></tr>
+<tr><td class="col-name">email</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes">Plain — used to pre-fill form.</td></tr>
+<tr><td class="col-name">type</td><td class="col-type">ENUM</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes">invite | password_reset</td></tr>
+<tr><td class="col-name">role</td><td class="col-type">ENUM</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">Only for type=invite.</td></tr>
+<tr><td class="col-name">hospital_id</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-fk">FK → hospitals.id</span>Only for type=invite.</td></tr>
+<tr><td class="col-name">token_hash</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-idx">IDX</span>SHA-256 of raw token. Raw token sent in email ONLY.</td></tr>
+<tr><td class="col-name">expires_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes">invite: now()+48h. reset: now()+1h.</td></tr>
+<tr><td class="col-name">used</td><td class="col-type">BOOLEAN</td><td class="col-null null-no">NOT NULL</td><td class="col-default">false</td><td class="col-notes">Set true on accept. Cannot be reused.</td></tr>
+<tr><td class="col-name">created_by</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-fk">FK → users.id</span></td></tr>
+<tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes"></td></tr>
+</table>
+</div>
+
+<div class="table-block">
+<div class="table-name"><span class="tname">settings</span><span class="tname-desc">Per-hospital branch configuration</span></div>
+<table>
+<tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th><th>Notes</th></tr>
+<tr><td class="col-name">id</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">gen_random_uuid()</td><td class="col-notes"><span class="badge b-pk">PK</span></td></tr>
+<tr><td class="col-name">hospital_id</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-fk">FK → hospitals.id</span><span class="badge b-uniq">UNIQUE</span>One row per hospital.</td></tr>
+<tr><td class="col-name">working_hours</td><td class="col-type">JSONB</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">{ mon:{open:"09:00",close:"18:00",enabled:true}, ... }</td></tr>
+<tr><td class="col-name">departments</td><td class="col-type">JSONB</td><td class="col-null null-yes">NULL</td><td class="col-default">[]</td><td class="col-notes">Array of department name strings.</td></tr>
+<tr><td class="col-name">services</td><td class="col-type">JSONB</td><td class="col-null null-yes">NULL</td><td class="col-default">[]</td><td class="col-notes">Array of service objects.</td></tr>
+<tr><td class="col-name">billing_config</td><td class="col-type">JSONB</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">Payment methods, tax config, currency.</td></tr>
+<tr><td class="col-name">onboarding_checklist</td><td class="col-type">JSONB</td><td class="col-null null-no">NOT NULL</td><td class="col-default">See note</td><td class="col-notes">{ admin_assigned:false, doctor_added:false, working_hours_set:false, billing_configured:false, reception_added:false }</td></tr>
+<tr><td class="col-name">updated_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes"></td></tr>
+</table>
+</div>
+
+<div class="table-block">
+<div class="table-name"><span class="tname">audit_logs</span><span class="tname-desc">Immutable action log — append only</span></div>
+<table>
+<tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th><th>Notes</th></tr>
+<tr><td class="col-name">id</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">gen_random_uuid()</td><td class="col-notes"><span class="badge b-pk">PK</span></td></tr>
+<tr><td class="col-name">user_id</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-idx">IDX</span>NULL for system actions.</td></tr>
+<tr><td class="col-name">user_role</td><td class="col-type">TEXT</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">Snapshot of role at time of action.</td></tr>
+<tr><td class="col-name">hospital_id</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-idx">IDX</span>For branch-level log filtering.</td></tr>
+<tr><td class="col-name">action</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-idx">IDX</span>e.g. USER_LOGIN, HOSPITAL_CREATED, STAFF_INVITED.</td></tr>
+<tr><td class="col-name">resource_type</td><td class="col-type">TEXT</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">hospital | user | invite | settings</td></tr>
+<tr><td class="col-name">resource_id</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">ID of the affected record.</td></tr>
+<tr><td class="col-name">old_value</td><td class="col-type">JSONB</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">Before state for updates.</td></tr>
+<tr><td class="col-name">new_value</td><td class="col-type">JSONB</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">After state for updates.</td></tr>
+<tr><td class="col-name">ip_address</td><td class="col-type">INET</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr>
+<tr><td class="col-name">user_agent</td><td class="col-type">TEXT</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr>
+<tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes"><span class="badge b-idx">IDX</span></td></tr>
+</table>
+</div>
+</div>
+
+<!-- Individual table tabs (abbreviated) -->
+<div class="panel" id="tab-users"><div class="erd-note"><strong>Key rules for users table:</strong><br/>1. email_hash is SHA-256(email.toLowerCase()) — used for unique constraint and fast lookup without decryption.<br/>2. hospital_id is NULL only for super_admin role — enforced at application layer.<br/>3. status starts as 'invited' when created via invite flow. Changes to 'active' on first login.<br/>4. created_by tracks who invited this user — important for audit trail.</div><div class="table-block"><div class="table-name"><span class="tname">users</span></div><table><tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th><th>Notes</th></tr><tr><td class="col-name">id</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">gen_random_uuid()</td><td class="col-notes"><span class="badge b-pk">PK</span></td></tr><tr><td class="col-name">email</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-enc">ENC</span>AES-256-GCM encrypted</td></tr><tr><td class="col-name">email_hash</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-uniq">UNIQUE</span><span class="badge b-idx">IDX</span>SHA-256 for lookup</td></tr><tr><td class="col-name">password_hash</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes">argon2id</td></tr><tr><td class="col-name">first_name</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr><tr><td class="col-name">last_name</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr><tr><td class="col-name">phone</td><td class="col-type">TEXT</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-enc">ENC</span></td></tr><tr><td class="col-name">role</td><td class="col-type">ENUM</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes">super_admin|admin|doctor|receptionist|lab_tech|pharmacist|nurse</td></tr><tr><td class="col-name">hospital_id</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-fk">FK → hospitals.id</span><span class="badge b-idx">IDX</span></td></tr><tr><td class="col-name">status</td><td class="col-type">ENUM</td><td class="col-null null-no">NOT NULL</td><td class="col-default">'invited'</td><td class="col-notes">invited|active|deactivated</td></tr><tr><td class="col-name">last_login_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr><tr><td class="col-name">created_by</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-fk">FK → users.id</span></td></tr><tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes"></td></tr><tr><td class="col-name">updated_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes">Auto-trigger</td></tr></table></div></div>
+
+<div class="panel" id="tab-hospitals"><div class="erd-note"><strong>Key rules for hospitals table:</strong><br/>1. branch_code must be globally unique across all hospitals — validate before insert.<br/>2. status starts as 'pending' — only super admin can change to 'active', and only after checklist passes.<br/>3. A settings row is auto-created (with default checklist) when a hospital record is inserted — use a DB trigger or application service.</div><div class="table-block"><div class="table-name"><span class="tname">hospitals</span></div><table><tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th><th>Notes</th></tr><tr><td class="col-name">id</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">gen_random_uuid()</td><td class="col-notes"><span class="badge b-pk">PK</span></td></tr><tr><td class="col-name">name</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr><tr><td class="col-name">address</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-enc">ENC</span></td></tr><tr><td class="col-name">city</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes">Plain text for filtering</td></tr><tr><td class="col-name">branch_code</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-uniq">UNIQUE</span></td></tr><tr><td class="col-name">phone</td><td class="col-type">TEXT</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr><tr><td class="col-name">plan</td><td class="col-type">ENUM</td><td class="col-null null-no">NOT NULL</td><td class="col-default">'basic'</td><td class="col-notes">basic|pro|enterprise</td></tr><tr><td class="col-name">status</td><td class="col-type">ENUM</td><td class="col-null null-no">NOT NULL</td><td class="col-default">'pending'</td><td class="col-notes">pending|active|inactive</td></tr><tr><td class="col-name">created_by</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-fk">FK → users.id</span></td></tr><tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes"></td></tr><tr><td class="col-name">updated_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes"></td></tr></table></div></div>
+
+<div class="panel" id="tab-invites"><div class="erd-note"><strong>Key rules for invites table:</strong><br/>1. The raw token is NEVER stored. Only SHA-256(token) is stored. The raw token is sent in the email link only.<br/>2. When verifying: hash the incoming token, look up token_hash, check used=false AND expires_at > now().<br/>3. After use: set used=true immediately — even before creating the user — to prevent race conditions.</div><div class="table-block"><div class="table-name"><span class="tname">invites</span></div><table><tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th><th>Notes</th></tr><tr><td class="col-name">id</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">gen_random_uuid()</td><td class="col-notes"><span class="badge b-pk">PK</span></td></tr><tr><td class="col-name">email</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes">Plain text</td></tr><tr><td class="col-name">type</td><td class="col-type">ENUM</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes">invite | password_reset</td></tr><tr><td class="col-name">role</td><td class="col-type">ENUM</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">Set for type=invite only</td></tr><tr><td class="col-name">hospital_id</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-fk">FK → hospitals.id</span></td></tr><tr><td class="col-name">token_hash</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-idx">IDX</span>SHA-256 only</td></tr><tr><td class="col-name">expires_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes">invite: +48h · reset: +1h</td></tr><tr><td class="col-name">used</td><td class="col-type">BOOLEAN</td><td class="col-null null-no">NOT NULL</td><td class="col-default">false</td><td class="col-notes">Set true on accept</td></tr><tr><td class="col-name">created_by</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-fk">FK → users.id</span></td></tr><tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes"></td></tr></table></div></div>
+
+<div class="panel" id="tab-settings"><div class="erd-note"><strong>Key rules for settings table:</strong><br/>1. One row per hospital — hospital_id is UNIQUE.<br/>2. Row is auto-created with default values when a hospital is created.<br/>3. onboarding_checklist is updated automatically by the application — never manually by admin.<br/>4. working_hours JSON schema: <code style="font-family:var(--mono)">{ mon: { enabled: true, open: "09:00", close: "18:00" }, ... }</code></div><div class="table-block"><div class="table-name"><span class="tname">settings</span></div><table><tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th><th>Notes</th></tr><tr><td class="col-name">id</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">gen_random_uuid()</td><td class="col-notes"><span class="badge b-pk">PK</span></td></tr><tr><td class="col-name">hospital_id</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-fk">FK → hospitals.id</span><span class="badge b-uniq">UNIQUE</span></td></tr><tr><td class="col-name">working_hours</td><td class="col-type">JSONB</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">Day-by-day schedule</td></tr><tr><td class="col-name">departments</td><td class="col-type">JSONB</td><td class="col-null null-yes">NULL</td><td class="col-default">[]</td><td class="col-notes">Array of strings</td></tr><tr><td class="col-name">services</td><td class="col-type">JSONB</td><td class="col-null null-yes">NULL</td><td class="col-default">[]</td><td class="col-notes">Array of service objects</td></tr><tr><td class="col-name">billing_config</td><td class="col-type">JSONB</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">Payment + tax config</td></tr><tr><td class="col-name">onboarding_checklist</td><td class="col-type">JSONB</td><td class="col-null null-no">NOT NULL</td><td class="col-default">all false</td><td class="col-notes">Auto-updated by app</td></tr><tr><td class="col-name">updated_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes"></td></tr></table></div></div>
+
+<div class="panel" id="tab-audit"><div class="erd-note"><strong>Key rules for audit_logs table:</strong><br/>1. APPEND ONLY — the application DB user must have SELECT and INSERT only. No UPDATE or DELETE.<br/>2. Log EVERY write action: logins, logouts, creates, updates, deletes, role changes, deactivations.<br/>3. action strings use SCREAMING_SNAKE_CASE constants: USER_LOGIN, HOSPITAL_CREATED, STAFF_INVITED, etc.<br/>4. old_value / new_value store JSON snapshots — strip sensitive fields (password_hash) before logging.</div><div class="table-block"><div class="table-name"><span class="tname">audit_logs</span></div><table><tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th><th>Notes</th></tr><tr><td class="col-name">id</td><td class="col-type">UUID</td><td class="col-null null-no">NOT NULL</td><td class="col-default">gen_random_uuid()</td><td class="col-notes"><span class="badge b-pk">PK</span></td></tr><tr><td class="col-name">user_id</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-idx">IDX</span></td></tr><tr><td class="col-name">user_role</td><td class="col-type">TEXT</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">Snapshot at time of action</td></tr><tr><td class="col-name">hospital_id</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-idx">IDX</span></td></tr><tr><td class="col-name">action</td><td class="col-type">TEXT</td><td class="col-null null-no">NOT NULL</td><td class="col-default">—</td><td class="col-notes"><span class="badge b-idx">IDX</span>e.g. USER_LOGIN</td></tr><tr><td class="col-name">resource_type</td><td class="col-type">TEXT</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">hospital|user|invite|settings</td></tr><tr><td class="col-name">resource_id</td><td class="col-type">UUID</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr><tr><td class="col-name">old_value</td><td class="col-type">JSONB</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">Strip password fields</td></tr><tr><td class="col-name">new_value</td><td class="col-type">JSONB</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes">Strip password fields</td></tr><tr><td class="col-name">ip_address</td><td class="col-type">INET</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr><tr><td class="col-name">user_agent</td><td class="col-type">TEXT</td><td class="col-null null-yes">NULL</td><td class="col-default">—</td><td class="col-notes"></td></tr><tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td class="col-null null-no">NOT NULL</td><td class="col-default">now()</td><td class="col-notes"><span class="badge b-idx">IDX</span></td></tr></table></div></div>
+
+<!-- SQL MIGRATIONS -->
+<div class="panel" id="tab-sql">
+<pre><span class="cmt">-- ================================================
+-- Phase 1 Migrations — Run in order
+-- ================================================</span>
+
+<span class="cmt">-- 001_create_enums.sql</span>
+<span class="kw">CREATE TYPE</span> user_role <span class="kw">AS ENUM</span> (
+  <span class="str">'super_admin'</span>, <span class="str">'admin'</span>, <span class="str">'doctor'</span>,
+  <span class="str">'receptionist'</span>, <span class="str">'lab_tech'</span>, <span class="str">'pharmacist'</span>, <span class="str">'nurse'</span>
+);
+<span class="kw">CREATE TYPE</span> user_status   <span class="kw">AS ENUM</span> (<span class="str">'invited'</span>, <span class="str">'active'</span>, <span class="str">'deactivated'</span>);
+<span class="kw">CREATE TYPE</span> hospital_plan <span class="kw">AS ENUM</span> (<span class="str">'basic'</span>, <span class="str">'pro'</span>, <span class="str">'enterprise'</span>);
+<span class="kw">CREATE TYPE</span> hospital_status <span class="kw">AS ENUM</span> (<span class="str">'pending'</span>, <span class="str">'active'</span>, <span class="str">'inactive'</span>);
+<span class="kw">CREATE TYPE</span> invite_type   <span class="kw">AS ENUM</span> (<span class="str">'invite'</span>, <span class="str">'password_reset'</span>);
+
+<span class="cmt">-- 002_create_hospitals.sql</span>
+<span class="kw">CREATE TABLE</span> hospitals (
+  id           UUID           <span class="kw">PRIMARY KEY DEFAULT</span> <span class="fn">gen_random_uuid</span>(),
+  name         TEXT           <span class="kw">NOT NULL</span>,
+  address      TEXT           <span class="kw">NOT NULL</span>,  <span class="cmt">-- AES-256 encrypted</span>
+  city         TEXT           <span class="kw">NOT NULL</span>,
+  branch_code  TEXT           <span class="kw">NOT NULL UNIQUE</span>,
+  phone        TEXT,
+  plan         hospital_plan  <span class="kw">NOT NULL DEFAULT</span> <span class="str">'basic'</span>,
+  status       hospital_status <span class="kw">NOT NULL DEFAULT</span> <span class="str">'pending'</span>,
+  created_by   UUID           <span class="kw">NOT NULL</span>,
+  created_at   TIMESTAMPTZ    <span class="kw">NOT NULL DEFAULT</span> <span class="fn">now</span>(),
+  updated_at   TIMESTAMPTZ    <span class="kw">NOT NULL DEFAULT</span> <span class="fn">now</span>()
+);
+
+<span class="cmt">-- 003_create_users.sql</span>
+<span class="kw">CREATE TABLE</span> users (
+  id             UUID         <span class="kw">PRIMARY KEY DEFAULT</span> <span class="fn">gen_random_uuid</span>(),
+  email          TEXT         <span class="kw">NOT NULL</span>,        <span class="cmt">-- AES-256 encrypted</span>
+  email_hash     TEXT         <span class="kw">NOT NULL UNIQUE</span>, <span class="cmt">-- SHA-256 for lookup</span>
+  password_hash  TEXT         <span class="kw">NOT NULL</span>,
+  first_name     TEXT         <span class="kw">NOT NULL</span>,
+  last_name      TEXT         <span class="kw">NOT NULL</span>,
+  phone          TEXT,                          <span class="cmt">-- AES-256 encrypted</span>
+  role           user_role    <span class="kw">NOT NULL</span>,
+  hospital_id    UUID         <span class="kw">REFERENCES</span> hospitals(id) <span class="kw">ON DELETE RESTRICT</span>,
+  status         user_status  <span class="kw">NOT NULL DEFAULT</span> <span class="str">'invited'</span>,
+  last_login_at  TIMESTAMPTZ,
+  created_by     UUID         <span class="kw">REFERENCES</span> users(id) <span class="kw">ON DELETE SET NULL</span>,
+  created_at     TIMESTAMPTZ  <span class="kw">NOT NULL DEFAULT</span> <span class="fn">now</span>(),
+  updated_at     TIMESTAMPTZ  <span class="kw">NOT NULL DEFAULT</span> <span class="fn">now</span>()
+);
+<span class="kw">CREATE INDEX</span> idx_users_hospital_id  <span class="kw">ON</span> users(hospital_id);
+<span class="kw">CREATE INDEX</span> idx_users_email_hash   <span class="kw">ON</span> users(email_hash);
+<span class="kw">CREATE INDEX</span> idx_users_role         <span class="kw">ON</span> users(role);
+
+<span class="cmt">-- 004_create_invites.sql</span>
+<span class="kw">CREATE TABLE</span> invites (
+  id           UUID          <span class="kw">PRIMARY KEY DEFAULT</span> <span class="fn">gen_random_uuid</span>(),
+  email        TEXT          <span class="kw">NOT NULL</span>,
+  type         invite_type   <span class="kw">NOT NULL</span>,
+  role         user_role,
+  hospital_id  UUID          <span class="kw">REFERENCES</span> hospitals(id) <span class="kw">ON DELETE CASCADE</span>,
+  token_hash   TEXT          <span class="kw">NOT NULL</span>,
+  expires_at   TIMESTAMPTZ   <span class="kw">NOT NULL</span>,
+  used         BOOLEAN       <span class="kw">NOT NULL DEFAULT</span> <span class="str">false</span>,
+  created_by   UUID          <span class="kw">REFERENCES</span> users(id) <span class="kw">ON DELETE SET NULL</span>,
+  created_at   TIMESTAMPTZ   <span class="kw">NOT NULL DEFAULT</span> <span class="fn">now</span>()
+);
+<span class="kw">CREATE INDEX</span> idx_invites_token_hash <span class="kw">ON</span> invites(token_hash);
+
+<span class="cmt">-- 005_create_settings.sql</span>
+<span class="kw">CREATE TABLE</span> settings (
+  id                   UUID         <span class="kw">PRIMARY KEY DEFAULT</span> <span class="fn">gen_random_uuid</span>(),
+  hospital_id          UUID         <span class="kw">NOT NULL UNIQUE REFERENCES</span> hospitals(id) <span class="kw">ON DELETE CASCADE</span>,
+  working_hours        JSONB,
+  departments          JSONB        <span class="kw">DEFAULT</span> <span class="str">'[]'</span>,
+  services             JSONB        <span class="kw">DEFAULT</span> <span class="str">'[]'</span>,
+  billing_config       JSONB,
+  onboarding_checklist JSONB        <span class="kw">NOT NULL DEFAULT</span> <span class="str">'{"admin_assigned":false,"doctor_added":false,"working_hours_set":false,"billing_configured":false,"reception_added":false}'</span>,
+  updated_at           TIMESTAMPTZ  <span class="kw">NOT NULL DEFAULT</span> <span class="fn">now</span>()
+);
+
+<span class="cmt">-- 006_create_audit_logs.sql</span>
+<span class="kw">CREATE TABLE</span> audit_logs (
+  id            UUID         <span class="kw">PRIMARY KEY DEFAULT</span> <span class="fn">gen_random_uuid</span>(),
+  user_id       UUID,        <span class="cmt">-- no FK — user may be deleted</span>
+  user_role     TEXT,
+  hospital_id   UUID,        <span class="cmt">-- no FK — hospital may be deleted</span>
+  action        TEXT         <span class="kw">NOT NULL</span>,
+  resource_type TEXT,
+  resource_id   UUID,
+  old_value     JSONB,
+  new_value     JSONB,
+  ip_address    INET,
+  user_agent    TEXT,
+  created_at    TIMESTAMPTZ  <span class="kw">NOT NULL DEFAULT</span> <span class="fn">now</span>()
+);
+<span class="kw">CREATE INDEX</span> idx_audit_user_id    <span class="kw">ON</span> audit_logs(user_id);
+<span class="kw">CREATE INDEX</span> idx_audit_hospital   <span class="kw">ON</span> audit_logs(hospital_id);
+<span class="kw">CREATE INDEX</span> idx_audit_action     <span class="kw">ON</span> audit_logs(action);
+<span class="kw">CREATE INDEX</span> idx_audit_created_at <span class="kw">ON</span> audit_logs(created_at);
+<span class="cmt">-- REVOKE update/delete from app user:
+-- REVOKE UPDATE, DELETE ON audit_logs FROM app_user;</span>
+
+<span class="cmt">-- 007_updated_at_trigger.sql</span>
+<span class="kw">CREATE OR REPLACE FUNCTION</span> <span class="fn">set_updated_at</span>()
+<span class="kw">RETURNS TRIGGER AS</span> $$
+<span class="kw">BEGIN</span>
+  NEW.updated_at = <span class="fn">now</span>();
+  <span class="kw">RETURN</span> NEW;
+<span class="kw">END</span>;
+$$ <span class="kw">LANGUAGE</span> plpgsql;
+
+<span class="kw">CREATE TRIGGER</span> trg_users_updated_at
+  <span class="kw">BEFORE UPDATE ON</span> users
+  <span class="kw">FOR EACH ROW EXECUTE FUNCTION</span> <span class="fn">set_updated_at</span>();
+
+<span class="kw">CREATE TRIGGER</span> trg_hospitals_updated_at
+  <span class="kw">BEFORE UPDATE ON</span> hospitals
+  <span class="kw">FOR EACH ROW EXECUTE FUNCTION</span> <span class="fn">set_updated_at</span>();
+
+<span class="cmt">-- 008_seed_super_admin.sql  (run once — change password immediately)</span>
+<span class="kw">INSERT INTO</span> users (email, email_hash, password_hash, first_name, last_name, role, status)
+<span class="kw">VALUES</span> (
+  <span class="str">'&lt;ENCRYPTED_EMAIL&gt;'</span>,
+  <span class="str">'&lt;SHA256_OF_EMAIL&gt;'</span>,
+  <span class="str">'&lt;ARGON2ID_HASH_OF_TEMP_PASSWORD&gt;'</span>,
+  <span class="str">'Super'</span>, <span class="str">'Admin'</span>,
+  <span class="str">'super_admin'</span>,
+  <span class="str">'active'</span>
+);</pre>
+</div>
+
+</div><!-- /page -->
+<script>
+function show(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+</script>
+</body>
+</html>

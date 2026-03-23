@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Phase 1 — Stories, Env & Git</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#f8f7f4;--bg2:#f1ede8;--bg3:#e8e3dc;
+  --surface:#ffffff;
+  --border:rgba(0,0,0,0.07);--border2:rgba(0,0,0,0.13);
+  --text:#1a1814;--text2:#6b6158;--text3:#b0a898;
+  --green:#166534;--green-bg:#dcfce7;--green-b:rgba(22,101,52,0.2);
+  --red:#991b1b;--red-bg:#fee2e2;--red-b:rgba(153,27,27,0.2);
+  --blue:#1e3a8a;--blue-bg:#dbeafe;--blue-b:rgba(30,58,138,0.2);
+  --amber:#92400e;--amber-bg:#fef3c7;--amber-b:rgba(146,64,14,0.2);
+  --purple:#5b21b6;--purple-bg:#ede9fe;--purple-b:rgba(91,33,182,0.2);
+  --mono:'JetBrains Mono',monospace;--sans:'Outfit',system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background-image:radial-gradient(rgba(0,0,0,0.03) 1px,transparent 1px);background-size:20px 20px;}
+.page{position:relative;max-width:1060px;margin:0 auto;padding:40px 20px 80px;}
+.header{margin-bottom:36px;border-bottom:2px solid var(--border2);padding-bottom:28px;}
+.eyebrow{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.14em;margin-bottom:10px;}
+h1{font-size:30px;font-weight:800;letter-spacing:-0.02em;color:var(--text);}
+h1 span{color:var(--blue);}
+
+.tabs{display:flex;gap:2px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:3px;width:fit-content;margin-bottom:32px;flex-wrap:wrap;}
+.tab{font-family:var(--sans);font-size:12px;font-weight:600;padding:7px 18px;border-radius:8px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.tab:hover{color:var(--text);}
+.tab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.1);}
+
+.panel{display:none;}
+.panel.active{display:block;}
+
+/* STORIES */
+.story{background:var(--surface);border:1px solid var(--border2);border-radius:12px;margin-bottom:12px;overflow:hidden;}
+.story-head{display:flex;align-items:center;gap:12px;padding:13px 18px;cursor:pointer;transition:background .1s;}
+.story-head:hover{background:var(--bg);}
+.story-id{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap;}
+.story-title{font-size:13px;font-weight:600;color:var(--text);flex:1;}
+.role-pill{font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:var(--mono);white-space:nowrap;}
+.chevron{font-size:10px;color:var(--text3);transition:transform .2s;margin-left:4px;}
+.story.open .chevron{transform:rotate(180deg);}
+.story-body{display:none;border-top:1px solid var(--border);padding:16px 18px;}
+.story.open .story-body{display:block;}
+.as-a{font-size:13px;color:var(--text2);margin-bottom:12px;font-style:italic;}
+.ac-title{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text3);margin-bottom:8px;}
+.ac-list{display:flex;flex-direction:column;gap:5px;}
+.ac-item{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;border-radius:7px;font-size:12px;}
+.ac-pass{background:var(--green-bg);border:1px solid var(--green-b);color:var(--green);}
+.ac-fail{background:var(--red-bg);border:1px solid var(--red-b);color:var(--red);}
+.ac-icon{font-size:11px;flex-shrink:0;margin-top:1px;font-weight:700;}
+
+.sid-a{background:var(--blue-bg);color:var(--blue);}
+.sid-b{background:var(--green-bg);color:var(--green);}
+.sid-c{background:var(--amber-bg);color:var(--amber);}
+.sid-d{background:var(--purple-bg);color:var(--purple);}
+.sid-e{background:var(--red-bg);color:var(--red);}
+.rp-sa{background:var(--purple-bg);color:var(--purple);}
+.rp-a{background:var(--green-bg);color:var(--green);}
+.rp-all{background:var(--bg3);color:var(--text2);}
+
+/* ENV */
+.env-group{margin-bottom:20px;}
+.env-group-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--text3);margin-bottom:8px;}
+.env-table{width:100%;border-collapse:collapse;border:1px solid var(--border2);border-radius:10px;overflow:hidden;}
+.env-table th{background:var(--bg2);padding:8px 14px;text-align:left;font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border2);}
+.env-table td{padding:9px 14px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;}
+.env-table tr:last-child td{border-bottom:none;}
+.env-table tr:hover td{background:var(--bg);}
+.env-key{font-family:var(--mono);font-weight:600;color:var(--blue);}
+.env-ex{font-family:var(--mono);font-size:10px;color:var(--text3);}
+.env-desc{font-size:11px;color:var(--text2);}
+.env-req{font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:3px;}
+.req-yes{background:var(--red-bg);color:var(--red);}
+.req-no{background:var(--bg3);color:var(--text3);}
+.env-file{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px;font-family:var(--mono);font-size:11px;line-height:2;color:var(--text);overflow-x:auto;white-space:pre;margin-top:16px;}
+.env-cmt{color:var(--text3);}
+.env-val{color:var(--amber);}
+
+/* GIT */
+.git-section{margin-bottom:24px;}
+.git-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+pre.git{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px;font-family:var(--mono);font-size:12px;line-height:1.8;color:var(--text);overflow-x:auto;white-space:pre;}
+.git-table{width:100%;border-collapse:collapse;border:1px solid var(--border2);border-radius:10px;overflow:hidden;}
+.git-table th{background:var(--bg2);padding:8px 14px;text-align:left;font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border2);}
+.git-table td{padding:9px 14px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;}
+.git-table tr:last-child td{border-bottom:none;}
+.git-table tr:hover td{background:var(--bg);}
+.branch-name{font-family:var(--mono);font-weight:600;color:var(--blue);}
+.branch-desc{font-size:11px;color:var(--text2);}
+.branch-rule{font-size:11px;color:var(--text2);}
+.rule-card{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:14px 18px;margin-bottom:8px;}
+.rule-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.rule-list{list-style:none;display:flex;flex-direction:column;gap:4px;}
+.rule-list li{font-size:12px;color:var(--text2);}
+.rule-list li::before{content:'→ ';color:var(--text3);}
+
+.cmt-ex{background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:12px 16px;font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--text);margin-top:8px;}
+.ct{color:var(--green);}
+.cs{color:var(--red);}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="header">
+  <div class="eyebrow">Phase 1 · Module 1 · Handoff Doc 03</div>
+  <h1>Stories, <span>Env</span> & Git</h1>
+  <p>User stories with acceptance criteria · Environment variables · Git structure & branching rules</p>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('stories')">User stories</button>
+  <button class="tab" onclick="showTab('env')">Env variables</button>
+  <button class="tab" onclick="showTab('git')">Git structure</button>
+</div>
+
+<!-- STORIES -->
+<div class="panel active" id="tab-stories">
+
+<!-- AUTH STORIES -->
+<div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin-bottom:10px;">Authentication</div>
+
+<div class="story" id="s1">
+  <div class="story-head" onclick="toggleStory('s1')">
+    <span class="story-id sid-a">AUTH-01</span>
+    <span class="story-title">Super admin logs in and lands on SA dashboard</span>
+    <span class="role-pill rp-sa">Super admin</span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="story-body">
+    <div class="as-a">As a super admin, I want to log in with my email and password so I can access the platform management dashboard.</div>
+    <div class="ac-title">Acceptance criteria</div>
+    <div class="ac-list">
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Given valid credentials, login succeeds and I am redirected to /superadmin/dashboard</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>My name and role "Super admin" are visible in the dashboard header</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>A JWT access token is set (not visible in localStorage — httpOnly cookie)</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Given wrong password, I see "Invalid email or password" — the error does not specify which field is wrong</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>After 5 failed attempts, I see "Too many attempts. Try again in 15 minutes" and cannot try again</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>If my account is deactivated, I see "Your account has been deactivated"</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>An admin visiting /superadmin/dashboard is redirected to /admin/dashboard</div>
+    </div>
+  </div>
+</div>
+
+<div class="story" id="s2">
+  <div class="story-head" onclick="toggleStory('s2')">
+    <span class="story-id sid-a">AUTH-02</span>
+    <span class="story-title">Admin logs in and lands on admin dashboard</span>
+    <span class="role-pill rp-a">Admin</span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="story-body">
+    <div class="as-a">As an admin, I want to log in and be taken to my branch dashboard, not the super admin panel.</div>
+    <div class="ac-list">
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Valid login redirects to /admin/dashboard</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Dashboard shows my hospital name and branch code</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>I can only see my branch's data — no other hospitals visible</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Navigating to /superadmin/dashboard shows "Access denied"</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Calling GET /api/hospitals (SA-only) returns 403</div>
+    </div>
+  </div>
+</div>
+
+<div class="story" id="s3">
+  <div class="story-head" onclick="toggleStory('s3')">
+    <span class="story-id sid-a">AUTH-03</span>
+    <span class="story-title">User resets forgotten password</span>
+    <span class="role-pill rp-all">All roles</span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="story-body">
+    <div class="as-a">As any user, I want to reset my password via email if I forget it.</div>
+    <div class="ac-list">
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>I enter my email and always see "If that email exists, a link was sent" — never a confirmation</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>I receive an email with a reset link (expires in 1 hour)</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>I set a new password meeting complexity rules and can log in immediately</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>All my other active sessions are logged out after reset</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Clicking an expired link shows "This link has expired. Request a new one."</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Clicking an already-used link shows "This link has already been used."</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Entering a non-existent email shows the same success message — no user enumeration</div>
+    </div>
+  </div>
+</div>
+
+<div class="story" id="s4">
+  <div class="story-head" onclick="toggleStory('s4')">
+    <span class="story-id sid-a">AUTH-04</span>
+    <span class="story-title">User logs out and session is invalidated</span>
+    <span class="role-pill rp-all">All roles</span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="story-body">
+    <div class="as-a">As any user, I want logging out to immediately end my session so no one can use my browser.</div>
+    <div class="ac-list">
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Clicking logout redirects to /login immediately</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>After logout, using the old JWT token returns 401 "Token revoked"</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Pressing browser back after logout does not restore the authenticated view</div>
+    </div>
+  </div>
+</div>
+
+<div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin:20px 0 10px;">Hospital onboarding — super admin</div>
+
+<div class="story" id="s5">
+  <div class="story-head" onclick="toggleStory('s5')">
+    <span class="story-id sid-b">HOSP-01</span>
+    <span class="story-title">Super admin creates a new hospital</span>
+    <span class="role-pill rp-sa">Super admin</span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="story-body">
+    <div class="as-a">As a super admin, I want to create a new hospital so it can be onboarded to the platform.</div>
+    <div class="ac-list">
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>I fill name, address, city, branch code, plan and submit</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Hospital appears in list with status "Pending"</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>A settings row is auto-created with all checklist items = false</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Action is logged in audit trail</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Using a duplicate branch code shows "Branch code already in use"</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Admin cannot access the create hospital form — they see 403</div>
+    </div>
+  </div>
+</div>
+
+<div class="story" id="s6">
+  <div class="story-head" onclick="toggleStory('s6')">
+    <span class="story-id sid-b">HOSP-02</span>
+    <span class="story-title">Super admin assigns an admin to a hospital</span>
+    <span class="role-pill rp-sa">Super admin</span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="story-body">
+    <div class="as-a">As a super admin, I want to assign an admin to a hospital so they can configure and manage it.</div>
+    <div class="ac-list">
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>I enter an email address and select role "Admin" — invite is sent</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Admin receives invite email with a link valid for 48 hours</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Checklist item "admin_assigned" turns true</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Using an already-registered email shows "User already exists"</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Admin cannot invite another admin — form does not show "Admin" as a role option</div>
+    </div>
+  </div>
+</div>
+
+<div class="story" id="s7">
+  <div class="story-head" onclick="toggleStory('s7')">
+    <span class="story-id sid-b">HOSP-03</span>
+    <span class="story-title">Super admin activates a hospital</span>
+    <span class="role-pill rp-sa">Super admin</span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="story-body">
+    <div class="as-a">As a super admin, I want to activate a hospital so patients can start booking appointments.</div>
+    <div class="ac-list">
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>When all 5 checklist items are complete, "Activate" button is enabled</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Clicking activate changes status to "Active" and logs the action</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>With incomplete checklist, "Activate" button is disabled with tooltip "Complete onboarding first"</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>API call to activate with incomplete checklist returns 400 listing missing items</div>
+    </div>
+  </div>
+</div>
+
+<div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin:20px 0 10px;">Admin — staff management</div>
+
+<div class="story" id="s8">
+  <div class="story-head" onclick="toggleStory('s8')">
+    <span class="story-id sid-c">STAFF-01</span>
+    <span class="story-title">Admin invites a doctor to the branch</span>
+    <span class="role-pill rp-a">Admin</span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="story-body">
+    <div class="as-a">As an admin, I want to invite a doctor so they can access the system and see patients.</div>
+    <div class="ac-list">
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>I enter email + select "Doctor" from roles — invite sent</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Doctor appears in staff list with status "Invited"</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Doctor receives invite email valid for 48 hours</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Checklist item "doctor_added" turns true</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Role dropdown does not show "Admin" or "Super admin" options</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Inviting someone from Hospital B's data is impossible — admin is scoped to own branch</div>
+    </div>
+  </div>
+</div>
+
+<div class="story" id="s9">
+  <div class="story-head" onclick="toggleStory('s9')">
+    <span class="story-id sid-c">STAFF-02</span>
+    <span class="story-title">New staff accepts invite and sets password</span>
+    <span class="role-pill rp-all">New staff member</span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="story-body">
+    <div class="as-a">As a newly invited staff member, I want to click the invite link and set my password to activate my account.</div>
+    <div class="ac-list">
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Clicking link shows my role and hospital name pre-filled</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>I set name + password and am auto-logged in and redirected to my dashboard</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>My status in staff list changes from "Invited" to "Active"</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Clicking an expired link (48h) shows "Invite expired. Contact your admin."</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Clicking an already-used link shows "This invite has already been used."</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Weak password (no uppercase/number/special char) shows inline validation error</div>
+    </div>
+  </div>
+</div>
+
+<div class="story" id="s10">
+  <div class="story-head" onclick="toggleStory('s10')">
+    <span class="story-id sid-c">STAFF-03</span>
+    <span class="story-title">Admin deactivates a staff member</span>
+    <span class="role-pill rp-a">Admin</span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="story-body">
+    <div class="as-a">As an admin, I want to deactivate a staff member so they immediately lose access.</div>
+    <div class="ac-list">
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Staff appears as "Deactivated" in list immediately</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Deactivated user's next API call returns 401 immediately (sessions killed)</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Action is logged in audit trail with who did it and when</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Admin cannot deactivate themselves — button is disabled for own account</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Admin cannot deactivate staff from another branch</div>
+    </div>
+  </div>
+</div>
+
+<div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin:20px 0 10px;">Edge cases & security</div>
+
+<div class="story" id="s11">
+  <div class="story-head" onclick="toggleStory('s11')">
+    <span class="story-id sid-e">SEC-01</span>
+    <span class="story-title">Cross-branch access attempt is blocked</span>
+    <span class="role-pill rp-a">Admin</span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="story-body">
+    <div class="as-a">As a security requirement, no admin should be able to read or write data belonging to another hospital.</div>
+    <div class="ac-list">
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>GET /api/hospitals/[other-hospital-id]/staff returns 403</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>PATCH /api/settings/hospital/[other-hospital-id] returns 403</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>GET /api/audit/logs/hospital/[other-hospital-id] returns 403</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>All cross-branch attempts are logged in audit_logs with action UNAUTHORIZED_ACCESS_ATTEMPT</div>
+    </div>
+  </div>
+</div>
+
+<div class="story" id="s12">
+  <div class="story-head" onclick="toggleStory('s12')">
+    <span class="story-id sid-e">SEC-02</span>
+    <span class="story-title">Rate limiting on login endpoint</span>
+    <span class="role-pill rp-all">All</span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="story-body">
+    <div class="as-a">As a security requirement, brute force attacks on the login endpoint must be blocked.</div>
+    <div class="ac-list">
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>5 failed logins from same IP within 15 minutes triggers rate limit</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>6th attempt returns 429 with message "Too many attempts. Try again in X minutes."</div>
+      <div class="ac-item ac-fail"><span class="ac-icon">✗</span>Response includes Retry-After header with seconds remaining</div>
+      <div class="ac-item ac-pass"><span class="ac-icon">✓</span>Counter resets after 15 minutes</div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ENV VARIABLES -->
+<div class="panel" id="tab-env">
+
+<div class="env-group">
+  <div class="env-group-title">Auth & security</div>
+  <table class="env-table">
+    <tr><th>Variable</th><th>Required</th><th>Example</th><th>Description</th></tr>
+    <tr><td class="env-key">JWT_SECRET</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">64-char random hex</td><td class="env-desc">Signs access tokens. Min 64 chars. Generate: openssl rand -hex 64</td></tr>
+    <tr><td class="env-key">JWT_REFRESH_SECRET</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">64-char random hex</td><td class="env-desc">Signs refresh tokens. Must be different from JWT_SECRET.</td></tr>
+    <tr><td class="env-key">JWT_EXPIRY</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">15m</td><td class="env-desc">Access token lifetime. Use short value: 15m.</td></tr>
+    <tr><td class="env-key">JWT_REFRESH_EXPIRY</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">7d</td><td class="env-desc">Refresh token lifetime.</td></tr>
+    <tr><td class="env-key">ENCRYPTION_KEY</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">32-byte hex</td><td class="env-desc">AES-256 key for field encryption. Generate: openssl rand -hex 32</td></tr>
+    <tr><td class="env-key">ENCRYPTION_IV_LENGTH</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">16</td><td class="env-desc">IV length for AES-256-GCM. Always 16.</td></tr>
+    <tr><td class="env-key">BCRYPT_ROUNDS</td><td><span class="env-req req-no">optional</span></td><td class="env-ex">12</td><td class="env-desc">argon2id time cost. Default 3 is fine. Higher = slower = safer.</td></tr>
+  </table>
+</div>
+
+<div class="env-group">
+  <div class="env-group-title">Database</div>
+  <table class="env-table">
+    <tr><th>Variable</th><th>Required</th><th>Example</th><th>Description</th></tr>
+    <tr><td class="env-key">DATABASE_URL</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">postgresql://user:pass@host:5432/dbname</td><td class="env-desc">Full PostgreSQL connection string.</td></tr>
+    <tr><td class="env-key">DATABASE_POOL_MIN</td><td><span class="env-req req-no">optional</span></td><td class="env-ex">2</td><td class="env-desc">Min connections in pool.</td></tr>
+    <tr><td class="env-key">DATABASE_POOL_MAX</td><td><span class="env-req req-no">optional</span></td><td class="env-ex">10</td><td class="env-desc">Max connections in pool.</td></tr>
+    <tr><td class="env-key">REDIS_URL</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">redis://localhost:6379</td><td class="env-desc">Redis connection for blacklist + rate limiting.</td></tr>
+  </table>
+</div>
+
+<div class="env-group">
+  <div class="env-group-title">Email</div>
+  <table class="env-table">
+    <tr><th>Variable</th><th>Required</th><th>Example</th><th>Description</th></tr>
+    <tr><td class="env-key">EMAIL_PROVIDER</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">sendgrid</td><td class="env-desc">sendgrid | mailgun | ses</td></tr>
+    <tr><td class="env-key">EMAIL_API_KEY</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">SG.xxxx</td><td class="env-desc">Provider API key.</td></tr>
+    <tr><td class="env-key">EMAIL_FROM</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">no-reply@yourdomain.com</td><td class="env-desc">From address for all system emails.</td></tr>
+    <tr><td class="env-key">EMAIL_FROM_NAME</td><td><span class="env-req req-no">optional</span></td><td class="env-ex">HealthCare Platform</td><td class="env-desc">Display name for email sender.</td></tr>
+  </table>
+</div>
+
+<div class="env-group">
+  <div class="env-group-title">Application</div>
+  <table class="env-table">
+    <tr><th>Variable</th><th>Required</th><th>Example</th><th>Description</th></tr>
+    <tr><td class="env-key">NODE_ENV</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">development</td><td class="env-desc">development | staging | production</td></tr>
+    <tr><td class="env-key">PORT</td><td><span class="env-req req-no">optional</span></td><td class="env-ex">3000</td><td class="env-desc">API server port. Default 3000.</td></tr>
+    <tr><td class="env-key">APP_URL</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">https://app.yourdomain.com</td><td class="env-desc">Frontend base URL. Used to build invite/reset links in emails.</td></tr>
+    <tr><td class="env-key">API_URL</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">https://api.yourdomain.com</td><td class="env-desc">Backend base URL.</td></tr>
+    <tr><td class="env-key">CORS_ORIGIN</td><td><span class="env-req req-yes">required</span></td><td class="env-ex">https://app.yourdomain.com</td><td class="env-desc">Allowed CORS origin. Must exactly match frontend URL.</td></tr>
+    <tr><td class="env-key">RATE_LIMIT_WINDOW_MS</td><td><span class="env-req req-no">optional</span></td><td class="env-ex">900000</td><td class="env-desc">Rate limit window in ms (default 15 min = 900000).</td></tr>
+    <tr><td class="env-key">RATE_LIMIT_MAX_LOGIN</td><td><span class="env-req req-no">optional</span></td><td class="env-ex">5</td><td class="env-desc">Max login attempts per window per IP.</td></tr>
+    <tr><td class="env-key">LOG_LEVEL</td><td><span class="env-req req-no">optional</span></td><td class="env-ex">info</td><td class="env-desc">error | warn | info | debug</td></tr>
+  </table>
+</div>
+
+<div class="env-file"><span class="env-cmt"># ============================================
+# .env.example — copy to .env and fill values
+# NEVER commit .env to git
+# ============================================
+
+# Auth
+</span>JWT_SECRET=<span class="env-val">your-64-char-random-secret-here</span>
+JWT_REFRESH_SECRET=<span class="env-val">your-different-64-char-secret-here</span>
+JWT_EXPIRY=<span class="env-val">15m</span>
+JWT_REFRESH_EXPIRY=<span class="env-val">7d</span>
+ENCRYPTION_KEY=<span class="env-val">your-32-byte-hex-key-here</span>
+ENCRYPTION_IV_LENGTH=<span class="env-val">16</span>
+
+<span class="env-cmt"># Database</span>
+DATABASE_URL=<span class="env-val">postgresql://user:password@localhost:5432/healthcare_db</span>
+REDIS_URL=<span class="env-val">redis://localhost:6379</span>
+
+<span class="env-cmt"># Email</span>
+EMAIL_PROVIDER=<span class="env-val">sendgrid</span>
+EMAIL_API_KEY=<span class="env-val">SG.your-api-key-here</span>
+EMAIL_FROM=<span class="env-val">no-reply@yourdomain.com</span>
+EMAIL_FROM_NAME=<span class="env-val">HealthCare Platform</span>
+
+<span class="env-cmt"># App</span>
+NODE_ENV=<span class="env-val">development</span>
+PORT=<span class="env-val">3000</span>
+APP_URL=<span class="env-val">http://localhost:3001</span>
+API_URL=<span class="env-val">http://localhost:3000</span>
+CORS_ORIGIN=<span class="env-val">http://localhost:3001</span>
+LOG_LEVEL=<span class="env-val">debug</span></div>
+
+</div>
+
+<!-- GIT STRUCTURE -->
+<div class="panel" id="tab-git">
+
+<div class="git-section">
+  <div class="git-title">Repository structure</div>
+  <pre class="git">healthcare-platform/
+├── backend/                    ← Node.js / Express API
+│   ├── src/
+│   │   ├── config/             ← env, db, redis config
+│   │   ├── middleware/         ← auth, rate limit, permissions
+│   │   ├── modules/
+│   │   │   ├── auth/           ← login, logout, refresh, reset, invite
+│   │   │   ├── hospitals/      ← CRUD, status, checklist
+│   │   │   ├── staff/          ← invite, role, deactivate
+│   │   │   └── settings/       ← branch config, audit logs
+│   │   ├── services/           ← email, audit, encryption, token
+│   │   ├── utils/              ← helpers, validators, constants
+│   │   └── app.js
+│   ├── migrations/             ← 001_create_enums.sql, 002_...
+│   ├── tests/
+│   │   ├── unit/
+│   │   └── integration/
+│   ├── .env.example
+│   └── package.json
+│
+├── frontend/                   ← React / Next.js
+│   ├── src/
+│   │   ├── app/                ← Next.js app router pages
+│   │   │   ├── (auth)/         ← login, forgot-password, reset, invite
+│   │   │   ├── superadmin/     ← SA dashboard, hospitals, settings
+│   │   │   └── admin/          ← admin dashboard, staff, branch settings
+│   │   ├── components/         ← shared UI components
+│   │   ├── hooks/              ← useAuth, useHospital, useStaff
+│   │   ├── services/           ← API call functions (auth.js, hospitals.js)
+│   │   ├── context/            ← AuthContext
+│   │   └── utils/
+│   ├── .env.example
+│   └── package.json
+│
+├── docs/                       ← All handoff docs (this folder)
+│   ├── 01_database_schema.html
+│   ├── 02_api_spec.html
+│   ├── 03_stories_env_git.html
+│   ├── phase1_architecture.html
+│   ├── phase1_tasks.html
+│   ├── backend_routes.html
+│   └── healthcare_flowchart.html
+│
+├── .gitignore
+└── README.md</pre>
+</div>
+
+<div class="git-section">
+  <div class="git-title">Branch strategy</div>
+  <table class="git-table">
+    <tr><th>Branch</th><th>Purpose</th><th>Rules</th></tr>
+    <tr><td class="branch-name">main</td><td class="branch-desc">Production-ready code only</td><td class="branch-rule">No direct push. Merge from staging only. Protected.</td></tr>
+    <tr><td class="branch-name">staging</td><td class="branch-desc">QA and testing environment</td><td class="branch-rule">Merge from dev after QA sign-off. Auto-deploys to staging server.</td></tr>
+    <tr><td class="branch-name">dev</td><td class="branch-desc">Integration branch</td><td class="branch-rule">Feature branches merge here. Runs CI on every push.</td></tr>
+    <tr><td class="branch-name">feature/TASK-ID-name</td><td class="branch-desc">Individual feature work</td><td class="branch-rule">e.g. feature/API-02-login-endpoint. Branches off dev. PR back to dev.</td></tr>
+    <tr><td class="branch-name">fix/TASK-ID-name</td><td class="branch-desc">Bug fixes</td><td class="branch-rule">e.g. fix/AUTH-01-token-expiry. Branches off dev (or main for hotfixes).</td></tr>
+  </table>
+</div>
+
+<div class="git-section">
+  <div class="git-title">Commit message format</div>
+  <div class="cmt-ex"><span class="ct">feat</span>(auth): add POST /login endpoint with rate limiting
+<span class="ct">feat</span>(hospitals): create hospital with checklist auto-init
+<span class="ct">fix</span>(auth): correct token blacklist TTL calculation
+<span class="cs">test</span>(middleware): add unit tests for checkPermission
+<span class="cs">chore</span>(db): add migration 006 for audit_logs table
+<span class="cs">docs</span>(api): update invite endpoint response schema</div>
+  <div style="font-size:11px;color:var(--text2);margin-top:8px;">Format: <code style="font-family:var(--mono);">type(scope): short description</code> — types: feat | fix | test | chore | docs | refactor</div>
+</div>
+
+<div class="git-section">
+  <div class="git-title">PR rules</div>
+  <div class="rule-card">
+    <div class="rule-title">Before opening a PR</div>
+    <ul class="rule-list">
+      <li>All tests pass locally</li>
+      <li>No console.log statements left in code</li>
+      <li>No .env file committed (check with git status)</li>
+      <li>PR title matches commit format: feat(auth): ...</li>
+      <li>PR description links the task ID: "Closes DB-01"</li>
+    </ul>
+  </div>
+  <div class="rule-card">
+    <div class="rule-title">Review requirements</div>
+    <ul class="rule-list">
+      <li>Minimum 1 reviewer approval before merge</li>
+      <li>CI pipeline must be green (lint + tests)</li>
+      <li>No direct push to dev, staging, or main</li>
+      <li>Reviewer checks: does the code match the API spec and task acceptance criteria?</li>
+    </ul>
+  </div>
+  <div class="rule-card">
+    <div class="rule-title">.gitignore must include</div>
+    <ul class="rule-list">
+      <li>.env (all variants — .env.local, .env.production)</li>
+      <li>node_modules/</li>
+      <li>*.log files</li>
+      <li>dist/ and .next/ build folders</li>
+      <li>*.pem and *.key certificate files</li>
+    </ul>
+  </div>
+</div>
+
+</div>
+
+</div><!-- /page -->
+<script>
+function showTab(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+function toggleStory(id){
+  document.getElementById(id).classList.toggle('open');
+}
+</script>
+</body>
+</html>
