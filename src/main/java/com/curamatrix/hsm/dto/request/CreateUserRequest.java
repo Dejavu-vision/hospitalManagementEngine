@@ -34,7 +34,7 @@ public class CreateUserRequest {
     private Double consultationFee;
 
     // Receptionist-specific fields (required if role is ROLE_RECEPTIONIST)
-    private String employeeId;
+    // Note: employeeId is auto-generated — not accepted from the client
     private String shift;
 
     // Extra page access (optional — pages beyond what the role provides)

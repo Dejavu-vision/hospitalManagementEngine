@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Set;
@@ -34,20 +35,50 @@ public class AdminController {
     // ─── CRUD ────────────────────────────────────────────────────
 
     @PostMapping("/users")
-    public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
+    public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request,
+            @RequestParam(required = false) Long tenantId,
+            Authentication authentication) {
         log.info("Creating new user: {}", request.getEmail());
-        UserResponse response = userManagementService.createUser(request);
+        boolean isSuperAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_SUPER_ADMIN".equals(a.getAuthority()));
+
+        Long effectiveTenantId;
+        if (isSuperAdmin) {
+            if (tenantId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "tenantId is required when creating users as SUPER_ADMIN");
+            }
+            effectiveTenantId = tenantId;
+        } else {
+            User currentUser = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+            effectiveTenantId = currentUser.getTenantId();
+            if (tenantId != null && !tenantId.equals(effectiveTenantId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "You cannot create users for another tenant");
+            }
+        }
+
+        UserResponse response = userManagementService.createUser(request, effectiveTenantId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/users")
     public ResponseEntity<List<UserResponse>> getAllUsers(
-            @RequestParam(required = false) Long tenantId) {
+            @RequestParam(required = false) Long tenantId,
+            Authentication authentication) {
+        boolean isSuperAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_SUPER_ADMIN".equals(a.getAuthority()));
+
         List<UserResponse> users;
-        if (tenantId != null) {
-            users = userManagementService.getUsersByTenantId(tenantId);
+        if (isSuperAdmin) {
+            users = (tenantId != null)
+                    ? userManagementService.getUsersByTenantId(tenantId)
+                    : userManagementService.getAllUsers();
         } else {
-            users = userManagementService.getAllUsers();
+            User currentUser = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+            users = userManagementService.getUsersByTenantId(currentUser.getTenantId());
         }
         return ResponseEntity.ok(users);
     }
@@ -60,7 +91,7 @@ public class AdminController {
 
     @PutMapping("/users/{id}")
     public ResponseEntity<UserResponse> updateUser(@PathVariable Long id,
-                                                   @Valid @RequestBody UpdateUserRequest request) {
+            @Valid @RequestBody UpdateUserRequest request) {
         log.info("Updating user: {}", id);
         UserResponse response = userManagementService.updateUser(id, request);
         return ResponseEntity.ok(response);
@@ -97,7 +128,7 @@ public class AdminController {
 
     @PutMapping("/users/{id}/roles")
     public ResponseEntity<UserResponse> setRoles(@PathVariable Long id,
-                                                 @RequestBody Set<RoleName> roleNames) {
+            @RequestBody Set<RoleName> roleNames) {
         log.info("Setting roles for user {}: {}", id, roleNames);
         UserResponse response = userManagementService.setRoles(id, roleNames);
         return ResponseEntity.ok(response);
@@ -105,7 +136,7 @@ public class AdminController {
 
     @PostMapping("/users/{id}/roles/{roleName}")
     public ResponseEntity<UserResponse> addRole(@PathVariable Long id,
-                                                @PathVariable RoleName roleName) {
+            @PathVariable RoleName roleName) {
         log.info("Adding role {} to user {}", roleName, id);
         UserResponse response = userManagementService.addRole(id, roleName);
         return ResponseEntity.ok(response);
@@ -113,7 +144,7 @@ public class AdminController {
 
     @DeleteMapping("/users/{id}/roles/{roleName}")
     public ResponseEntity<UserResponse> removeRole(@PathVariable Long id,
-                                                   @PathVariable RoleName roleName) {
+            @PathVariable RoleName roleName) {
         log.info("Removing role {} from user {}", roleName, id);
         UserResponse response = userManagementService.removeRole(id, roleName);
         return ResponseEntity.ok(response);

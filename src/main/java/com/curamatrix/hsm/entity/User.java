@@ -10,7 +10,15 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "users")
+@Table(
+        name = "users",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_user_employee_id_tenant",
+                        columnNames = {"employee_id", "tenant_id"}
+                )
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -30,6 +38,9 @@ public class User extends TenantAwareEntity {
 
     @Column(name = "full_name", nullable = false)
     private String fullName;
+
+    @Column(name = "employee_id", length = 20)
+    private String employeeId;
 
     private String phone;
 

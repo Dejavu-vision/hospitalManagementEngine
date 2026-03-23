@@ -7,6 +7,7 @@ import com.curamatrix.hsm.entity.*;
 import com.curamatrix.hsm.enums.RoleName;
 import com.curamatrix.hsm.enums.Shift;
 import com.curamatrix.hsm.repository.*;
+import com.curamatrix.hsm.context.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,29 +30,40 @@ public class UserManagementService {
     private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final AccessControlService accessControlService;
+    private final EmployeeIdGeneratorService employeeIdGeneratorService;
 
     // ─── Create ──────────────────────────────────────────────────
 
     @Transactional
-    public UserResponse createUser(CreateUserRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists: " + request.getEmail());
-        }
-
+    public UserResponse createUser(CreateUserRequest request, Long targetTenantId) {
         Role role = roleRepository.findByName(request.getRole())
                 .orElseThrow(() -> new RuntimeException("Role not found: " + request.getRole()));
 
         Set<Role> roles = new HashSet<>();
         roles.add(role);
 
+        Long tenantId = targetTenantId != null ? targetTenantId : TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context is missing. Please login again.");
+        }
+
+        Optional<User> existingOpt = userRepository.findByEmail(request.getEmail());
+        if (existingOpt.isPresent()) {
+            return reactivateOrRejectExistingUser(existingOpt.get(), request, role, tenantId);
+        }
+
+        String generatedEmployeeId = employeeIdGeneratorService.generateEmployeeId(tenantId, request.getRole());
+
         User user = User.builder()
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
+                .employeeId(generatedEmployeeId)
                 .phone(request.getPhone())
                 .isActive(true)
                 .roles(roles)
                 .build();
+        user.setTenantId(tenantId);
 
         user = userRepository.save(user);
         log.info("User created: {} with role: {}", user.getEmail(), request.getRole());
@@ -67,6 +79,39 @@ public class UserManagementService {
             createDoctorProfile(user, request);
         } else if (request.getRole() == RoleName.ROLE_RECEPTIONIST) {
             createReceptionistProfile(user, request);
+        }
+
+        return mapToResponse(user);
+    }
+
+    private UserResponse reactivateOrRejectExistingUser(User existingUser,
+            CreateUserRequest request,
+            Role role,
+            Long tenantId) {
+        if (Boolean.TRUE.equals(existingUser.getIsActive())) {
+            throw new RuntimeException("Email already exists: " + request.getEmail());
+        }
+        if (!tenantId.equals(existingUser.getTenantId())) {
+            throw new RuntimeException("Email already exists in another hospital: " + request.getEmail());
+        }
+
+        existingUser.setIsActive(true);
+        existingUser.setFullName(request.getFullName());
+        existingUser.setPhone(request.getPhone());
+        existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
+        existingUser.setRoles(Set.of(role));
+
+        if (existingUser.getEmployeeId() == null || existingUser.getEmployeeId().isBlank()) {
+            existingUser.setEmployeeId(employeeIdGeneratorService.generateEmployeeId(tenantId, request.getRole()));
+        }
+
+        User user = userRepository.save(existingUser);
+        log.info("Reactivated user: {} with role: {}", user.getEmail(), request.getRole());
+
+        if (request.getRole() == RoleName.ROLE_DOCTOR) {
+            createOrUpdateDoctorProfile(user, request);
+        } else if (request.getRole() == RoleName.ROLE_RECEPTIONIST) {
+            createOrUpdateReceptionistProfile(user, request);
         }
 
         return mapToResponse(user);
@@ -219,34 +264,40 @@ public class UserManagementService {
     // ─── Helpers ─────────────────────────────────────────────────
 
     private void createDoctorProfile(User user, CreateUserRequest request) {
+        createOrUpdateDoctorProfile(user, request);
+    }
+
+    private void createOrUpdateDoctorProfile(User user, CreateUserRequest request) {
         if (request.getDepartmentId() == null || request.getSpecialization() == null ||
-            request.getLicenseNumber() == null || request.getConsultationFee() == null) {
-            throw new RuntimeException("Doctor profile requires: departmentId, specialization, licenseNumber, consultationFee");
+                request.getLicenseNumber() == null || request.getConsultationFee() == null) {
+            throw new RuntimeException(
+                    "Doctor profile requires: departmentId, specialization, licenseNumber, consultationFee");
         }
 
         Department department = departmentRepository.findById(request.getDepartmentId())
                 .orElseThrow(() -> new RuntimeException("Department not found"));
 
-        Doctor doctor = Doctor.builder()
-                .user(user)
-                .department(department)
-                .specialization(request.getSpecialization())
-                .licenseNumber(request.getLicenseNumber())
-                .qualification(request.getQualification())
-                .experienceYears(request.getExperienceYears())
-                .consultationFee(BigDecimal.valueOf(request.getConsultationFee()))
-                .build();
+        Doctor doctor = doctorRepository.findByUserId(user.getId()).orElse(Doctor.builder().user(user).build());
+        doctor.setDepartment(department);
+        doctor.setSpecialization(request.getSpecialization());
+        doctor.setLicenseNumber(request.getLicenseNumber());
+        doctor.setQualification(request.getQualification());
+        doctor.setExperienceYears(request.getExperienceYears());
+        doctor.setConsultationFee(BigDecimal.valueOf(request.getConsultationFee()));
 
         doctorRepository.save(doctor);
         log.info("Doctor profile created for user: {}", user.getEmail());
     }
 
     private void createReceptionistProfile(User user, CreateUserRequest request) {
-        Receptionist receptionist = Receptionist.builder()
-                .user(user)
-                .employeeId(request.getEmployeeId())
-                .shift(request.getShift() != null ? Shift.valueOf(request.getShift()) : null)
-                .build();
+        createOrUpdateReceptionistProfile(user, request);
+    }
+
+    private void createOrUpdateReceptionistProfile(User user, CreateUserRequest request) {
+        Receptionist receptionist = receptionistRepository.findByUserId(user.getId())
+                .orElse(Receptionist.builder().user(user).build());
+        receptionist.setEmployeeId(user.getEmployeeId());
+        receptionist.setShift(request.getShift() != null ? Shift.valueOf(request.getShift()) : null);
 
         receptionistRepository.save(receptionist);
         log.info("Receptionist profile created for user: {}", user.getEmail());
@@ -269,6 +320,7 @@ public class UserManagementService {
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
+                .employeeId(user.getEmployeeId())
                 .phone(user.getPhone())
                 .isActive(user.getIsActive())
                 .role(primaryRole)

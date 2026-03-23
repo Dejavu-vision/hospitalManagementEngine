@@ -392,7 +392,6 @@
               <div class="divider"></div>
               <p class="muted" style="margin-bottom:6px; font-size:12px;">Receptionist-specific fields</p>
               <div class="grid-3">
-                <div class="field"><label>Employee ID</label><input id="cu_employeeId" type="text" placeholder="REC001"></div>
                 <div class="field"><label>Shift</label>
                   <select id="cu_shift"><option value="">—</option><option value="MORNING">MORNING</option><option value="AFTERNOON">AFTERNOON</option><option value="NIGHT">NIGHT</option></select>
                 </div>
@@ -1264,14 +1263,13 @@
           body.experienceYears = Number($("cu_experienceYears").value) || null;
           body.consultationFee = Number($("cu_consultationFee").value) || null;
         } else if (body.role === "ROLE_RECEPTIONIST") {
-          body.employeeId = $("cu_employeeId").value.trim() || null;
           body.shift = $("cu_shift").value || null;
         }
 
         if (!body.email || !body.password || !body.fullName) { setMsg("cu_msg", "Email, password, and full name required.", "warn"); return; }
         setMsg("cu_msg", "Creating…", "warn");
         try {
-          const res = await api("/api/admin/users", { method: "POST", body });
+          const res = await api("/api/admin/users?tenantId=" + state.selectedTenantId, { method: "POST", body });
           setMsg("cu_msg", "Created: " + res.email + " (ID: " + res.id + ")", "ok");
           togglePanel("createUserPanel", false);
           await loadTenantUsers();

@@ -28,6 +28,7 @@ public class TenantManagementService {
     private final RoleRepository roleRepository;
     private final PatientRepository patientRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmployeeIdGeneratorService employeeIdGeneratorService;
 
     @Transactional
     public TenantResponse registerTenant(TenantRegistrationRequest request) {
@@ -81,6 +82,7 @@ public class TenantManagementService {
                 .email(request.getAdminEmail())
                 .password(passwordEncoder.encode(request.getAdminPassword()))
                 .fullName(request.getAdminFullName())
+                .employeeId(employeeIdGeneratorService.generateEmployeeId(tenant.getId(), RoleName.ROLE_ADMIN))
                 .phone(request.getAdminPhone())
                 .isActive(true)
                 .roles(roles)

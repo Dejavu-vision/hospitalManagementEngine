@@ -17,6 +17,7 @@ public class UserResponse {
     private Long id;
     private String email;
     private String fullName;
+    private String employeeId;
     private String phone;
     private Boolean isActive;
     private String role;               // primary role (backward compat)
