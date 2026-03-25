@@ -10,6 +10,9 @@ import com.curamatrix.hsm.entity.Patient;
 import com.curamatrix.hsm.entity.User;
 import com.curamatrix.hsm.enums.AppointmentStatus;
 import com.curamatrix.hsm.enums.AppointmentType;
+import com.curamatrix.hsm.exception.DuplicateResourceException;
+import com.curamatrix.hsm.exception.InvalidStateTransitionException;
+import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.AppointmentRepository;
 import com.curamatrix.hsm.repository.DoctorRepository;
 import com.curamatrix.hsm.repository.PatientRepository;
@@ -44,13 +47,15 @@ public class AppointmentService {
         appointmentRepository.findByDoctorAndDateAndTime(
                 request.getDoctorId(), request.getAppointmentDate(), request.getAppointmentTime())
                 .ifPresent(a -> {
-                    throw new RuntimeException("Time slot already booked");
+                    throw new DuplicateResourceException(
+                            "Time slot already booked for this doctor on " +
+                            request.getAppointmentDate() + " at " + request.getAppointmentTime());
                 });
 
         Patient patient = patientRepository.findById(request.getPatientId())
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", request.getPatientId()));
         Doctor doctor = doctorRepository.findById(request.getDoctorId())
-                .orElseThrow(() -> new RuntimeException("Doctor not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", request.getDoctorId()));
         User bookedBy = getCurrentUser();
 
         Appointment appointment = Appointment.builder()
@@ -73,9 +78,9 @@ public class AppointmentService {
     @Transactional
     public AppointmentResponse createWalkIn(WalkInRequest request) {
         Patient patient = patientRepository.findById(request.getPatientId())
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", request.getPatientId()));
         Doctor doctor = doctorRepository.findById(request.getDoctorId())
-                .orElseThrow(() -> new RuntimeException("Doctor not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", request.getDoctorId()));
         User bookedBy = getCurrentUser();
 
         LocalDate today = LocalDate.now();
@@ -99,6 +104,12 @@ public class AppointmentService {
         return mapToResponse(appointment);
     }
 
+    public AppointmentResponse getAppointmentById(Long id) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", id));
+        return mapToResponse(appointment);
+    }
+
     public Page<AppointmentResponse> getAppointments(LocalDate date, Long doctorId, Long patientId,
                                                      AppointmentStatus status, AppointmentType type, Pageable pageable) {
         return appointmentRepository.findByFilters(date, doctorId, patientId, status, type, pageable)
@@ -107,7 +118,7 @@ public class AppointmentService {
 
     public SlotResponse getAvailableSlots(Long doctorId, LocalDate date) {
         Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new RuntimeException("Doctor not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", doctorId));
 
         List<String> allSlots = generateTimeSlots();
         List<Appointment> bookedAppointments = appointmentRepository.findByDoctorIdAndAppointmentDate(
@@ -139,14 +150,30 @@ public class AppointmentService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Updates the appointment status with strict state machine validation.
+     * Valid transitions (per product guide):
+     *   BOOKED → CHECKED_IN | CANCELLED
+     *   CHECKED_IN → IN_PROGRESS | CANCELLED
+     *   IN_PROGRESS → COMPLETED
+     *   COMPLETED → (terminal)
+     *   CANCELLED → (terminal)
+     */
     @Transactional
-    public AppointmentResponse updateStatus(Long id, AppointmentStatus status) {
+    public AppointmentResponse updateStatus(Long id, AppointmentStatus newStatus) {
         Appointment appointment = appointmentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Appointment not found"));
-        
-        appointment.setStatus(status);
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", id));
+
+        AppointmentStatus currentStatus = appointment.getStatus();
+        if (!currentStatus.canTransitionTo(newStatus)) {
+            throw new InvalidStateTransitionException("appointment status",
+                    currentStatus.name(), newStatus.name());
+        }
+
+        appointment.setStatus(newStatus);
         appointment = appointmentRepository.save(appointment);
-        
+        log.info("Appointment {} status updated: {} → {}", id, currentStatus, newStatus);
+
         return mapToResponse(appointment);
     }
 
@@ -154,19 +181,19 @@ public class AppointmentService {
         List<String> slots = new ArrayList<>();
         LocalTime start = LocalTime.of(9, 0);
         LocalTime end = LocalTime.of(17, 0);
-        
+
         while (start.isBefore(end)) {
             slots.add(start.toString());
             start = start.plusMinutes(30);
         }
-        
+
         return slots;
     }
 
     private User getCurrentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
     }
 
     private AppointmentResponse mapToResponse(Appointment appointment) {
@@ -176,7 +203,7 @@ public class AppointmentService {
                 .patientName(appointment.getPatient().getFirstName() + " " + appointment.getPatient().getLastName())
                 .doctorId(appointment.getDoctor().getId())
                 .doctorName(appointment.getDoctor().getUser().getFullName())
-                .department(appointment.getDoctor().getDepartment() != null ? 
+                .department(appointment.getDoctor().getDepartment() != null ?
                         appointment.getDoctor().getDepartment().getName() : null)
                 .appointmentDate(appointment.getAppointmentDate())
                 .appointmentTime(appointment.getAppointmentTime())

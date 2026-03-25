@@ -78,6 +78,40 @@
               ]
             }
           }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const res = pm.response.json();",
+                  "  pm.environment.set('token', res.token);",
+                  "  console.log('Token refreshed successfully');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Refresh the JWT token. Send the current token in the Authorization header (Bearer token). Returns a fresh token with updated claims."
+          }
         }
       ]
     },
@@ -112,11 +146,11 @@
           }
         },
         {
-          "name": "Get All Tenants",
+          "name": "Get All Tenants (Paginated)",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/super-admin/tenants",
+              "raw": "{{baseUrl}}/api/super-admin/tenants?page=0&size=20&sortBy=createdAt&sortDir=desc",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -124,8 +158,39 @@
                 "api",
                 "super-admin",
                 "tenants"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt"
+                },
+                {
+                  "key": "sortDir",
+                  "value": "desc"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Filter by active status (true/false)"
+                },
+                {
+                  "key": "plan",
+                  "value": "PREMIUM",
+                  "disabled": true,
+                  "description": "Filter by subscription plan (BASIC/STANDARD/PREMIUM)"
+                }
               ]
-            }
+            },
+            "description": "Paginated and filterable tenant listing. Supports sorting, active status filter, and plan filter."
           }
         },
         {
@@ -229,6 +294,37 @@
                 "stats"
               ]
             }
+          }
+        },
+        {
+          "name": "Reset Admin Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"adminEmail\": \"admin@hospital1.com\",\n  \"newPassword\": \"newAdmin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/super-admin/tenants/1/admin/password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "super-admin",
+                "tenants",
+                "1",
+                "admin",
+                "password"
+              ]
+            },
+            "description": "Reset a tenant's admin user password. Optionally provide adminEmail to target a specific admin."
           }
         }
       ]
@@ -938,7 +1034,74 @@
           }
         },
         {
-          "name": "Update Appointment Status",
+          "name": "Get Appointment By ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{appointmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments",
+                "{{appointmentId}}"
+              ]
+            },
+            "description": "Get appointment details by ID. Accessible by RECEPTIONIST, DOCTOR, and ADMIN roles."
+          }
+        },
+        {
+          "name": "Update Appointment Status (CHECKED_IN)",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{appointmentId}}/status?status=CHECKED_IN",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments",
+                "{{appointmentId}}",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "CHECKED_IN"
+                }
+              ]
+            },
+            "description": "Valid transitions: BOOKED→CHECKED_IN, CHECKED_IN→IN_PROGRESS, IN_PROGRESS→COMPLETED. BOOKED/CHECKED_IN→CANCELLED. Invalid transitions return 422."
+          }
+        },
+        {
+          "name": "Update Appointment Status (IN_PROGRESS)",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{appointmentId}}/status?status=IN_PROGRESS",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments",
+                "{{appointmentId}}",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "IN_PROGRESS"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Appointment Status (COMPLETED)",
           "request": {
             "method": "PUT",
             "url": {
@@ -959,6 +1122,31 @@
                 }
               ]
             }
+          }
+        },
+        {
+          "name": "Cancel Appointment",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/{{appointmentId}}/status?status=CANCELLED",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments",
+                "{{appointmentId}}",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "CANCELLED"
+                }
+              ]
+            },
+            "description": "Only allowed from BOOKED or CHECKED_IN status. Returns 422 for invalid transitions."
           }
         }
       ]
@@ -1065,6 +1253,25 @@
                 "{{diagnosisId}}"
               ]
             }
+          }
+        },
+        {
+          "name": "Get Patient Diagnosis History",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/diagnoses/patient/{{patientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "diagnoses",
+                "patient",
+                "{{patientId}}"
+              ]
+            },
+            "description": "Get all past diagnoses for a patient, ordered by date (latest first). Useful for doctors to review patient medical history before consultation."
           }
         }
       ]
@@ -2110,6 +2317,155 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Receptionist gets 403 on admin access APIs', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "\ud83d\udcca Reports & Analytics",
+      "description": "Reporting endpoints for Super Admin (platform-wide) and Hospital Admin (tenant-scoped).",
+      "item": [
+        {
+          "name": "Platform Summary (Super Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/super-admin/reports/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "super-admin",
+                "reports",
+                "summary"
+              ]
+            },
+            "description": "Platform-wide summary: total tenants, active/suspended hospitals, total users, patients, and appointments. Requires SUPER_ADMIN role."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const res = pm.response.json();",
+                  "pm.test('Has totalTenants', function () { pm.expect(res.totalTenants).to.be.a('number'); });",
+                  "pm.test('Has activeHospitals', function () { pm.expect(res.activeHospitals).to.be.a('number'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Appointment Statistics (Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reports/appointments?startDate=2026-01-01&endDate=2026-12-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reports",
+                "appointments"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-01-01",
+                  "description": "Start date (ISO format). Defaults to 30 days ago if not provided."
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-12-31",
+                  "description": "End date (ISO format). Defaults to today if not provided."
+                }
+              ]
+            },
+            "description": "Appointment stats by date range: total, completed, cancelled, in-progress, completion/cancellation rates, per-doctor breakdown. Requires ADMIN role."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const res = pm.response.json();",
+                  "pm.test('Has totalAppointments', function () { pm.expect(res.totalAppointments).to.be.a('number'); });",
+                  "pm.test('Has completionRate', function () { pm.expect(res.completionRate).to.be.a('number'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Doctor Workload Report (Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reports/doctors",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reports",
+                "doctors"
+              ]
+            },
+            "description": "Today's workload per doctor: total appointments, completed, pending. Requires ADMIN role."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const res = pm.response.json();",
+                  "pm.test('Has totalDoctors', function () { pm.expect(res.totalDoctors).to.be.a('number'); });",
+                  "pm.test('Has doctorStats', function () { pm.expect(res.doctorStats).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Patient Registration Trends (Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/reports/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reports",
+                "patients"
+              ]
+            },
+            "description": "Patient registration totals and monthly trend data. Requires ADMIN role."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const res = pm.response.json();",
+                  "pm.test('Has totalPatients', function () { pm.expect(res.totalPatients).to.be.a('number'); });"
                 ]
               }
             }

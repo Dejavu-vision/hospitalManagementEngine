@@ -4,16 +4,19 @@ import com.curamatrix.hsm.dto.request.TenantRegistrationRequest;
 import com.curamatrix.hsm.dto.request.AdminPasswordResetRequest;
 import com.curamatrix.hsm.dto.response.TenantResponse;
 import com.curamatrix.hsm.service.TenantManagementService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @Slf4j
 @RestController
@@ -33,8 +36,18 @@ public class SuperAdminController {
     }
 
     @GetMapping
-    public ResponseEntity<List<TenantResponse>> getAllTenants() {
-        List<TenantResponse> tenants = tenantManagementService.getAllTenants();
+    @Operation(summary = "List Tenants", description = "Paginated and filterable tenant listing. " +
+            "Supports filtering by active status and subscription plan.")
+    public ResponseEntity<Page<TenantResponse>> getAllTenants(
+            @RequestParam(required = false) Boolean isActive,
+            @RequestParam(required = false) String plan,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Page<TenantResponse> tenants = tenantManagementService.getTenantsPaginated(isActive, plan, pageable);
         return ResponseEntity.ok(tenants);
     }
 

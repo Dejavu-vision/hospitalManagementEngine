@@ -6,6 +6,10 @@ import com.curamatrix.hsm.dto.response.UserResponse;
 import com.curamatrix.hsm.entity.*;
 import com.curamatrix.hsm.enums.RoleName;
 import com.curamatrix.hsm.enums.Shift;
+import com.curamatrix.hsm.enums.SubscriptionPlan;
+import com.curamatrix.hsm.exception.DuplicateResourceException;
+import com.curamatrix.hsm.exception.QuotaExceededException;
+import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.*;
 import com.curamatrix.hsm.context.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +32,7 @@ public class UserManagementService {
     private final DoctorRepository doctorRepository;
     private final ReceptionistRepository receptionistRepository;
     private final DepartmentRepository departmentRepository;
+    private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
     private final AccessControlService accessControlService;
     private final EmployeeIdGeneratorService employeeIdGeneratorService;
@@ -37,14 +42,29 @@ public class UserManagementService {
     @Transactional
     public UserResponse createUser(CreateUserRequest request, Long targetTenantId) {
         Role role = roleRepository.findByName(request.getRole())
-                .orElseThrow(() -> new RuntimeException("Role not found: " + request.getRole()));
+                .orElseThrow(() -> new ResourceNotFoundException("Role", "name", request.getRole()));
 
         Set<Role> roles = new HashSet<>();
         roles.add(role);
 
         Long tenantId = targetTenantId != null ? targetTenantId : TenantContext.getTenantId();
         if (tenantId == null) {
-            throw new RuntimeException("Tenant context is missing. Please login again.");
+            throw new IllegalStateException("Tenant context is missing. Please login again.");
+        }
+
+        // ─── Quota enforcement: check user limit ────────────────
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant", "id", tenantId));
+
+        SubscriptionPlan plan = SubscriptionPlan.valueOf(tenant.getSubscriptionPlan());
+        if (!plan.isUnlimited("users")) {
+            long currentUsers = userRepository.countByTenantId(tenantId);
+            if (currentUsers >= tenant.getMaxUsers()) {
+                throw new QuotaExceededException(
+                        "User creation limit reached. Your plan allows a maximum of " +
+                        tenant.getMaxUsers() + " users. " +
+                        "Please upgrade your subscription to add more users.");
+            }
         }
 
         Optional<User> existingOpt = userRepository.findByEmail(request.getEmail());
@@ -89,10 +109,11 @@ public class UserManagementService {
             Role role,
             Long tenantId) {
         if (Boolean.TRUE.equals(existingUser.getIsActive())) {
-            throw new RuntimeException("Email already exists: " + request.getEmail());
+            throw new DuplicateResourceException("User", "email", request.getEmail());
         }
         if (!tenantId.equals(existingUser.getTenantId())) {
-            throw new RuntimeException("Email already exists in another hospital: " + request.getEmail());
+            throw new DuplicateResourceException(
+                    "Email already exists in another hospital: " + request.getEmail());
         }
 
         existingUser.setIsActive(true);
@@ -122,7 +143,7 @@ public class UserManagementService {
     @Transactional
     public UserResponse updateUser(Long id, UpdateUserRequest request) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
             user.setFullName(request.getFullName());
@@ -144,9 +165,9 @@ public class UserManagementService {
     @Transactional
     public UserResponse addRole(Long userId, RoleName roleName) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
         Role role = roleRepository.findByName(roleName)
-                .orElseThrow(() -> new RuntimeException("Role not found: " + roleName));
+                .orElseThrow(() -> new ResourceNotFoundException("Role", "name", roleName));
 
         user.getRoles().add(role);
         user = userRepository.save(user);
@@ -157,14 +178,14 @@ public class UserManagementService {
     @Transactional
     public UserResponse removeRole(Long userId, RoleName roleName) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
         boolean removed = user.getRoles().removeIf(r -> r.getName() == roleName);
         if (!removed) {
-            throw new RuntimeException("User does not have role: " + roleName);
+            throw new ResourceNotFoundException("User does not have role: " + roleName);
         }
         if (user.getRoles().isEmpty()) {
-            throw new RuntimeException("Cannot remove the last role. A user must have at least one role.");
+            throw new IllegalArgumentException("Cannot remove the last role. A user must have at least one role.");
         }
 
         user = userRepository.save(user);
@@ -175,16 +196,16 @@ public class UserManagementService {
     @Transactional
     public UserResponse setRoles(Long userId, Set<RoleName> roleNames) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
         if (roleNames == null || roleNames.isEmpty()) {
-            throw new RuntimeException("At least one role is required.");
+            throw new IllegalArgumentException("At least one role is required.");
         }
 
         Set<Role> newRoles = new HashSet<>();
         for (RoleName rn : roleNames) {
             Role role = roleRepository.findByName(rn)
-                    .orElseThrow(() -> new RuntimeException("Role not found: " + rn));
+                    .orElseThrow(() -> new ResourceNotFoundException("Role", "name", rn));
             newRoles.add(role);
         }
 
@@ -199,7 +220,7 @@ public class UserManagementService {
     @Transactional
     public void deactivateUser(Long id) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
         user.setIsActive(false);
         userRepository.save(user);
         log.info("User deactivated: {}", user.getEmail());
@@ -208,7 +229,7 @@ public class UserManagementService {
     @Transactional
     public void activateUser(Long id) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
         user.setIsActive(true);
         userRepository.save(user);
         log.info("User activated: {}", user.getEmail());
@@ -219,7 +240,7 @@ public class UserManagementService {
     @Transactional
     public void deleteUser(Long id, Long actorUserId) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
         // Clear user-specific page overrides
         accessControlService.resetUserPages(user.getId(), user.getTenantId(), actorUserId);
@@ -249,7 +270,7 @@ public class UserManagementService {
 
     public UserResponse getUserById(Long id) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
         return mapToResponse(user);
     }
 
@@ -257,7 +278,7 @@ public class UserManagementService {
 
     public List<UserAccessAudit> getAuditLog(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
         return accessControlService.getAuditLog(userId, user.getTenantId());
     }
 
@@ -270,12 +291,12 @@ public class UserManagementService {
     private void createOrUpdateDoctorProfile(User user, CreateUserRequest request) {
         if (request.getDepartmentId() == null || request.getSpecialization() == null ||
                 request.getLicenseNumber() == null || request.getConsultationFee() == null) {
-            throw new RuntimeException(
+            throw new IllegalArgumentException(
                     "Doctor profile requires: departmentId, specialization, licenseNumber, consultationFee");
         }
 
         Department department = departmentRepository.findById(request.getDepartmentId())
-                .orElseThrow(() -> new RuntimeException("Department not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Department", "id", request.getDepartmentId()));
 
         Doctor doctor = doctorRepository.findByUserId(user.getId()).orElse(Doctor.builder().user(user).build());
         doctor.setDepartment(department);

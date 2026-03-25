@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/diagnoses")
@@ -47,5 +49,11 @@ public class DiagnosisController {
         log.info("Updating diagnosis: {}", id);
         DiagnosisResponse response = diagnosisService.updateDiagnosis(id, request);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/patient/{patientId}")
+    public ResponseEntity<List<DiagnosisResponse>> getPatientDiagnosisHistory(@PathVariable Long patientId) {
+        List<DiagnosisResponse> responses = diagnosisService.getDiagnosesByPatientId(patientId);
+        return ResponseEntity.ok(responses);
     }
 }

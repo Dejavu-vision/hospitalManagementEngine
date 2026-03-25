@@ -15,4 +15,7 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
     Page<Patient> searchPatients(@Param("search") String search, Pageable pageable);
     
     long countByTenantId(Long tenantId);
+
+    boolean existsByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirthAndTenantId(
+            String firstName, String lastName, java.time.LocalDate dateOfBirth, Long tenantId);
 }

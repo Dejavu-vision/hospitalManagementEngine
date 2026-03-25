@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.curamatrix.hsm.exception.ResourceNotFoundException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,12 +29,12 @@ public class PrescriptionService {
     @Transactional
     public List<PrescriptionResponse> addPrescriptions(PrescriptionBatchRequest request) {
         Diagnosis diagnosis = diagnosisRepository.findById(request.getDiagnosisId())
-                .orElseThrow(() -> new RuntimeException("Diagnosis not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Diagnosis", "id", request.getDiagnosisId()));
 
         List<Prescription> prescriptions = request.getPrescriptions().stream()
                 .map(item -> {
                     Medicine medicine = medicineRepository.findById(item.getMedicineId())
-                            .orElseThrow(() -> new RuntimeException("Medicine not found: " + item.getMedicineId()));
+                            .orElseThrow(() -> new ResourceNotFoundException("Medicine", "id", item.getMedicineId()));
 
                     return Prescription.builder()
                             .diagnosis(diagnosis)

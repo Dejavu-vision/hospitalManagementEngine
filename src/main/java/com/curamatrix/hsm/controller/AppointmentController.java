@@ -47,8 +47,15 @@ public class AppointmentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR', 'ADMIN')")
+    public ResponseEntity<AppointmentResponse> getAppointmentById(@PathVariable Long id) {
+        AppointmentResponse response = appointmentService.getAppointmentById(id);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping
-    @PreAuthorize("hasRole('RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<Page<AppointmentResponse>> getAppointments(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) Long doctorId,

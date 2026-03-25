@@ -6,6 +6,10 @@ import com.curamatrix.hsm.dto.response.PrescriptionResponse;
 import com.curamatrix.hsm.entity.Appointment;
 import com.curamatrix.hsm.entity.Diagnosis;
 import com.curamatrix.hsm.entity.Doctor;
+import com.curamatrix.hsm.enums.AppointmentStatus;
+import com.curamatrix.hsm.exception.DuplicateResourceException;
+import com.curamatrix.hsm.exception.InvalidStateTransitionException;
+import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.AppointmentRepository;
 import com.curamatrix.hsm.repository.DiagnosisRepository;
 import com.curamatrix.hsm.repository.DoctorRepository;
@@ -16,6 +20,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,14 +36,27 @@ public class DiagnosisService {
     @Transactional
     public DiagnosisResponse createDiagnosis(DiagnosisRequest request) {
         Appointment appointment = appointmentRepository.findById(request.getAppointmentId())
-                .orElseThrow(() -> new RuntimeException("Appointment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", request.getAppointmentId()));
+
+        // Business rule: Appointment must be IN_PROGRESS to create diagnosis
+        if (appointment.getStatus() != AppointmentStatus.IN_PROGRESS) {
+            throw new InvalidStateTransitionException(
+                    "Diagnosis can only be created when appointment is IN_PROGRESS. " +
+                    "Current status: " + appointment.getStatus().name());
+        }
+
+        // Business rule: Exactly one diagnosis per appointment
+        if (diagnosisRepository.existsByAppointmentId(request.getAppointmentId())) {
+            throw new DuplicateResourceException(
+                    "Diagnosis already exists for appointment with id: " + request.getAppointmentId());
+        }
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         Doctor doctor = doctorRepository.findByUserId(
                 userRepository.findByEmail(email)
-                        .orElseThrow(() -> new RuntimeException("User not found"))
+                        .orElseThrow(() -> new ResourceNotFoundException("User", "email", email))
                         .getId())
-                .orElseThrow(() -> new RuntimeException("Doctor profile not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor profile not found for current user"));
 
         Diagnosis diagnosis = Diagnosis.builder()
                 .appointment(appointment)
@@ -58,20 +76,38 @@ public class DiagnosisService {
 
     public DiagnosisResponse getDiagnosisById(Long id) {
         Diagnosis diagnosis = diagnosisRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Diagnosis not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Diagnosis", "id", id));
         return mapToResponse(diagnosis);
     }
 
     public DiagnosisResponse getDiagnosisByAppointmentId(Long appointmentId) {
         Diagnosis diagnosis = diagnosisRepository.findByAppointmentId(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Diagnosis not found for appointment"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Diagnosis not found for appointment with id: " + appointmentId));
         return mapToResponse(diagnosis);
+    }
+
+    /**
+     * Retrieves all past diagnoses for a patient (read-only reference for doctors).
+     */
+    public List<DiagnosisResponse> getDiagnosesByPatientId(Long patientId) {
+        return diagnosisRepository.findByAppointmentPatientIdOrderByCreatedAtDesc(patientId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional
     public DiagnosisResponse updateDiagnosis(Long id, DiagnosisRequest request) {
         Diagnosis diagnosis = diagnosisRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Diagnosis not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Diagnosis", "id", id));
+
+        // Business rule: Cannot edit diagnosis after appointment is COMPLETED or CANCELLED
+        AppointmentStatus appointmentStatus = diagnosis.getAppointment().getStatus();
+        if (appointmentStatus == AppointmentStatus.COMPLETED || appointmentStatus == AppointmentStatus.CANCELLED) {
+            throw new InvalidStateTransitionException(
+                    "Cannot update diagnosis after appointment is " + appointmentStatus.name() +
+                    ". Diagnosis can only be edited while the appointment is still open.");
+        }
 
         diagnosis.setSymptoms(request.getSymptoms());
         diagnosis.setDiagnosis(request.getDiagnosis());

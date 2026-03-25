@@ -17,6 +17,7 @@ public class LoginResponse {
     private Long userId;
     private String fullName;
     private String role;
+    private List<String> roles;
     private Long expiresIn;
 
     // Multi-tenant fields

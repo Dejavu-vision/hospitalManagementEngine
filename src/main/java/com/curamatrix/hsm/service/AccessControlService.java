@@ -4,6 +4,7 @@ import com.curamatrix.hsm.dto.access.PageAccessDto;
 import com.curamatrix.hsm.dto.access.UserAccessResponse;
 import com.curamatrix.hsm.entity.*;
 import com.curamatrix.hsm.entity.UserPage.Effect;
+import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -72,7 +73,7 @@ public class AccessControlService {
          */
         public UserAccessResponse getUserAccess(Long userId) {
                 User user = userRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
                 Set<String> roleNames = user.getRoles().stream()
                                 .map(r -> r.getName().name())
@@ -108,7 +109,7 @@ public class AccessControlService {
         @Transactional
         public void setUserPages(Long userId, Long tenantId, Set<String> pageKeys, Long changedByUserId) {
                 User user = userRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
                 Long tid = user.getTenantId();
 
                 userPageRepository.deleteByUserIdAndTenantId(userId, tid);
@@ -136,7 +137,7 @@ public class AccessControlService {
         @Transactional
         public void addUserPage(Long userId, String pageKey, Long changedByUserId) {
                 User user = userRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
                 Long tid = user.getTenantId();
 
                 Optional<UserPage> existing = userPageRepository
@@ -163,7 +164,7 @@ public class AccessControlService {
                 }
 
                 UiPage page = uiPageRepository.findByPageKey(pageKey)
-                                .orElseThrow(() -> new RuntimeException("Page not found: " + pageKey));
+                                .orElseThrow(() -> new ResourceNotFoundException("Page", "pageKey", pageKey));
 
                 UserPage up = UserPage.builder()
                                 .user(user).page(page).effect(Effect.GRANT).build();
@@ -183,7 +184,7 @@ public class AccessControlService {
         @Transactional
         public void removeUserPage(Long userId, String pageKey, Long changedByUserId) {
                 User user = userRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
                 Long tid = user.getTenantId();
 
                 Optional<UserPage> existing = userPageRepository
@@ -205,12 +206,12 @@ public class AccessControlService {
                 // No user-page record — check if it's a role-default page
                 Set<String> rolePages = getRolePageKeys(user);
                 if (!rolePages.contains(pageKey)) {
-                        throw new RuntimeException("Page '" + pageKey + "' is not in user's access");
+                        throw new ResourceNotFoundException("Page '" + pageKey + "' is not in user's access");
                 }
 
                 // Role-default page → create DENY record
                 UiPage page = uiPageRepository.findByPageKey(pageKey)
-                                .orElseThrow(() -> new RuntimeException("Page not found: " + pageKey));
+                                .orElseThrow(() -> new ResourceNotFoundException("Page", "pageKey", pageKey));
 
                 UserPage deny = UserPage.builder()
                                 .user(user).page(page).effect(Effect.DENY).build();
@@ -226,7 +227,7 @@ public class AccessControlService {
         /** Get only the extra GRANT page keys for a user. */
         public Set<String> getUserExtraPageKeys(Long userId) {
                 User user = userRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
                 return new LinkedHashSet<>(
                                 userPageRepository.findGrantedPageKeysByUserIdAndTenantId(
                                                 user.getId(), user.getTenantId()));
@@ -235,7 +236,7 @@ public class AccessControlService {
         /** Get only the DENY page keys for a user. */
         public Set<String> getUserDeniedPageKeys(Long userId) {
                 User user = userRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
                 return new LinkedHashSet<>(
                                 userPageRepository.findDeniedPageKeysByUserIdAndTenantId(
                                                 user.getId(), user.getTenantId()));
@@ -251,7 +252,7 @@ public class AccessControlService {
         @Transactional
         public void restoreDeniedPage(Long userId, String pageKey, Long changedByUserId) {
                 User user = userRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
                 Long tid = user.getTenantId();
 
                 Optional<UserPage> existing = userPageRepository
@@ -273,7 +274,7 @@ public class AccessControlService {
         @Transactional
         public void resetUserPages(Long userId, Long tenantId, Long changedByUserId) {
                 User user = userRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
                 Long tid = user.getTenantId();
                 userPageRepository.deleteByUserIdAndTenantId(userId, tid);
                 audit(tid, userId, changedByUserId, "USER_PAGE_RESET", "Reverted to role defaults");

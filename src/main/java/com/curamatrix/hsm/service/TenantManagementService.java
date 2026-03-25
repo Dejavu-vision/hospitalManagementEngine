@@ -18,6 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -170,6 +173,15 @@ public class TenantManagementService {
 
         return stats;
     }
+
+    /**
+     * Paginated + filtered tenant listing for Super Admin dashboard.
+     */
+    public Page<TenantResponse> getTenantsPaginated(Boolean isActive, String plan, Pageable pageable) {
+        return tenantRepository.findByFilters(isActive, plan, pageable)
+                .map(this::mapToResponse);
+    }
+
 
     @Transactional
     public void resetTenantAdminPassword(Long tenantId, AdminPasswordResetRequest request) {
