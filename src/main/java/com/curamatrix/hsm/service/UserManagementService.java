@@ -289,10 +289,10 @@ public class UserManagementService {
     }
 
     private void createOrUpdateDoctorProfile(User user, CreateUserRequest request) {
-        if (request.getDepartmentId() == null || request.getSpecialization() == null ||
+        if (request.getDepartmentId() == null ||
                 request.getLicenseNumber() == null || request.getConsultationFee() == null) {
             throw new IllegalArgumentException(
-                    "Doctor profile requires: departmentId, specialization, licenseNumber, consultationFee");
+                    "Doctor profile requires: departmentId, licenseNumber, consultationFee");
         }
 
         Department department = departmentRepository.findById(request.getDepartmentId())
@@ -300,7 +300,6 @@ public class UserManagementService {
 
         Doctor doctor = doctorRepository.findByUserId(user.getId()).orElse(Doctor.builder().user(user).build());
         doctor.setDepartment(department);
-        doctor.setSpecialization(request.getSpecialization());
         doctor.setLicenseNumber(request.getLicenseNumber());
         doctor.setQualification(request.getQualification());
         doctor.setExperienceYears(request.getExperienceYears());

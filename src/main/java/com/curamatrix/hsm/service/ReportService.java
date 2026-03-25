@@ -139,7 +139,6 @@ public class ReportService {
                     stats.put("doctorName", doctor.getUser().getFullName());
                     stats.put("department", doctor.getDepartment() != null ?
                             doctor.getDepartment().getName() : "N/A");
-                    stats.put("specialization", doctor.getSpecialization());
                     stats.put("todayAppointments", todayAppts.size());
                     stats.put("todayCompleted", todayAppts.stream()
                             .filter(a -> a.getStatus() == AppointmentStatus.COMPLETED).count());

@@ -384,7 +384,6 @@
                     <option value="">— Loading departments —</option>
                   </select>
                 </div>
-                <div class="field"><label>Specialization</label><input id="cu_specialization" type="text" placeholder="Cardiology"></div>
                 <div class="field"><label>License Number</label><input id="cu_licenseNumber" type="text" placeholder="MH12345"></div>
                 <div class="field"><label>Qualification</label><input id="cu_qualification" type="text" placeholder="MBBS, MD"></div>
                 <div class="field"><label>Experience (years)</label><input id="cu_experienceYears" type="number" placeholder="10"></div>
@@ -815,10 +814,10 @@
       }
 
       async function loadDepartments() {
+        const sel = $("cu_departmentId");
         try {
           const deps = await api("/api/departments");
           state.departments = Array.isArray(deps) ? deps : [];
-          const sel = $("cu_departmentId");
           sel.innerHTML = '<option value="">— Select a department —</option>';
           state.departments.forEach((d) => {
             const opt = document.createElement("option");
@@ -827,6 +826,7 @@
             sel.appendChild(opt);
           });
         } catch (e) {
+          sel.innerHTML = '<option value="">— Failed to load departments (restart backend) —</option>';
           console.error("Failed to load departments:", e);
         }
       }
@@ -1283,7 +1283,6 @@
 
         if (body.role === "ROLE_DOCTOR") {
           body.departmentId = Number($("cu_departmentId").value) || null;
-          body.specialization = $("cu_specialization").value.trim() || null;
           body.licenseNumber = $("cu_licenseNumber").value.trim() || null;
           body.qualification = $("cu_qualification").value.trim() || null;
           body.experienceYears = Number($("cu_experienceYears").value) || null;

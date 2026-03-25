@@ -27,7 +27,6 @@ public class CreateUserRequest {
 
     // Doctor-specific fields (required if role is ROLE_DOCTOR)
     private Long departmentId;
-    private String specialization;
     private String licenseNumber;
     private String qualification;
     private Integer experienceYears;

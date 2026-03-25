@@ -357,7 +357,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Dr. John Smith\",\n  \"email\": \"dr.john@hospital.com\",\n  \"password\": \"doctor123\",\n  \"phone\": \"9876543210\",\n  \"role\": \"ROLE_DOCTOR\",\n  \"specialization\": \"Cardiology\",\n  \"qualification\": \"MBBS, MD\",\n  \"experience\": 10,\n  \"consultationFee\": 500.00,\n  \"departmentId\": 1\n}"
+              "raw": "{\n  \"fullName\": \"Dr. John Smith\",\n  \"email\": \"dr.john@hospital.com\",\n  \"password\": \"doctor123\",\n  \"phone\": \"9876543210\",\n  \"role\": \"ROLE_DOCTOR\",\n  \"qualification\": \"MBBS, MD\",\n  \"experience\": 10,\n  \"consultationFee\": 500.00,\n  \"departmentId\": 1\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/admin/users",
@@ -397,7 +397,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Dr. Senior Specialist\",\n  \"email\": \"dr.senior@hospital.com\",\n  \"password\": \"doctor123\",\n  \"phone\": \"9876543299\",\n  \"role\": \"ROLE_DOCTOR\",\n  \"specialization\": \"Neurology\",\n  \"qualification\": \"MBBS, DM\",\n  \"experience\": 15,\n  \"consultationFee\": 1000.00,\n  \"departmentId\": 1,\n  \"allowedPageKeys\": [\"ADMIN_USERS\", \"ADMIN_DASHBOARD\"]\n}"
+              "raw": "{\n  \"fullName\": \"Dr. Senior Specialist\",\n  \"email\": \"dr.senior@hospital.com\",\n  \"password\": \"doctor123\",\n  \"phone\": \"9876543299\",\n  \"role\": \"ROLE_DOCTOR\",\n  \"qualification\": \"MBBS, DM\",\n  \"experience\": 15,\n  \"consultationFee\": 1000.00,\n  \"departmentId\": 1,\n  \"allowedPageKeys\": [\"ADMIN_USERS\", \"ADMIN_DASHBOARD\"]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/admin/users",
