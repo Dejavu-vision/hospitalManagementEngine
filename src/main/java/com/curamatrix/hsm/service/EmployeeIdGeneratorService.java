@@ -41,7 +41,7 @@ public class EmployeeIdGeneratorService {
         }
 
         long serial = allocateNextSerial(tenantId, prefix);
-        String employeeId = formatEmployeeId(prefix, serial);
+        String employeeId = formatEmployeeId(tenantId, prefix, serial);
 
         if (userRepository.existsByEmployeeIdAndTenantId(employeeId, tenantId)) {
             log.warn("Generated employeeId {} already exists for tenant {}. Advancing sequence.", employeeId, tenantId);
@@ -85,7 +85,7 @@ public class EmployeeIdGeneratorService {
     private String advanceUntilFree(Long tenantId, String prefix) {
         for (int i = 0; i < 100; i++) {
             long nextSerial = allocateNextSerial(tenantId, prefix);
-            String candidate = formatEmployeeId(prefix, nextSerial);
+            String candidate = formatEmployeeId(tenantId, prefix, nextSerial);
             if (!userRepository.existsByEmployeeIdAndTenantId(candidate, tenantId)) {
                 return candidate;
             }
@@ -93,8 +93,8 @@ public class EmployeeIdGeneratorService {
         throw new IllegalStateException("Unable to find free employee ID for tenant " + tenantId + " and prefix " + prefix);
     }
 
-    private static String formatEmployeeId(String prefix, long serial) {
+    private static String formatEmployeeId(Long tenantId, String prefix, long serial) {
         int width = Math.max(MIN_DIGITS, String.valueOf(serial).length());
-        return prefix + String.format("%0" + width + "d", serial);
+        return "T" + tenantId + "-" + prefix + String.format("%0" + width + "d", serial);
     }
 }

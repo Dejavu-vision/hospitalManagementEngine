@@ -26,9 +26,6 @@ public class Doctor {
     @JoinColumn(name = "department_id")
     private Department department;
 
-    @Column(nullable = false)
-    private String specialization;
-
     @Column(name = "license_number", unique = true, nullable = false)
     private String licenseNumber;
 
