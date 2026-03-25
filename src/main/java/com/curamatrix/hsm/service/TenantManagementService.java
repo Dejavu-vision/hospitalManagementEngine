@@ -178,8 +178,17 @@ public class TenantManagementService {
      * Paginated + filtered tenant listing for Super Admin dashboard.
      */
     public Page<TenantResponse> getTenantsPaginated(Boolean isActive, String plan, Pageable pageable) {
-        return tenantRepository.findByFilters(isActive, plan, pageable)
-                .map(this::mapToResponse);
+        Page<Tenant> page;
+        if (isActive != null && plan != null && !plan.isBlank()) {
+            page = tenantRepository.findByIsActiveAndSubscriptionPlan(isActive, plan, pageable);
+        } else if (isActive != null) {
+            page = tenantRepository.findByIsActive(isActive, pageable);
+        } else if (plan != null && !plan.isBlank()) {
+            page = tenantRepository.findBySubscriptionPlan(plan, pageable);
+        } else {
+            page = tenantRepository.findAll(pageable);
+        }
+        return page.map(this::mapToResponse);
     }
 
 

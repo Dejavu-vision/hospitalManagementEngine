@@ -379,7 +379,11 @@
               <div class="divider"></div>
               <p class="muted" style="margin-bottom:6px; font-size:12px;">Doctor-specific fields</p>
               <div class="grid-3">
-                <div class="field"><label>Department ID</label><input id="cu_departmentId" type="number" placeholder="1"></div>
+                <div class="field"><label>Department</label>
+                  <select id="cu_departmentId">
+                    <option value="">— Loading departments —</option>
+                  </select>
+                </div>
                 <div class="field"><label>Specialization</label><input id="cu_specialization" type="text" placeholder="Cardiology"></div>
                 <div class="field"><label>License Number</label><input id="cu_licenseNumber" type="text" placeholder="MH12345"></div>
                 <div class="field"><label>Qualification</label><input id="cu_qualification" type="text" placeholder="MBBS, MD"></div>
@@ -594,6 +598,7 @@
         token: null,
         tokenExpiry: null,
         tenants: [],           // cached tenant list
+        departments: [],       // cached departments
         selectedTenantId: null,
         selectedUserId: null,
         users: []              // cached user list for selected tenant
@@ -716,6 +721,7 @@
           setAuthUI();
           // Load pages now that we have a token, so the Add Page dropdown gets options
           await loadAllAvailablePages();
+          await loadDepartments();
           await loadTenants();
           populateTenantDropdowns();
           setMsg("loginMsg", "Signed in as " + (data.fullName || email), "ok");
@@ -733,8 +739,11 @@
         const tbody = $("tenantsTable").querySelector("tbody");
         tbody.innerHTML = "";
         try {
-          const tenants = await api("/api/super-admin/tenants");
-          state.tenants = Array.isArray(tenants) ? tenants : [];
+          const tenantsResponse = await api("/api/super-admin/tenants");
+          // Backward compatible with both old array response and new Spring Page response.
+          state.tenants = Array.isArray(tenantsResponse)
+            ? tenantsResponse
+            : (Array.isArray(tenantsResponse?.content) ? tenantsResponse.content : []);
           if (state.tenants.length === 0) { setMsg("listMsg", "No hospitals found.", "warn"); return; }
           setMsg("listMsg", state.tenants.length + " hospital(s) loaded.", "ok");
 
@@ -803,6 +812,23 @@
           sel.appendChild(opt);
         });
         if (current) sel.value = current;
+      }
+
+      async function loadDepartments() {
+        try {
+          const deps = await api("/api/departments");
+          state.departments = Array.isArray(deps) ? deps : [];
+          const sel = $("cu_departmentId");
+          sel.innerHTML = '<option value="">— Select a department —</option>';
+          state.departments.forEach((d) => {
+            const opt = document.createElement("option");
+            opt.value = d.id;
+            opt.textContent = `${d.id} - ${d.name}`;
+            sel.appendChild(opt);
+          });
+        } catch (e) {
+          console.error("Failed to load departments:", e);
+        }
       }
 
       /* ── Create Hospital ──────────────────────────────────── */

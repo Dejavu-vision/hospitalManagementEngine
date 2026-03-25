@@ -4,9 +4,6 @@ import com.curamatrix.hsm.entity.Tenant;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 import java.util.Optional;
 
 public interface TenantRepository extends JpaRepository<Tenant, Long> {
@@ -15,14 +12,14 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
     boolean existsByContactEmail(String contactEmail);
 
     /**
-     * Filtered + paginated tenant listing for Super Admin dashboard.
+     * Filtered tenant listings — separate methods to avoid Hibernate 6
+     * issues with IS NULL on typed parameters.
      */
-    @Query("SELECT t FROM Tenant t WHERE " +
-           "(:isActive IS NULL OR t.isActive = :isActive) AND " +
-           "(:plan IS NULL OR t.subscriptionPlan = :plan)")
-    Page<Tenant> findByFilters(@Param("isActive") Boolean isActive,
-                               @Param("plan") String plan,
-                               Pageable pageable);
+    Page<Tenant> findByIsActiveAndSubscriptionPlan(Boolean isActive, String subscriptionPlan, Pageable pageable);
+
+    Page<Tenant> findByIsActive(Boolean isActive, Pageable pageable);
+
+    Page<Tenant> findBySubscriptionPlan(String subscriptionPlan, Pageable pageable);
 
     long countByIsActive(boolean isActive);
 }

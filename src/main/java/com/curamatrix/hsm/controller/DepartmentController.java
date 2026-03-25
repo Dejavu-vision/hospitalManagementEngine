@@ -20,14 +20,14 @@ public class DepartmentController {
     private final DepartmentRepository departmentRepository;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'SUPER_ADMIN')")
     public ResponseEntity<List<Department>> getAllDepartments() {
         List<Department> departments = departmentRepository.findByIsActiveTrue();
         return ResponseEntity.ok(departments);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'SUPER_ADMIN')")
     public ResponseEntity<Department> getDepartmentById(@PathVariable Long id) {
         Department department = departmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Department not found"));
