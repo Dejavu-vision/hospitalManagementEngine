@@ -79,7 +79,8 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(java.util.Arrays.asList(
             "http://localhost:*",
             "http://127.0.0.1:*",
-            "https://*.curamatrix.com"
+            "https://*.curamatrix.com",
+            "https://dnry1vs9w5nkw.cloudfront.net"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
