@@ -5,8 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'docs/**/*.md'
-      - 'curamatrix-hsm-docs/**/*.md'
+      - 'docs/**'
       - 'README.md'
   workflow_dispatch: # Allows manual trigger from Actions tab
 
@@ -27,17 +26,13 @@ jobs:
           path: wiki-temp
           token: ${{ secrets.GITHUB_TOKEN }}
           
-      - name: Sync Markdown Files
+      - name: Sync Documentation Files
         run: |
           echo "Copying documentation to wiki..."
           
-          # Copy standard documentation directories if they exist
+          # Copy docs/ folder structure natively to the wiki root
           if [ -d "docs" ]; then
-            find docs -name "*.md" -type f -exec cp {} wiki-temp/ \;
-          fi
-          
-          if [ -d "curamatrix-hsm-docs" ]; then
-            find curamatrix-hsm-docs -name "*.md" -type f -exec cp {} wiki-temp/ \;
+            rsync -av --exclude='.git' docs/ wiki-temp/
           fi
           
           # Copy root README to Wiki Home
