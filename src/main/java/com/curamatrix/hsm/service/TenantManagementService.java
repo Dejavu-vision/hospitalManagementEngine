@@ -48,6 +48,11 @@ public class TenantManagementService {
             throw new RuntimeException("Invalid subscription plan: " + request.getSubscriptionPlan());
         }
 
+        // Validate dates
+        if (request.getSubscriptionEnd() != null && !request.getSubscriptionEnd().isAfter(java.time.LocalDate.now())) {
+            throw new RuntimeException("End date Can't be today's date or in the past.");
+        }
+
         // Create tenant
         Tenant tenant = Tenant.builder()
                 .tenantKey(request.getTenantKey())

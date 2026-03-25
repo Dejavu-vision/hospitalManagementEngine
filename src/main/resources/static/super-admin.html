@@ -113,6 +113,25 @@
       cursor: pointer; margin-left: 3px; font-weight: bold; color: var(--accent);
     }
 
+    /* ── Custom Modal ────────────────────────────────────── */
+    .custom-modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(3px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .custom-modal-overlay.active { opacity: 1; pointer-events: auto; }
+    .custom-modal {
+      background: #0f172a; border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px; width: 90%; max-width: 450px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5); transform: translateY(10px);
+      transition: transform 0.2s; display: flex; flex-direction: column; gap: 15px;
+    }
+    .custom-modal-overlay.active .custom-modal { transform: translateY(0); }
+    .custom-modal-title { font-size: 16px; font-weight: 600; color: var(--text); }
+    .custom-modal-body { font-size: 13px; color: var(--muted); line-height: 1.5; white-space: pre-wrap; word-break: break-all; max-height: 60vh; overflow-y: auto; }
+    .custom-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 5px; }
+
     /* ── Tables ──────────────────────────────────────────── */
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -580,7 +599,19 @@
       </div>
     </section>
 
-    <footer>CuraMatrix HSM — Super Admin Console</footer>
+    </footer>
+  </div>
+
+  <!-- Custom Modal -->
+  <div id="customModalOverlay" class="custom-modal-overlay">
+    <div class="custom-modal">
+      <div id="customModalTitle" class="custom-modal-title">Notice</div>
+      <div id="customModalBody" class="custom-modal-body"></div>
+      <div class="custom-modal-actions">
+        <button id="btnModalCancel" class="btn ghost hidden">Cancel</button>
+        <button id="btnModalConfirm" class="btn">OK</button>
+      </div>
+    </div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════
@@ -656,6 +687,30 @@
         return b;
       }
 
+      function showModal(title, msg, isConfirm = false) {
+        return new Promise((resolve) => {
+          $("customModalTitle").textContent = title;
+          $("customModalBody").textContent = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
+          
+          const overlay = $("customModalOverlay");
+          const btnCancel = $("btnModalCancel");
+          const btnConfirm = $("btnModalConfirm");
+          
+          if (isConfirm) btnCancel.classList.remove("hidden");
+          else btnCancel.classList.add("hidden");
+          
+          const newCancel = btnCancel.cloneNode(true);
+          const newConfirm = btnConfirm.cloneNode(true);
+          btnCancel.replaceWith(newCancel);
+          btnConfirm.replaceWith(newConfirm);
+          
+          newCancel.onclick = () => { overlay.classList.remove("active"); resolve(false); };
+          newConfirm.onclick = () => { overlay.classList.remove("active"); resolve(true); };
+          
+          overlay.classList.add("active");
+        });
+      }
+
       function setMsg(id, text, kind) {
         const el = $(id);
         if (!el) return;
@@ -690,6 +745,30 @@
         if (show) el.classList.remove("hidden");
         else el.classList.add("hidden");
         if (show) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function showModal(title, msg, isConfirm = false) {
+        return new Promise((resolve) => {
+          $("customModalTitle").textContent = title;
+          $("customModalBody").textContent = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
+          
+          const overlay = $("customModalOverlay");
+          const btnCancel = $("btnModalCancel");
+          const btnConfirm = $("btnModalConfirm");
+          
+          if (isConfirm) btnCancel.classList.remove("hidden");
+          else btnCancel.classList.add("hidden");
+          
+          const newCancel = btnCancel.cloneNode(true);
+          const newConfirm = btnConfirm.cloneNode(true);
+          btnCancel.replaceWith(newCancel);
+          btnConfirm.replaceWith(newConfirm);
+          
+          newCancel.onclick = () => { overlay.classList.remove("active"); resolve(false); };
+          newConfirm.onclick = () => { overlay.classList.remove("active"); resolve(true); };
+          
+          overlay.classList.add("active");
+        });
       }
 
       /* ── Tabs ──────────────────────────────────────────────── */
@@ -759,22 +838,22 @@
             actions.className = "controls";
 
             actions.appendChild(btn("View", "ghost", async () => {
-              try { alert(JSON.stringify(await api("/api/super-admin/tenants/" + t.id), null, 2)); } catch (e) { alert("Error: " + e.message); }
+              try { await showModal("Hospital Details", await api("/api/super-admin/tenants/" + t.id)); } catch (e) { await showModal("Error", e.message); }
             }));
             actions.appendChild(btn("Stats", "secondary", async () => {
-              try { alert(JSON.stringify(await api("/api/super-admin/tenants/" + t.id + "/stats"), null, 2)); } catch (e) { alert("Error: " + e.message); }
+              try { await showModal("Hospital Stats", await api("/api/super-admin/tenants/" + t.id + "/stats")); } catch (e) { await showModal("Error", e.message); }
             }));
             actions.appendChild(btn("Edit", "", () => openEditHospital(t)));
 
             if (t.suspended || t.active === false) {
               actions.appendChild(btn("Activate", "", async () => {
-                if (!confirm("Activate this hospital?")) return;
-                try { await api("/api/super-admin/tenants/" + t.id + "/activate", { method: "PUT" }); await loadTenants(); populateTenantDropdowns(); } catch (e) { alert("Error: " + e.message); }
+                if (!(await showModal("Activate Hospital", "Are you sure you want to activate this hospital?", true))) return;
+                try { await api("/api/super-admin/tenants/" + t.id + "/activate", { method: "PUT" }); await loadTenants(); populateTenantDropdowns(); } catch (e) { await showModal("Error", e.message); }
               }));
             } else {
               actions.appendChild(btn("Suspend", "warn", async () => {
-                if (!confirm("Suspend this hospital?")) return;
-                try { await api("/api/super-admin/tenants/" + t.id + "/suspend", { method: "PUT" }); await loadTenants(); populateTenantDropdowns(); } catch (e) { alert("Error: " + e.message); }
+                if (!(await showModal("Suspend Hospital", "Are you sure you want to suspend this hospital? They will lose access immediately.", true))) return;
+                try { await api("/api/super-admin/tenants/" + t.id + "/suspend", { method: "PUT" }); await loadTenants(); populateTenantDropdowns(); } catch (e) { await showModal("Error", e.message); }
               }));
             }
 
