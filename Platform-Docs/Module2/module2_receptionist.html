@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Module 2 — Receptionist · Complete Handoff</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:#f9f8f6; --bg2:#f2f0ec; --bg3:#e8e5df;
+  --surface:#fff; --border:rgba(0,0,0,0.07); --border2:rgba(0,0,0,0.13); --border3:rgba(0,0,0,0.2);
+  --text:#1a1916; --text2:#5a5650; --text3:#9a9488;
+  --red:#b91c1c; --red-bg:#fef2f2; --red-b:rgba(185,28,28,0.18);
+  --amber:#a16207; --amber-bg:#fffbeb; --amber-b:rgba(161,98,7,0.18);
+  --blue:#1e40af; --blue-bg:#eff6ff; --blue-b:rgba(30,64,175,0.18);
+  --green:#15803d; --green-bg:#f0fdf4; --green-b:rgba(21,128,61,0.18);
+  --purple:#7e22ce; --purple-bg:#faf5ff; --purple-b:rgba(126,34,206,0.18);
+  --teal:#0f766e; --teal-bg:#f0fdfa; --teal-b:rgba(15,118,110,0.18);
+  --indigo:#3730a3; --indigo-bg:#eef2ff; --indigo-b:rgba(55,48,163,0.18);
+  --mono:'Geist Mono',monospace; --sans:'Geist',system-ui,sans-serif; --serif:'Instrument Serif',Georgia,serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.7;}
+@media print{.no-print{display:none!important;} .page{padding:20px;} body{font-size:12px;}}
+
+/* ── Sticky nav ── */
+.topbar{position:sticky;top:0;z-index:200;background:rgba(249,248,246,0.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:8px;padding:10px 28px;flex-wrap:wrap;}
+.tb-brand{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;margin-right:8px;}
+.tb-tab{font-size:11px;font-weight:600;padding:5px 14px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap;font-family:var(--sans);}
+.tb-tab:hover{color:var(--text);}
+.tb-tab.active{background:var(--text);color:#fff;border-color:var(--text);}
+.tb-print{margin-left:auto;font-size:11px;font-weight:600;padding:5px 14px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;font-family:var(--sans);}
+.tb-print:hover{background:var(--text);color:#fff;border-color:var(--text);}
+
+.page{max-width:1020px;margin:0 auto;padding:44px 24px 100px;}
+.panel{display:none;animation:fadeUp .2s ease both;}
+.panel.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+/* ── Section headings ── */
+.sec-eyebrow{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--text3);margin-bottom:6px;}
+.sec-h{font-family:var(--serif);font-size:28px;color:var(--text);margin-bottom:6px;line-height:1.2;}
+.sec-h em{font-style:italic;color:var(--blue);}
+.sec-intro{font-size:14px;color:var(--text2);font-weight:300;line-height:1.75;max-width:640px;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--border);}
+.sub-h{font-family:var(--serif);font-size:19px;color:var(--text);margin-bottom:10px;margin-top:28px;}
+
+/* ── Callouts ── */
+.callout{border-radius:10px;border-left:3px solid;padding:13px 16px;margin-bottom:14px;font-size:13px;line-height:1.7;}
+.callout strong{display:block;font-weight:600;margin-bottom:3px;}
+.co-red{background:var(--red-bg);border-color:var(--red);color:#7f1d1d;}
+.co-amber{background:var(--amber-bg);border-color:var(--amber);color:#713f12;}
+.co-blue{background:var(--blue-bg);border-color:var(--blue);color:#1e3a8a;}
+.co-green{background:var(--green-bg);border-color:var(--green);color:#14532d;}
+.co-teal{background:var(--teal-bg);border-color:var(--teal);color:#134e4a;}
+.co-purple{background:var(--purple-bg);border-color:var(--purple);color:#4c1d95;}
+
+/* ── Tables ── */
+.tw{border:1px solid var(--border2);border-radius:12px;overflow:hidden;margin-bottom:20px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead th{background:var(--bg2);padding:9px 14px;text-align:left;font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);border-bottom:2px solid var(--border2);}
+tbody td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--bg);}
+.mono{font-family:var(--mono);font-size:11px;}
+.fw{font-weight:600;}
+
+/* ── Badges ── */
+.b{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap;}
+.b-now{background:var(--red-bg);color:var(--red);border:1px solid var(--red-b);}
+.b-p1{background:var(--red-bg);color:var(--red);border:1px solid var(--red-b);}
+.b-p2{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-b);}
+.b-p3{background:var(--green-bg);color:var(--green);border:1px solid var(--green-b);}
+.b-db{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-b);}
+.b-api{background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-b);}
+.b-ui{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-b);}
+.b-get{background:var(--green-bg);color:var(--green);border:1px solid var(--green-b);}
+.b-post{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-b);}
+.b-patch{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-b);}
+.b-delete{background:var(--red-bg);color:var(--red);border:1px solid var(--red-b);}
+.b-enc{background:var(--red-bg);color:var(--red);border:1px solid var(--red-b);}
+.b-mask{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-b);}
+
+/* ── Workflow steps ── */
+.flow{display:flex;flex-direction:column;align-items:center;gap:0;max-width:540px;margin:0 auto 28px;}
+.flow-step{width:100%;border-radius:12px;border:1px solid;padding:14px 18px;cursor:pointer;transition:transform .15s;}
+.flow-step:hover{transform:translateX(4px);}
+.fs-num{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;opacity:.7;}
+.fs-title{font-size:13px;font-weight:600;margin-bottom:3px;}
+.fs-sub{font-size:11px;opacity:.7;font-family:var(--mono);}
+.fs-body{display:none;margin-top:10px;padding-top:10px;border-top:1px solid rgba(0,0,0,.07);}
+.flow-step.open .fs-body{display:block;}
+.fs-list{list-style:none;font-size:11px;display:flex;flex-direction:column;gap:3px;}
+.fs-list li::before{content:'→ ';opacity:.5;}
+
+.flow-arr{height:24px;width:2px;background:var(--border2);margin:0 auto;position:relative;}
+.flow-arr::after{content:'';position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--border3);}
+
+.fs-1{background:var(--blue-bg);border-color:var(--blue-b);}
+.fs-1 .fs-num,.fs-1 .fs-sub{color:var(--blue);}
+.fs-1 .fs-title{color:#1e3a8a;}
+.fs-2{background:var(--teal-bg);border-color:var(--teal-b);}
+.fs-2 .fs-num,.fs-2 .fs-sub{color:var(--teal);}
+.fs-2 .fs-title{color:#134e4a;}
+.fs-3{background:var(--purple-bg);border-color:var(--purple-b);}
+.fs-3 .fs-num,.fs-3 .fs-sub{color:var(--purple);}
+.fs-3 .fs-title{color:#4c1d95;}
+.fs-4{background:var(--amber-bg);border-color:var(--amber-b);}
+.fs-4 .fs-num,.fs-4 .fs-sub{color:var(--amber);}
+.fs-4 .fs-title{color:#713f12;}
+.fs-5{background:var(--green-bg);border-color:var(--green-b);}
+.fs-5 .fs-num,.fs-5 .fs-sub{color:var(--green);}
+.fs-5 .fs-title{color:#14532d;}
+.fs-6{background:var(--indigo-bg);border-color:var(--indigo-b);}
+.fs-6 .fs-num,.fs-6 .fs-sub{color:var(--indigo);}
+.fs-6 .fs-title{color:var(--indigo);}
+
+/* ── Tasks ── */
+.task-group{margin-bottom:20px;border:1px solid var(--border2);border-radius:12px;overflow:hidden;}
+.tg-head{display:flex;align-items:center;gap:10px;padding:11px 16px;background:var(--bg2);cursor:pointer;border-bottom:1px solid var(--border2);}
+.tg-icon{width:26px;height:26px;border-radius:7px;border:1px solid;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;font-weight:700;flex-shrink:0;}
+.tg-title{font-size:13px;font-weight:700;flex:1;}
+.tg-count{font-family:var(--mono);font-size:10px;color:var(--text3);}
+.tg-chev{font-size:10px;color:var(--text3);transition:transform .2s;}
+.task-group.collapsed .tg-chev{transform:rotate(-90deg);}
+.task-group.collapsed .task-list{display:none;}
+
+.tg-db .tg-icon{background:var(--blue-bg);border-color:var(--blue-b);color:var(--blue);}
+.tg-db .tg-title{color:var(--blue);}
+.tg-api .tg-icon{background:var(--teal-bg);border-color:var(--teal-b);color:var(--teal);}
+.tg-api .tg-title{color:var(--teal);}
+.tg-ui .tg-icon{background:var(--purple-bg);border-color:var(--purple-b);color:var(--purple);}
+.tg-ui .tg-title{color:var(--purple);}
+
+.task-item{display:grid;grid-template-columns:30px 56px 1fr auto;gap:10px;align-items:start;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface);transition:background .1s;cursor:pointer;}
+.task-item:last-child{border-bottom:none;}
+.task-item:hover{background:var(--bg);}
+.task-item.done{opacity:.45;}
+.task-item.done .ti-title{text-decoration:line-through;}
+.ti-check{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0;margin-top:1px;}
+.ti-check:hover{border-color:var(--text2);}
+.ti-check.done{background:var(--text);border-color:var(--text);}
+.ti-check.done::after{content:'✓';color:#fff;font-size:10px;font-weight:700;}
+.ti-id{font-family:var(--mono);font-size:9px;color:var(--text3);padding-top:2px;}
+.ti-body{min-width:0;}
+.ti-title{font-size:12px;font-weight:600;color:var(--text);}
+.ti-desc{font-size:11px;color:var(--text2);margin-top:3px;line-height:1.6;}
+.ti-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;}
+.ti-meta{display:flex;flex-direction:column;align-items:flex-end;gap:3px;}
+.est{font-family:var(--mono);font-size:9px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);padding:1px 6px;border-radius:4px;white-space:nowrap;}
+
+/* ── Stories ── */
+.story{border:1px solid var(--border2);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+.story-head{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;background:var(--surface);transition:background .1s;}
+.story-head:hover{background:var(--bg);}
+.story-id{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;}
+.story-title{font-size:13px;font-weight:600;color:var(--text);flex:1;}
+.story-chev{font-size:10px;color:var(--text3);transition:transform .2s;}
+.story.open .story-chev{transform:rotate(180deg);}
+.story-body{display:none;border-top:1px solid var(--border);padding:14px 16px;}
+.story.open .story-body{display:block;}
+.as-a{font-size:13px;color:var(--text2);font-style:italic;margin-bottom:12px;}
+.ac-label{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:6px;}
+.ac-list{display:flex;flex-direction:column;gap:4px;}
+.ac-item{display:flex;align-items:flex-start;gap:8px;padding:6px 10px;border-radius:7px;font-size:12px;}
+.ac-pass{background:var(--green-bg);border:1px solid var(--green-b);color:#14532d;}
+.ac-fail{background:var(--red-bg);border:1px solid var(--red-b);color:#7f1d1d;}
+.ac-icon{font-weight:700;flex-shrink:0;font-size:11px;}
+
+.sid-reg{background:var(--blue-bg);color:var(--blue);}
+.sid-appt{background:var(--teal-bg);color:var(--teal);}
+.sid-bill{background:var(--amber-bg);color:var(--amber);}
+.sid-svc{background:var(--purple-bg);color:var(--purple);}
+.sid-sec{background:var(--red-bg);color:var(--red);}
+.rp-rec{background:var(--green-bg);color:var(--green);}
+
+/* ── Existing vs new comparison ── */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
+.compare-col{border-radius:10px;border:1px solid;padding:14px;}
+.cc-old{background:var(--bg2);border-color:var(--border2);}
+.cc-old .cc-title{color:var(--text2);}
+.cc-new{background:var(--green-bg);border-color:var(--green-b);}
+.cc-new .cc-title{color:var(--green);}
+.cc-title{font-size:11px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+.cc-list{list-style:none;font-size:11px;color:var(--text2);display:flex;flex-direction:column;gap:4px;}
+.cc-list li::before{content:'· ';}
+
+/* Progress bar */
+.prog-bar{height:5px;background:var(--bg3);border-radius:10px;overflow:hidden;margin-bottom:24px;}
+.prog-fill{height:100%;background:var(--blue);border-radius:10px;}
+
+.divider{border:none;border-top:1px solid var(--border2);margin:24px 0;}
+.footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--border2);font-family:var(--mono);font-size:10px;color:var(--text3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+
+@media(max-width:640px){.compare-grid{grid-template-columns:1fr;}.task-item{grid-template-columns:26px 1fr;}.ti-meta{grid-column:2;flex-direction:row;}.topbar{padding:8px 12px;}.page{padding:28px 14px 80px;}}
+</style>
+</head>
+<body>
+
+<!-- Top navigation -->
+<div class="topbar no-print">
+  <span class="tb-brand">Module 2 · Receptionist</span>
+  <button class="tb-tab active" onclick="showPanel('overview')">Overview</button>
+  <button class="tb-tab" onclick="showPanel('workflow')">Workflow</button>
+  <button class="tb-tab" onclick="showPanel('schema')">DB Schema</button>
+  <button class="tb-tab" onclick="showPanel('routes')">API Routes</button>
+  <button class="tb-tab" onclick="showPanel('tasks')">Tasks</button>
+  <button class="tb-tab" onclick="showPanel('stories')">User Stories</button>
+  <button class="tb-btn tb-print" onclick="window.print()">Print / PDF</button>
+</div>
+
+<div class="page">
+
+<!-- ════════════════════════════════
+     PANEL 1 — OVERVIEW
+════════════════════════════════ -->
+<div class="panel active" id="panel-overview">
+  <div class="sec-eyebrow">Module 2 · Receptionist Handoff</div>
+  <h1 class="sec-h">Receptionist <em>Module</em></h1>
+  <p class="sec-intro">Based on analysis of the existing WinMD PolyClinic system. This module covers everything a receptionist does from the moment a patient walks in — registration, appointment booking, service selection, billing, payment collection, and patient history lookup. All workflows observed from the existing system have been mapped, improved, and broken into dev tasks.</p>
+
+  <div class="callout co-blue">
+    <strong>What the existing system does — observed from  existing system</strong>
+    Patient registration (Add New Patient form with 20+ fields including Aadhaar), appointment management with department and doctor filters, service appointment creation (Lab, X-Ray, USG, Other Service), billing with line items and discount, payment collection (Cash/Cheque with receipt generation), patient history view (OPD + IPD with all service dates), lab report entry with abnormal value highlighting, WhatsApp receipt sharing.
+  </div>
+
+  <div class="callout co-amber">
+    <strong>What we are improving over the existing system</strong>
+    Web-based (not desktop), role-scoped so receptionist sees ONLY what they need, Aadhaar and contact details encrypted at rest, no clinical data visible (diagnosis/lab results hidden), token/queue number system, WhatsApp notification via API instead of manual sharing, consent captured digitally at registration, audit log on every action.
+  </div>
+
+  <div class="sub-h">Existing system analysis — what maps to what</div>
+  <div class="compare-grid">
+    <div class="compare-col cc-old">
+      <div class="cc-title">Existing (WinMD)</div>
+      <ul class="cc-list">
+        <li>Add New Patient — 20+ field form</li>
+        <li>Appointment list filtered by date, dept, doctor</li>
+        <li>Service Appointment — add lab/xray/usg/other</li>
+        <li>Bill with discount, paid, due columns</li>
+        <li>Add Receipt — cash/cheque/bank</li>
+        <li>View All — full patient history OPD+IPD</li>
+        <li>Lab Report Entry — manual value entry</li>
+        <li>Referring Doctor selection</li>
+        <li>Ward/Bed assignment visible</li>
+        <li>Print bill, reprint, WhatsApp share</li>
+        <li>Token number visible in appointment list</li>
+        <li>Combine bill print across services</li>
+      </ul>
+    </div>
+    <div class="compare-col cc-new">
+      <div class="cc-title">Our system (new)</div>
+      <ul class="cc-list">
+        <li>Register patient — required fields only, consent captured</li>
+        <li>Today's appointment queue — role scoped</li>
+        <li>Book appointment + select services for patient</li>
+        <li>Generate invoice with line items + discount</li>
+        <li>Collect payment — cash/UPI/card/cheque + receipt</li>
+        <li>Patient lookup — basic info only (no clinical)</li>
+        <li>Lab report entry moved to Lab Tech module</li>
+        <li>Referring doctor — select from doctor list</li>
+        <li>Ward/bed — read only for reference</li>
+        <li>Send receipt via WhatsApp API + print</li>
+        <li>Auto token number on check-in</li>
+        <li>Combined invoice across services</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="sub-h">Module scope — what receptionist can and cannot do</div>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Feature</th><th>Access level</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td class="fw">Register new patient</td><td><span class="b b-post">WRITE</span></td><td>Basic fields only — no clinical fields</td></tr>
+        <tr><td class="fw">View patient basic info</td><td><span class="b b-get">READ</span></td><td>Name, contact, DOB, insurance — masked in UI</td></tr>
+        <tr><td class="fw">Book / reschedule appointment</td><td><span class="b b-post">WRITE</span></td><td>Any doctor in branch</td></tr>
+        <tr><td class="fw">Patient check-in + token</td><td><span class="b b-post">WRITE</span></td><td>Auto-generates token number</td></tr>
+        <tr><td class="fw">Cancel appointment</td><td><span class="b b-patch">UPDATE</span></td><td>With reason — logged</td></tr>
+        <tr><td class="fw">View doctor schedule / availability</td><td><span class="b b-get">READ</span></td><td>Slots only — no clinical notes</td></tr>
+        <tr><td class="fw">Add services to patient visit</td><td><span class="b b-post">WRITE</span></td><td>Lab, X-Ray, USG, OPD, Other</td></tr>
+        <tr><td class="fw">Generate invoice</td><td><span class="b b-post">WRITE</span></td><td>With line items and discount</td></tr>
+        <tr><td class="fw">Collect payment</td><td><span class="b b-post">WRITE</span></td><td>Cash, UPI, card, cheque</td></tr>
+        <tr><td class="fw">Print / WhatsApp receipt</td><td><span class="b b-post">WRITE</span></td><td>Via WhatsApp API</td></tr>
+        <tr><td class="fw">View billing history</td><td><span class="b b-get">READ</span></td><td>Own branch only</td></tr>
+        <tr><td class="fw">View patient medical history</td><td><span class="b b-delete">BLOCKED</span></td><td>No access — 403</td></tr>
+        <tr><td class="fw">View diagnosis / lab results</td><td><span class="b b-delete">BLOCKED</span></td><td>No access — 403</td></tr>
+        <tr><td class="fw">View/write prescriptions</td><td><span class="b b-delete">BLOCKED</span></td><td>No access — 403</td></tr>
+        <tr><td class="fw">Refunds / billing adjustments</td><td><span class="b b-delete">BLOCKED</span></td><td>Admin only</td></tr>
+        <tr><td class="fw">Manage staff / settings</td><td><span class="b b-delete">BLOCKED</span></td><td>Admin only</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sub-h">Fields observed in existing system — patient registration</div>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Field (existing)</th><th>Our field name</th><th>Required</th><th>Encryption</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Patient No</td><td class="mono">patient_id</td><td>Auto</td><td>—</td><td>Auto-generated UUID / sequential</td></tr>
+        <tr><td>First / Middle / Last Name</td><td class="mono">first_name, last_name</td><td>Required</td><td><span class="b b-enc">AES-256</span></td><td>Middle name optional</td></tr>
+        <tr><td>Age (YY/MM/DD)</td><td class="mono">date_of_birth</td><td>Required</td><td><span class="b b-enc">AES-256</span></td><td>Store DOB not age</td></tr>
+        <tr><td>Sex</td><td class="mono">gender</td><td>Required</td><td>—</td><td>M/F/Other enum</td></tr>
+        <tr><td>Place / PIN</td><td class="mono">city, pincode</td><td>Optional</td><td>—</td><td>City plain, address encrypted</td></tr>
+        <tr><td>Mobile / Mobile4SMS</td><td class="mono">phone, sms_phone</td><td>Required</td><td><span class="b b-enc">AES-256</span></td><td>Separate SMS number field</td></tr>
+        <tr><td>Department</td><td class="mono">department</td><td>Optional</td><td>—</td><td>Default: General</td></tr>
+        <tr><td>Appointment for Dr</td><td class="mono">preferred_doctor_id</td><td>Optional</td><td>—</td><td>FK → users (doctors)</td></tr>
+        <tr><td>Referred By</td><td class="mono">referred_by</td><td>Optional</td><td>—</td><td>Free text or FK → referrers table</td></tr>
+        <tr><td>Aadhar No</td><td class="mono">national_id</td><td>Optional</td><td><span class="b b-enc">AES-256</span></td><td>Last 4 shown in UI only</td></tr>
+        <tr><td>Address</td><td class="mono">address</td><td>Optional</td><td><span class="b b-enc">AES-256</span></td><td>Full address encrypted</td></tr>
+        <tr><td>Country</td><td class="mono">country</td><td>Optional</td><td>—</td><td>Default India</td></tr>
+        <tr><td>Phone</td><td class="mono">alt_phone</td><td>Optional</td><td><span class="b b-enc">AES-256</span></td><td>Alternate phone</td></tr>
+        <tr><td>Education</td><td class="mono">education</td><td>Optional</td><td>—</td><td>Dropdown enum</td></tr>
+        <tr><td>Occupation</td><td class="mono">occupation</td><td>Optional</td><td>—</td><td>Dropdown enum</td></tr>
+        <tr><td>Category</td><td class="mono">category</td><td>Optional</td><td>—</td><td>General/BPL/Staff etc</td></tr>
+        <tr><td>Language</td><td class="mono">language</td><td>Optional</td><td>—</td><td>Default Kannada</td></tr>
+        <tr><td>Religion</td><td class="mono">religion</td><td>Optional</td><td>—</td><td>Optional</td></tr>
+        <tr><td>Blood Group</td><td class="mono">blood_group</td><td>Optional</td><td><span class="b b-enc">AES-256</span></td><td>Clinical data — encrypted</td></tr>
+        <tr><td>Height</td><td class="mono">height_cm</td><td>Optional</td><td>—</td><td>Numeric</td></tr>
+        <tr><td>Income</td><td class="mono">income_bracket</td><td>Optional</td><td>—</td><td>For subsidy categorisation</td></tr>
+        <tr><td>Notes</td><td class="mono">registration_notes</td><td>Optional</td><td>—</td><td>Plain text, receptionist only</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     PANEL 2 — WORKFLOW
+════════════════════════════════ -->
+<div class="panel" id="panel-workflow">
+  <div class="sec-eyebrow">Module 2 · Complete workflow</div>
+  <h2 class="sec-h">Receptionist <em>Workflows</em></h2>
+  <p class="sec-intro">Six primary workflows the receptionist performs daily. Click each step to expand implementation detail. These are derived directly from the existing system  plus improvements for the web platform.</p>
+
+  <div class="sub-h">Workflow 1 — New patient walk-in</div>
+  <div class="flow">
+    <div class="flow-step fs-1" onclick="toggleStep(this)">
+      <div class="fs-num">Step 1</div>
+      <div class="fs-title">Search if patient already exists</div>
+      <div class="fs-sub">GET /api/patients?search= · phone or name</div>
+      <div class="fs-body">
+        <ul class="fs-list">
+          <li>Search by phone number (primary) or name</li>
+          <li>Phone lookup uses hash index — fast without decrypting all records</li>
+          <li>If found → open existing patient profile → proceed to appointment</li>
+          <li>If not found → proceed to registration</li>
+          <li>Results show: name (masked), patient ID, last visit date only</li>
+        </ul>
+      </div>
+    </div>
+    <div class="flow-arr"></div>
+    <div class="flow-step fs-2" onclick="toggleStep(this)">
+      <div class="fs-num">Step 2</div>
+      <div class="fs-title">Register new patient</div>
+      <div class="fs-sub">POST /api/patients · consent captured</div>
+      <div class="fs-body">
+        <ul class="fs-list">
+          <li>Required: first_name, last_name, phone, gender, date_of_birth</li>
+          <li>Optional: Aadhaar, address, blood group, referred_by, department</li>
+          <li>Consent checkbox must be checked before save (DPDP compliance)</li>
+          <li>Patient ID auto-generated (sequential + UUID)</li>
+          <li>Checklist: admin's "patient_added" checklist item updates automatically</li>
+          <li>Audit log: PATIENT_REGISTERED with receptionist user_id</li>
+        </ul>
+      </div>
+    </div>
+    <div class="flow-arr"></div>
+    <div class="flow-step fs-3" onclick="toggleStep(this)">
+      <div class="fs-num">Step 3</div>
+      <div class="fs-title">Book appointment</div>
+      <div class="fs-sub">POST /api/appointments · assigns token</div>
+      <div class="fs-body">
+        <ul class="fs-list">
+          <li>Select department → filter available doctors</li>
+          <li>Select doctor → view available slots for today/date</li>
+          <li>Select time slot → book appointment</li>
+          <li>Token number auto-assigned (sequential per day per doctor)</li>
+          <li>Appointment status: scheduled</li>
+          <li>Optional: enter referring doctor name</li>
+        </ul>
+      </div>
+    </div>
+    <div class="flow-arr"></div>
+    <div class="flow-step fs-4" onclick="toggleStep(this)">
+      <div class="fs-num">Step 4</div>
+      <div class="fs-title">Patient arrives — check in</div>
+      <div class="fs-sub">PATCH /api/appointments/:id/status → checked_in</div>
+      <div class="fs-body">
+        <ul class="fs-list">
+          <li>Find appointment in today's queue</li>
+          <li>Mark as checked_in — triggers token display</li>
+          <li>Appointment status: scheduled → checked_in</li>
+          <li>Doctor's queue updates in real time</li>
+          <li>Check-in time recorded for analytics</li>
+        </ul>
+      </div>
+    </div>
+    <div class="flow-arr"></div>
+    <div class="flow-step fs-5" onclick="toggleStep(this)">
+      <div class="fs-num">Step 5</div>
+      <div class="fs-title">Add services to visit</div>
+      <div class="fs-sub">POST /api/visits/:id/services · Lab/X-Ray/USG/OPD</div>
+      <div class="fs-body">
+        <ul class="fs-list">
+          <li>Select service type: Lab, X-Ray, USG, OPD Consultation, Other</li>
+          <li>Select specific items from price list (e.g. ESR ₹100, CRP ₹350)</li>
+          <li>Multiple items can be added in one visit</li>
+          <li>Referring doctor selected per service</li>
+          <li>Auto-calculates total from price list</li>
+          <li>Creates service orders — visible to Lab Tech / Pharmacist in their module</li>
+        </ul>
+      </div>
+    </div>
+    <div class="flow-arr"></div>
+    <div class="flow-step fs-6" onclick="toggleStep(this)">
+      <div class="fs-num">Step 6</div>
+      <div class="fs-title">Generate invoice + collect payment</div>
+      <div class="fs-sub">POST /api/billing/invoices + POST /api/billing/payments</div>
+      <div class="fs-body">
+        <ul class="fs-list">
+          <li>Invoice auto-generated from services added</li>
+          <li>Apply discount if applicable (requires reason)</li>
+          <li>Collect payment: Cash / UPI / Card / Cheque</li>
+          <li>For cheque: capture cheque no, date, bank name</li>
+          <li>Receipt auto-generated with sequential receipt number</li>
+          <li>Send receipt via WhatsApp API or print</li>
+          <li>Due balance tracked if partial payment</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="sub-h">Workflow 2 — Returning patient</div>
+  <div class="callout co-teal">
+    Search by phone → existing profile opens → book appointment or add service to existing visit → generate invoice → collect payment → send receipt. Same flow as new patient from Step 3 onwards.
+  </div>
+
+  <div class="sub-h">Workflow 3 — View patient history (receptionist view)</div>
+  <div class="callout co-blue">
+    <strong>Receptionist sees only:</strong> Patient name, contact, past appointment dates, invoice amounts, payment status, pending dues. They do NOT see: diagnosis, lab results, prescriptions, clinical notes. Separate API endpoint (/api/patients/:id/basic) enforces this at the data layer — not just the UI.
+  </div>
+
+  <div class="sub-h">Workflow 4 — Collect due payment</div>
+  <div class="callout co-amber">
+    Patient lookup → view billing history → find invoice with due amount → POST /api/billing/payments against that invoice → receipt generated. The existing system shows this clearly — patient may pay a previous balance separately (seen in View All screen with due amounts).
+  </div>
+
+  <div class="sub-h">Workflow 5 — Cancel / reschedule appointment</div>
+  <div class="callout co-purple">
+    Find appointment in queue → PATCH status to cancelled with reason → system logs action with user_id → patient SMS notification triggered. Reschedule = cancel + rebook. Both actions logged in audit trail. Receptionist cannot delete — only cancel with reason.
+  </div>
+
+  <div class="sub-h">Workflow 6 — Print / WhatsApp receipt or bill</div>
+  <div class="callout co-green">
+    From billing screen → select invoice → Print (generates PDF) or WhatsApp (sends via WhatsApp API to patient's registered number). Combine bill print merges multiple services into single invoice — matches existing "Combine Bill Print" feature seen in  existing system. Reprint available from payment history.
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     PANEL 3 — DB SCHEMA
+════════════════════════════════ -->
+<div class="panel" id="panel-schema">
+  <div class="sec-eyebrow">Module 2 · Database</div>
+  <h2 class="sec-h">Database <em>Schema</em></h2>
+  <p class="sec-intro">6 new tables for Module 2. All build on top of the 5 existing Phase 1 tables. Run migrations in order.</p>
+
+  <div class="callout co-red">
+    <strong>Encryption reminder:</strong> Fields marked AES-256 must be encrypted at application layer before insert. Store email_hash / phone_hash separately as SHA-256 for fast lookup without decryption. This is required before Module 2 goes to production.
+  </div>
+
+  <div class="sub-h">Table 1 — patients</div>
+  <div class="tw"><table>
+    <thead><tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="mono fw">id</td><td class="mono">UUID</td><td>NOT NULL</td><td>gen_random_uuid()</td><td>PK</td></tr>
+      <tr><td class="mono fw">hospital_id</td><td class="mono">UUID</td><td>NOT NULL</td><td>—</td><td>FK → hospitals.id · branch scope</td></tr>
+      <tr><td class="mono fw">patient_number</td><td class="mono">TEXT</td><td>NOT NULL</td><td>auto</td><td>UNIQUE per hospital. Sequential e.g. H001-00001</td></tr>
+      <tr><td class="mono fw">first_name</td><td class="mono">TEXT</td><td>NOT NULL</td><td>—</td><td><span class="b b-enc">AES-256</span></td></tr>
+      <tr><td class="mono fw">last_name</td><td class="mono">TEXT</td><td>NOT NULL</td><td>—</td><td><span class="b b-enc">AES-256</span></td></tr>
+      <tr><td class="mono fw">middle_name</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td><span class="b b-enc">AES-256</span></td></tr>
+      <tr><td class="mono fw">phone</td><td class="mono">TEXT</td><td>NOT NULL</td><td>—</td><td><span class="b b-enc">AES-256</span> · Required</td></tr>
+      <tr><td class="mono fw">phone_hash</td><td class="mono">TEXT</td><td>NOT NULL</td><td>—</td><td>SHA-256 for search lookup. UNIQUE per hospital.</td></tr>
+      <tr><td class="mono fw">alt_phone</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td><span class="b b-enc">AES-256</span> · SMS number</td></tr>
+      <tr><td class="mono fw">date_of_birth</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td><span class="b b-enc">AES-256</span> · Store as encrypted string</td></tr>
+      <tr><td class="mono fw">gender</td><td class="mono">ENUM</td><td>NOT NULL</td><td>—</td><td>male | female | other</td></tr>
+      <tr><td class="mono fw">national_id</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td><span class="b b-enc">AES-256</span> · Aadhaar. Show last 4 in UI only.</td></tr>
+      <tr><td class="mono fw">address</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td><span class="b b-enc">AES-256</span></td></tr>
+      <tr><td class="mono fw">city</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td>Plain — used for display/filter</td></tr>
+      <tr><td class="mono fw">pincode</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td>Plain</td></tr>
+      <tr><td class="mono fw">country</td><td class="mono">TEXT</td><td>NULL</td><td>'India'</td><td>—</td></tr>
+      <tr><td class="mono fw">blood_group</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td><span class="b b-enc">AES-256</span> · Clinical field</td></tr>
+      <tr><td class="mono fw">gender</td><td class="mono">ENUM</td><td>NOT NULL</td><td>—</td><td>male | female | other</td></tr>
+      <tr><td class="mono fw">language</td><td class="mono">TEXT</td><td>NULL</td><td>'Kannada'</td><td>—</td></tr>
+      <tr><td class="mono fw">religion</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td>—</td></tr>
+      <tr><td class="mono fw">education</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td>—</td></tr>
+      <tr><td class="mono fw">occupation</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td>—</td></tr>
+      <tr><td class="mono fw">category</td><td class="mono">TEXT</td><td>NULL</td><td>'General'</td><td>General | BPL | Staff | Other</td></tr>
+      <tr><td class="mono fw">income_bracket</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td>For subsidy categorisation</td></tr>
+      <tr><td class="mono fw">height_cm</td><td class="mono">NUMERIC</td><td>NULL</td><td>—</td><td>—</td></tr>
+      <tr><td class="mono fw">referred_by</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td>Free text or referrer name</td></tr>
+      <tr><td class="mono fw">registration_notes</td><td class="mono">TEXT</td><td>NULL</td><td>—</td><td>Receptionist visible only</td></tr>
+      <tr><td class="mono fw">consent_given</td><td class="mono">BOOLEAN</td><td>NOT NULL</td><td>false</td><td>DPDP — must be true before save</td></tr>
+      <tr><td class="mono fw">consent_at</td><td class="mono">TIMESTAMPTZ</td><td>NULL</td><td>—</td><td>Timestamp of consent</td></tr>
+      <tr><td class="mono fw">status</td><td class="mono">ENUM</td><td>NOT NULL</td><td>'active'</td><td>active | inactive | anonymised</td></tr>
+      <tr><td class="mono fw">created_by</td><td class="mono">UUID</td><td>NOT NULL</td><td>—</td><td>FK → users.id (receptionist who registered)</td></tr>
+      <tr><td class="mono fw">created_at</td><td class="mono">TIMESTAMPTZ</td><td>NOT NULL</td><td>now()</td><td>—</td></tr>
+      <tr><td class="mono fw">updated_at</td><td class="mono">TIMESTAMPTZ</td><td>NOT NULL</td><td>now()</td><td>Auto-trigger</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="sub-h">Table 2 — appointments</div>
+  <div class="tw"><table>
+    <thead><tr><th>Column</th><th>Type</th><th>Null</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="mono fw">id</td><td class="mono">UUID</td><td>NOT NULL</td><td>PK</td></tr>
+      <tr><td class="mono fw">hospital_id</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → hospitals.id · IDX</td></tr>
+      <tr><td class="mono fw">patient_id</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → patients.id · IDX</td></tr>
+      <tr><td class="mono fw">doctor_id</td><td class="mono">UUID</td><td>NULL</td><td>FK → users.id · NULL for walk-in without doctor</td></tr>
+      <tr><td class="mono fw">department</td><td class="mono">TEXT</td><td>NOT NULL</td><td>e.g. General, Ortho, Gynaecology</td></tr>
+      <tr><td class="mono fw">appointment_date</td><td class="mono">DATE</td><td>NOT NULL</td><td>IDX</td></tr>
+      <tr><td class="mono fw">appointment_time</td><td class="mono">TIME</td><td>NULL</td><td>NULL for walk-in</td></tr>
+      <tr><td class="mono fw">token_number</td><td class="mono">INTEGER</td><td>NULL</td><td>Sequential per doctor per day. Auto-assigned on check-in.</td></tr>
+      <tr><td class="mono fw">status</td><td class="mono">ENUM</td><td>NOT NULL</td><td>scheduled | checked_in | in_progress | completed | cancelled | no_show</td></tr>
+      <tr><td class="mono fw">referred_by</td><td class="mono">TEXT</td><td>NULL</td><td>Referring doctor name or code</td></tr>
+      <tr><td class="mono fw">cancellation_reason</td><td class="mono">TEXT</td><td>NULL</td><td>Required when status = cancelled</td></tr>
+      <tr><td class="mono fw">checked_in_at</td><td class="mono">TIMESTAMPTZ</td><td>NULL</td><td>Set on check-in</td></tr>
+      <tr><td class="mono fw">visit_type</td><td class="mono">ENUM</td><td>NOT NULL</td><td>OPD | IPD | emergency</td></tr>
+      <tr><td class="mono fw">notes</td><td class="mono">TEXT</td><td>NULL</td><td>Receptionist notes — not clinical</td></tr>
+      <tr><td class="mono fw">created_by</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → users.id</td></tr>
+      <tr><td class="mono fw">created_at</td><td class="mono">TIMESTAMPTZ</td><td>NOT NULL</td><td>now()</td></tr>
+      <tr><td class="mono fw">updated_at</td><td class="mono">TIMESTAMPTZ</td><td>NOT NULL</td><td>now()</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="sub-h">Table 3 — visits (service appointments)</div>
+  <div class="tw"><table>
+    <thead><tr><th>Column</th><th>Type</th><th>Null</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="mono fw">id</td><td class="mono">UUID</td><td>NOT NULL</td><td>PK · "Service No" from existing system</td></tr>
+      <tr><td class="mono fw">hospital_id</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → hospitals.id</td></tr>
+      <tr><td class="mono fw">patient_id</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → patients.id</td></tr>
+      <tr><td class="mono fw">appointment_id</td><td class="mono">UUID</td><td>NULL</td><td>FK → appointments.id · NULL for direct service without appointment</td></tr>
+      <tr><td class="mono fw">visit_date</td><td class="mono">DATE</td><td>NOT NULL</td><td>IDX</td></tr>
+      <tr><td class="mono fw">service_type</td><td class="mono">ENUM</td><td>NOT NULL</td><td>lab | xray | usg | opd | other</td></tr>
+      <tr><td class="mono fw">incharge_doctor_id</td><td class="mono">UUID</td><td>NULL</td><td>FK → users.id</td></tr>
+      <tr><td class="mono fw">referring_doctor</td><td class="mono">TEXT</td><td>NULL</td><td>Ref Dr from existing system</td></tr>
+      <tr><td class="mono fw">ward_bed</td><td class="mono">TEXT</td><td>NULL</td><td>e.g. GWF12 — for IPD patients</td></tr>
+      <tr><td class="mono fw">status</td><td class="mono">ENUM</td><td>NOT NULL</td><td>pending | in_progress | completed</td></tr>
+      <tr><td class="mono fw">created_by</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → users.id</td></tr>
+      <tr><td class="mono fw">created_at</td><td class="mono">TIMESTAMPTZ</td><td>NOT NULL</td><td>now()</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="sub-h">Table 4 — visit_items (line items per service)</div>
+  <div class="tw"><table>
+    <thead><tr><th>Column</th><th>Type</th><th>Null</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="mono fw">id</td><td class="mono">UUID</td><td>NOT NULL</td><td>PK</td></tr>
+      <tr><td class="mono fw">visit_id</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → visits.id</td></tr>
+      <tr><td class="mono fw">service_item_id</td><td class="mono">UUID</td><td>NULL</td><td>FK → service_items price list</td></tr>
+      <tr><td class="mono fw">item_name</td><td class="mono">TEXT</td><td>NOT NULL</td><td>Snapshot of name at time of booking</td></tr>
+      <tr><td class="mono fw">rate</td><td class="mono">NUMERIC(10,2)</td><td>NOT NULL</td><td>Snapshot of rate at time of booking</td></tr>
+      <tr><td class="mono fw">quantity</td><td class="mono">INTEGER</td><td>NOT NULL</td><td>Default 1</td></tr>
+      <tr><td class="mono fw">discount</td><td class="mono">NUMERIC(10,2)</td><td>NOT NULL</td><td>Default 0</td></tr>
+      <tr><td class="mono fw">net_amount</td><td class="mono">NUMERIC(10,2)</td><td>NOT NULL</td><td>Computed: (rate * qty) - discount</td></tr>
+      <tr><td class="mono fw">report_generated</td><td class="mono">BOOLEAN</td><td>NOT NULL</td><td>Default false. Set true when lab/xray report uploaded.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="sub-h">Table 5 — invoices</div>
+  <div class="tw"><table>
+    <thead><tr><th>Column</th><th>Type</th><th>Null</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="mono fw">id</td><td class="mono">UUID</td><td>NOT NULL</td><td>PK</td></tr>
+      <tr><td class="mono fw">hospital_id</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → hospitals.id · IDX</td></tr>
+      <tr><td class="mono fw">patient_id</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → patients.id · IDX</td></tr>
+      <tr><td class="mono fw">visit_id</td><td class="mono">UUID</td><td>NULL</td><td>FK → visits.id · NULL for combined bill</td></tr>
+      <tr><td class="mono fw">invoice_number</td><td class="mono">TEXT</td><td>NOT NULL</td><td>UNIQUE. Sequential per hospital e.g. INV-2026-00001</td></tr>
+      <tr><td class="mono fw">invoice_date</td><td class="mono">DATE</td><td>NOT NULL</td><td>IDX</td></tr>
+      <tr><td class="mono fw">total_amount</td><td class="mono">NUMERIC(10,2)</td><td>NOT NULL</td><td>Sum of all line items</td></tr>
+      <tr><td class="mono fw">discount_amount</td><td class="mono">NUMERIC(10,2)</td><td>NOT NULL</td><td>Default 0</td></tr>
+      <tr><td class="mono fw">net_amount</td><td class="mono">NUMERIC(10,2)</td><td>NOT NULL</td><td>total - discount</td></tr>
+      <tr><td class="mono fw">paid_amount</td><td class="mono">NUMERIC(10,2)</td><td>NOT NULL</td><td>Default 0. Updated on payment.</td></tr>
+      <tr><td class="mono fw">due_amount</td><td class="mono">NUMERIC(10,2)</td><td>NOT NULL</td><td>Computed: net - paid</td></tr>
+      <tr><td class="mono fw">status</td><td class="mono">ENUM</td><td>NOT NULL</td><td>draft | issued | partially_paid | paid | cancelled</td></tr>
+      <tr><td class="mono fw">printed</td><td class="mono">BOOLEAN</td><td>NOT NULL</td><td>Default false</td></tr>
+      <tr><td class="mono fw">whatsapp_sent</td><td class="mono">BOOLEAN</td><td>NOT NULL</td><td>Default false</td></tr>
+      <tr><td class="mono fw">created_by</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → users.id</td></tr>
+      <tr><td class="mono fw">created_at</td><td class="mono">TIMESTAMPTZ</td><td>NOT NULL</td><td>now()</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="sub-h">Table 6 — payments (receipts)</div>
+  <div class="tw"><table>
+    <thead><tr><th>Column</th><th>Type</th><th>Null</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="mono fw">id</td><td class="mono">UUID</td><td>NOT NULL</td><td>PK</td></tr>
+      <tr><td class="mono fw">hospital_id</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → hospitals.id</td></tr>
+      <tr><td class="mono fw">invoice_id</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → invoices.id</td></tr>
+      <tr><td class="mono fw">patient_id</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → patients.id</td></tr>
+      <tr><td class="mono fw">receipt_number</td><td class="mono">TEXT</td><td>NOT NULL</td><td>UNIQUE per hospital. Sequential.</td></tr>
+      <tr><td class="mono fw">receipt_date</td><td class="mono">DATE</td><td>NOT NULL</td><td>—</td></tr>
+      <tr><td class="mono fw">amount</td><td class="mono">NUMERIC(10,2)</td><td>NOT NULL</td><td>—</td></tr>
+      <tr><td class="mono fw">payment_type</td><td class="mono">ENUM</td><td>NOT NULL</td><td>cash | upi | card | cheque | online</td></tr>
+      <tr><td class="mono fw">description</td><td class="mono">TEXT</td><td>NULL</td><td>Optional description</td></tr>
+      <tr><td class="mono fw">cheque_number</td><td class="mono">TEXT</td><td>NULL</td><td>If payment_type = cheque</td></tr>
+      <tr><td class="mono fw">cheque_date</td><td class="mono">DATE</td><td>NULL</td><td>—</td></tr>
+      <tr><td class="mono fw">bank_name</td><td class="mono">TEXT</td><td>NULL</td><td>—</td></tr>
+      <tr><td class="mono fw">upi_ref</td><td class="mono">TEXT</td><td>NULL</td><td>UPI transaction reference</td></tr>
+      <tr><td class="mono fw">printed</td><td class="mono">BOOLEAN</td><td>NOT NULL</td><td>Default false</td></tr>
+      <tr><td class="mono fw">whatsapp_sent</td><td class="mono">BOOLEAN</td><td>NOT NULL</td><td>Default false</td></tr>
+      <tr><td class="mono fw">created_by</td><td class="mono">UUID</td><td>NOT NULL</td><td>FK → users.id (receptionist)</td></tr>
+      <tr><td class="mono fw">created_at</td><td class="mono">TIMESTAMPTZ</td><td>NOT NULL</td><td>IDX</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="sub-h">Additional supporting tables needed</div>
+  <div class="tw"><table>
+    <thead><tr><th>Table</th><th>Purpose</th><th>Key columns</th></tr></thead>
+    <tbody>
+      <tr><td class="mono fw">service_items</td><td>Price list — items receptionist can add (ESR, CRP, X-Ray Chest etc.)</td><td>id, hospital_id, name, category, rate, is_active</td></tr>
+      <tr><td class="mono fw">doctor_slots</td><td>Available appointment slots per doctor per day</td><td>id, doctor_id, date, time, is_available, max_tokens</td></tr>
+      <tr><td class="mono fw">referrers</td><td>Referring doctors / sources list (seen in existing system)</td><td>id, hospital_id, name, code, phone</td></tr>
+    </tbody>
+  </table></div>
+
+  <pre style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px;font-family:var(--mono);font-size:11px;line-height:1.8;overflow-x:auto;white-space:pre-wrap;margin-bottom:16px;"><span style="color:var(--text3)">-- Key indexes for Module 2</span>
+CREATE INDEX idx_patients_hospital      ON patients(hospital_id);
+CREATE INDEX idx_patients_phone_hash    ON patients(phone_hash);
+CREATE INDEX idx_appointments_date      ON appointments(appointment_date);
+CREATE INDEX idx_appointments_doctor    ON appointments(doctor_id);
+CREATE INDEX idx_appointments_patient   ON appointments(patient_id);
+CREATE INDEX idx_visits_patient         ON visits(patient_id);
+CREATE INDEX idx_visits_date            ON visits(visit_date);
+CREATE INDEX idx_invoices_patient       ON invoices(patient_id);
+CREATE INDEX idx_invoices_date          ON invoices(invoice_date);
+CREATE INDEX idx_payments_invoice       ON payments(invoice_id);
+CREATE INDEX idx_payments_created_at    ON payments(created_at);</pre>
+</div>
+
+<!-- ════════════════════════════════
+     PANEL 4 — API ROUTES
+════════════════════════════════ -->
+<div class="panel" id="panel-routes">
+  <div class="sec-eyebrow">Module 2 · API Routes</div>
+  <h2 class="sec-h">API <em>Routes</em></h2>
+  <p class="sec-intro">All new routes for Module 2. These add to the 24 existing Phase 1 routes. All routes are branch-scoped via middleware. Receptionist role enforced on every route.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Method</th><th>Route</th><th>Who</th><th>Description</th><th>Key rules</th></tr></thead>
+    <tbody>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/patients</td><td>SA, A, D, Rec</td><td>Search patients by name or phone</td><td>Rec: returns basic fields only. Phone search via hash.</td></tr>
+      <tr><td><span class="b b-post">POST</span></td><td class="mono">/api/patients</td><td>SA, A, Rec</td><td>Register new patient</td><td>consent_given must be true. Encrypt PII before save.</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/patients/:id</td><td>SA, A, D</td><td>Full patient profile</td><td>Rec blocked — use /basic</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/patients/:id/basic</td><td>Rec, Lab, Ph</td><td>Safe patient info only</td><td>Returns: name, phone (masked), DOB, city, patient_number</td></tr>
+      <tr><td><span class="b b-patch">PATCH</span></td><td class="mono">/api/patients/:id</td><td>SA, A, D, Rec</td><td>Update patient profile</td><td>Rec: can only update contact/basic fields. Not clinical.</td></tr>
+      <tr style="background:var(--bg)"><td colspan="5" style="padding:6px 14px;font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;">Appointments</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/appointments</td><td>SA, A, D, Rec</td><td>List appointments (date/doctor/dept filter)</td><td>Rec: today's queue by default. Branch scoped.</td></tr>
+      <tr><td><span class="b b-post">POST</span></td><td class="mono">/api/appointments</td><td>SA, A, Rec</td><td>Book new appointment</td><td>Validates doctor slot availability.</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/appointments/:id</td><td>SA, A, D, Rec</td><td>Get appointment detail</td><td>—</td></tr>
+      <tr><td><span class="b b-patch">PATCH</span></td><td class="mono">/api/appointments/:id</td><td>SA, A, Rec</td><td>Reschedule appointment</td><td>Creates audit log entry</td></tr>
+      <tr><td><span class="b b-patch">PATCH</span></td><td class="mono">/api/appointments/:id/status</td><td>SA, A, D, Rec</td><td>Check-in / cancel / complete</td><td>Cancel requires reason field. Token assigned on check-in.</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/appointments/slots</td><td>SA, A, Rec</td><td>Available slots for doctor + date</td><td>Returns array of time slots with available/booked status</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/doctors/:id/schedule</td><td>SA, A, Rec, D</td><td>Doctor availability and schedule</td><td>—</td></tr>
+      <tr style="background:var(--bg)"><td colspan="5" style="padding:6px 14px;font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;">Visits & Services</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/patients/:id/visits</td><td>SA, A, D, Rec</td><td>Patient visit history</td><td>Rec: sees date, service type, amount. Not clinical details.</td></tr>
+      <tr><td><span class="b b-post">POST</span></td><td class="mono">/api/visits</td><td>SA, A, Rec</td><td>Create new service visit</td><td>Linked to appointment or standalone</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/visits/:id</td><td>SA, A, D, Rec</td><td>Get visit details + line items</td><td>—</td></tr>
+      <tr><td><span class="b b-post">POST</span></td><td class="mono">/api/visits/:id/items</td><td>SA, A, Rec</td><td>Add service items to visit</td><td>From price list. Validates item exists + rate.</td></tr>
+      <tr><td><span class="b b-patch">PATCH</span></td><td class="mono">/api/visits/:id/items/:itemId</td><td>SA, A, Rec</td><td>Update/remove item from visit</td><td>Cannot modify if already paid.</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/service-items</td><td>SA, A, D, Rec</td><td>Price list — all available service items</td><td>Filter by category: lab | xray | usg | opd | other</td></tr>
+      <tr style="background:var(--bg)"><td colspan="5" style="padding:6px 14px;font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;">Billing & Payments</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/billing/invoices</td><td>SA, A, Rec</td><td>List invoices (branch scoped)</td><td>Filter: patient_id, date, status, due only</td></tr>
+      <tr><td><span class="b b-post">POST</span></td><td class="mono">/api/billing/invoices</td><td>SA, A, Rec</td><td>Generate invoice from visit</td><td>Auto-calculates from visit_items. Discount requires reason.</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/billing/invoices/:id</td><td>SA, A, Rec</td><td>Get invoice with line items</td><td>—</td></tr>
+      <tr><td><span class="b b-patch">PATCH</span></td><td class="mono">/api/billing/invoices/:id</td><td>SA, A</td><td>Update invoice (discount, void)</td><td>Rec cannot update — admin only</td></tr>
+      <tr><td><span class="b b-post">POST</span></td><td class="mono">/api/billing/invoices/:id/combine</td><td>SA, A, Rec</td><td>Combine multiple invoices into one</td><td>Matches existing "Combine Bill Print" feature</td></tr>
+      <tr><td><span class="b b-post">POST</span></td><td class="mono">/api/billing/payments</td><td>SA, A, Rec</td><td>Record payment against invoice</td><td>Updates invoice paid_amount and due_amount.</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/billing/payments/:id/receipt</td><td>SA, A, Rec</td><td>Get receipt for printing/sharing</td><td>Returns PDF-ready data</td></tr>
+      <tr><td><span class="b b-post">POST</span></td><td class="mono">/api/billing/payments/:id/whatsapp</td><td>SA, A, Rec</td><td>Send receipt via WhatsApp</td><td>Triggers WhatsApp API to patient's registered number</td></tr>
+      <tr><td><span class="b b-post">POST</span></td><td class="mono">/api/billing/refunds</td><td>SA</td><td>Issue refund</td><td>Super admin only — receptionist blocked</td></tr>
+      <tr style="background:var(--bg)"><td colspan="5" style="padding:6px 14px;font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;">Supporting</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/referrers</td><td>SA, A, Rec</td><td>List of referring doctors</td><td>Used in patient registration and visit forms</td></tr>
+      <tr><td><span class="b b-get">GET</span></td><td class="mono">/api/patients/:id/billing-summary</td><td>SA, A, Rec</td><td>Patient's billing overview</td><td>Total paid, total due, last visit date</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout co-amber">
+    <strong>Total new routes — Module 2: 27 routes</strong>
+    Combined with Phase 1 (24 routes), total platform routes = 51 of the 76 planned. Remaining 25 routes cover Lab, Pharmacy, Billing reports, and Analytics in future modules.
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     PANEL 5 — TASKS
+════════════════════════════════ -->
+<div class="panel" id="panel-tasks">
+  <div class="sec-eyebrow">Module 2 · Dev Tasks</div>
+  <h2 class="sec-h">Task <em>Breakdown</em></h2>
+  <p class="sec-intro">All tasks split by track. Click any task to expand detail. P1 = blocks others, P2 = sprint goal, P3 = if time allows.</p>
+
+  <div class="prog-bar"><div class="prog-fill" id="prog" style="width:0%"></div></div>
+  <p style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:20px;" id="prog-label">0 / 0 tasks completed</p>
+
+  <div id="task-container"></div>
+</div>
+
+<!-- ════════════════════════════════
+     PANEL 6 — USER STORIES
+════════════════════════════════ -->
+<div class="panel" id="panel-stories">
+  <div class="sec-eyebrow">Module 2 · Acceptance criteria</div>
+  <h2 class="sec-h">User <em>Stories</em></h2>
+  <p class="sec-intro">Each story has pass (happy path) and fail (edge case / security) criteria. QA uses these directly as test cases.</p>
+
+  <div id="story-container"></div>
+</div>
+
+<div class="footer">
+  <span>Healthcare Platform · Module 2 · Receptionist Handoff · v1.0</span>
+  <span>March 2026 · Confidential Internal</span>
+</div>
+
+</div><!-- /page -->
+
+<script>
+// ── Panel navigation ──
+function showPanel(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tb-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// ── Workflow steps ──
+function toggleStep(el){ el.classList.toggle('open'); }
+
+// ── TASKS DATA ──
+const TASKS = [
+  // DB
+  { id:'DB-01', track:'DB', p:'P1', est:'2h', title:'Create patients table with all columns + indexes',
+    desc:'All columns per schema doc including phone_hash (SHA-256), consent fields, status enum. Indexes on hospital_id, phone_hash. Updated_at trigger.',
+    tags:['Foundation — all Module 2 tasks depend on this','Encrypt: first_name, last_name, phone, DOB, national_id, address, blood_group before insert'] },
+  { id:'DB-02', track:'DB', p:'P1', est:'1h', title:'Create appointments table + indexes',
+    desc:'Status enum: scheduled|checked_in|in_progress|completed|cancelled|no_show. Token number field. Indexes on appointment_date, doctor_id, patient_id.',
+    tags:['Depends on DB-01 (patients) and Phase 1 users table'] },
+  { id:'DB-03', track:'DB', p:'P1', est:'1h', title:'Create visits + visit_items tables',
+    desc:'visits: service type enum, ward/bed, referring doctor. visit_items: item name snapshot, rate snapshot, discount, net_amount, report_generated flag.',
+    tags:['Rate snapshot important — price may change later, bill must reflect price at time of service'] },
+  { id:'DB-04', track:'DB', p:'P1', est:'1h', title:'Create invoices + payments tables',
+    desc:'invoices: sequential invoice_number per hospital, paid/due tracking, printed/whatsapp_sent flags. payments: payment_type enum (cash|upi|card|cheque), cheque fields, UPI ref.',
+    tags:['invoice_number and receipt_number must be sequential — use DB sequence, not application logic'] },
+  { id:'DB-05', track:'DB', p:'P1', est:'1h', title:'Create service_items, doctor_slots, referrers tables',
+    desc:'service_items: price list per hospital (name, category, rate, is_active). doctor_slots: availability grid per doctor per day. referrers: referring doctor list.',
+    tags:['service_items needed before any billing can be tested'] },
+  { id:'DB-06', track:'DB', p:'P1', est:'1h', title:'Run all migrations + seed sample data',
+    desc:'Run all 5 migration files in order. Seed: 3 sample patients, 5 service items (ESR 100, CRP 350, CBC 250, X-Ray Chest 400, USG Abdomen 600), 2 doctors with slots.',
+    tags:['Sample data allows frontend dev to test without waiting for real data'] },
+  { id:'DB-07', track:'DB', p:'P2', est:'1h', title:'Encryption utility for patient PII fields',
+    desc:'Create encrypt(value) and decrypt(value) helper using AES-256-GCM with ENCRYPTION_KEY from env/KMS. Hash helper: sha256Hash(value) for phone_hash, email_hash lookup. Apply to all patient PII fields on insert/update.',
+    tags:['Required before Module 2 goes to production — DPDP compliance'] },
+
+  // API
+  { id:'API-01', track:'API', p:'P1', est:'2h', title:'POST + GET /api/patients (register + search)',
+    desc:'POST: validate required fields, encrypt PII, generate patient_number (sequential per hospital), check consent_given=true, check phone_hash uniqueness. GET: search by phone_hash or name (decrypted comparison). Receptionist gets /basic fields only.',
+    tags:['consent_given=false → 400 CONSENT_REQUIRED','Duplicate phone → 409 PHONE_ALREADY_REGISTERED'] },
+  { id:'API-02', track:'API', p:'P1', est:'1h', title:'GET /api/patients/:id/basic (safe patient info)',
+    desc:'Returns only: patient_number, first_name, last_name, phone (masked ***6789), city, gender, created_at, last_visit_date. Does NOT return: DOB, address, national_id, blood_group, medical history. Receptionist, Lab, Pharmacy all use this endpoint.',
+    tags:['Field masking happens in response serialiser — not in DB query','Return 403 if role tries to access /api/patients/:id (full profile)'] },
+  { id:'API-03', track:'API', p:'P1', est:'2h', title:'POST /api/appointments (book appointment)',
+    desc:'Validate: doctor_id exists in same branch, appointment_date not in past, slot available (check doctor_slots table). Create appointment with status=scheduled. Do not auto-assign token — token assigned on check-in only.',
+    tags:['Slot conflict → 409 SLOT_NOT_AVAILABLE','Past date → 400 INVALID_DATE'] },
+  { id:'API-04', track:'API', p:'P1', est:'1h', title:'PATCH /api/appointments/:id/status (check-in + cancel)',
+    desc:'Check-in: status → checked_in, generate token_number (max existing token for this doctor+date + 1), record checked_in_at. Cancel: require cancellation_reason field, status → cancelled. Log both actions in audit_logs.',
+    tags:['Cannot check-in already cancelled appointment → 400','Cannot cancel already completed appointment → 400'] },
+  { id:'API-05', track:'API', p:'P1', est:'1h', title:'GET /api/appointments/slots (doctor availability)',
+    desc:'Query params: doctor_id, date. Returns array of time slots with status: available | booked | blocked. Used by receptionist when booking to show available times.',
+    tags:[] },
+  { id:'API-06', track:'API', p:'P1', est:'2h', title:'POST /api/visits + POST /api/visits/:id/items',
+    desc:'POST /visits: create service visit linked to appointment or standalone. POST /visits/:id/items: add items from service_items price list. Snapshot item name and rate at time of adding (price may change later). Calculate net_amount.',
+    tags:['Rate snapshot critical — must store rate at time of service, not from price list at time of billing'] },
+  { id:'API-07', track:'API', p:'P1', est:'2h', title:'POST /api/billing/invoices (generate invoice)',
+    desc:'Generate invoice from visit items. Auto-calculate total, net, due. discount_amount requires discount_reason. Auto-assign invoice_number (sequential per hospital — use DB sequence). Set status=issued.',
+    tags:['invoice_number generated by DB sequence — never in application code','Cannot generate invoice for visit with no items → 400'] },
+  { id:'API-08', track:'API', p:'P1', est:'2h', title:'POST /api/billing/payments (collect payment)',
+    desc:'Record payment against invoice. Validate amount ≤ due_amount. Update invoice paid_amount and due_amount. Auto-generate receipt_number (sequential). Set invoice status = paid or partially_paid. For cheque: validate cheque fields present.',
+    tags:['Overpayment → 400 AMOUNT_EXCEEDS_DUE','payment_type=cheque without cheque_number → 400'] },
+  { id:'API-09', track:'API', p:'P2', est:'1h', title:'POST /api/billing/payments/:id/whatsapp',
+    desc:'Send receipt to patient via WhatsApp API. Use patient phone (decrypt from DB). Format message with: patient name, receipt number, amount, date, hospital name. Mark payment.whatsapp_sent = true. Log action.',
+    tags:['WhatsApp provider to be decided — Twilio / WATI / MSG91','If WhatsApp fails → return 200 with { whatsapp_sent: false, reason: "..." } — do not fail the payment'] },
+  { id:'API-10', track:'API', p:'P2', est:'1h', title:'GET /api/patients/:id/billing-summary',
+    desc:'Returns: total_invoiced, total_paid, total_due, last_visit_date, invoice_count. Used in patient lookup card to show outstanding balance without opening full billing screen.',
+    tags:[] },
+  { id:'API-11', track:'API', p:'P2', est:'1h', title:'POST /api/billing/invoices/:id/combine',
+    desc:'Combine multiple visits/invoices into a single invoice for printing. Creates new combined invoice record linking all source invoices. Marks source invoices as combined. Returns combined invoice for print.',
+    tags:['Matches "Combine Bill Print" in existing system','Combined invoice is print-only — payments still recorded against individual invoices'] },
+  { id:'API-12', track:'API', p:'P2', est:'1h', title:'GET /api/patients/:id/visits (patient history)',
+    desc:'Returns paginated visit history. Receptionist view: date, service_type, total_amount, paid, due, invoice_number. Doctor view includes clinical notes. Filter by date range, service type.',
+    tags:[] },
+  { id:'API-13', track:'API', p:'P2', est:'1h', title:'GET /api/service-items (price list)',
+    desc:'Return all active service items for the branch. Group by category: lab | xray | usg | opd | other. Used in service selection dropdown. Admin can add/edit via settings.',
+    tags:[] },
+  { id:'API-14', track:'API', p:'P3', est:'1h', title:'GET /api/referrers (referring doctors list)',
+    desc:'List of referring doctors for the branch. Used in patient registration and visit forms. Admin manages this list via settings.',
+    tags:[] },
+
+  // UI
+  { id:'UI-01', track:'UI', p:'P1', est:'2h', title:'Receptionist dashboard — today\'s queue',
+    desc:'Main landing screen after login. Shows today\'s appointment list: token no, patient name, time, doctor, status badge, due amount. Filter by department and doctor. Refresh every 30 seconds. Search bar.',
+    tags:['Mirror existing appointment list UI from WinMD but web-based','Status badges: Scheduled (gray) | Checked In (blue) | In Progress (green) | Completed | Cancelled'] },
+  { id:'UI-02', track:'UI', p:'P1', est:'3h', title:'Patient search + quick profile card',
+    desc:'Search bar on dashboard. Search by phone or name. Shows result as card: name, patient ID, last visit, outstanding due. Click → open patient detail. "Register New" button if no results found.',
+    tags:['Phone search — type number, hits /api/patients?search=','Show outstanding due amount in red if > 0'] },
+  { id:'UI-03', track:'UI', p:'P1', est:'4h', title:'Register new patient form',
+    desc:'All fields from existing system mapped to new form. Required fields: first_name, last_name, phone, gender, DOB. Consent checkbox with policy text — required before save. Auto-validate phone format. Age auto-calculated from DOB.',
+    tags:['Required fields bold-labeled (matches existing system convention "BOLD = Required")','Consent checkbox cannot be pre-checked — patient must actively check it'] },
+  { id:'UI-04', track:'UI', p:'P1', est:'3h', title:'Book appointment form',
+    desc:'Department selector → doctor dropdown (filtered) → date picker → time slot grid (available/booked visual). Add referring doctor optional. Confirm booking → shows token number.',
+    tags:['Slot grid shows: available slots (white), booked (gray), selected (blue)','Confirm shows: "Appointment booked. Token will be assigned on arrival."'] },
+  { id:'UI-05', track:'UI', p:'P1', est:'2h', title:'Patient check-in + token assignment',
+    desc:'From appointment queue → click patient → "Check In" button. Token number displayed prominently. Status changes to Checked In. Doctor queue updates. Print token slip option.',
+    tags:[] },
+  { id:'UI-06', track:'UI', p:'P1', est:'4h', title:'Add services screen',
+    desc:'Service type tabs: Lab | X-Ray | USG | OPD | Other. Each tab shows item list with rate from price list. Add items to right panel (mirror existing dual-panel select system). Show running total. Referring doctor dropdown. Save creates visit_items.',
+    tags:['Match existing UI pattern: left panel = available items, right panel = selected items, arrow buttons to move','Rate shown next to each item — matches existing system'] },
+  { id:'UI-07', track:'UI', p:'P1', est:'4h', title:'Billing + invoice screen',
+    desc:'Shows all services for patient visit. Line items with name, rate, discount, net. Total / Paid / Due summary. "Add Payment" button → payment modal. Print Bill / Combine Bill / WhatsApp buttons. Receipt history at bottom.',
+    tags:['Matches existing Service Appointment screen (existing system 3)','Due amount in red. Paid in green.'] },
+  { id:'UI-08', track:'UI', p:'P1', est:'2h', title:'Collect payment modal',
+    desc:'Receipt date (default today), Amount, Description (optional), Payment type selector (Cash/UPI/Card/Cheque). If Cheque selected: show Cheque No, Date, Bank Name fields. Save generates receipt number. Print / WhatsApp options on success.',
+    tags:['Matches existing Add receipt form (existing system )','Payment type = Cash is default — matches existing system'] },
+  { id:'UI-09', track:'UI', p:'P2', est:'2h', title:'Patient history view (receptionist scope)',
+    desc:'Tabbed view: OPD visits | Billing history. OPD: date, department, doctor, token, status. Billing: invoice number, date, services, amount, paid, due, print button. No clinical data visible.',
+    tags:['Matches existing View All screen (Existing system ) but without clinical fields'] },
+  { id:'UI-10', track:'UI', p:'P2', est:'2h', title:'WhatsApp receipt sharing',
+    desc:'After payment: "Send WhatsApp" button. Calls /api/billing/payments/:id/whatsapp. Shows success toast with message preview. Shows failure gracefully (still lets user print).',
+    tags:[] },
+  { id:'UI-11', track:'UI', p:'P2', est:'2h', title:'Print receipt + print bill',
+    desc:'Print receipt: formatted single-page receipt with hospital letterhead, patient name, services, amount, receipt no. Print bill: full invoice with all line items. Both use browser print dialog. PDF download option.',
+    tags:[] },
+  { id:'UI-12', track:'UI', p:'P3', est:'2h', title:'Cancel / reschedule appointment flow',
+    desc:'From appointment → cancel button → reason required (dropdown + optional text). Reschedule → opens booking form pre-filled with patient. Confirmation dialog before cancel.',
+    tags:[] },
+];
+
+const STORIES = [
+  { id:'REG-01', cat:'reg', catLabel:'Registration', role:'Receptionist',
+    title:'Register a new patient with consent',
+    asA:'As a receptionist, I want to register a new patient so they can receive treatment.',
+    pass:['Entering required fields (name, phone, gender, DOB) and checking consent box allows save','Patient appears in search results immediately after registration','Patient ID and number are auto-generated — receptionist cannot edit them','Audit log records: PATIENT_REGISTERED with my user_id'],
+    fail:['Trying to save without checking consent box shows "Patient consent is required"','Entering a phone number already registered shows "Patient with this number already exists"','Leaving first_name or phone empty shows inline validation error','Receptionist cannot see or edit blood_group or clinical fields on this form'] },
+  { id:'REG-02', cat:'reg', catLabel:'Registration', role:'Receptionist',
+    title:'Search for existing patient before registering',
+    asA:'As a receptionist, I want to search by phone number to check if a patient is already registered.',
+    pass:['Typing phone number in search shows matching patient card instantly','Card shows: name, patient ID, last visit date, outstanding due','Clicking card opens patient profile without needing to re-register'],
+    fail:['Searching an unregistered number shows "No patient found. Register new?" option','Search never shows clinical data — only name, ID, last visit, due amount'] },
+  { id:'APPT-01', cat:'appt', catLabel:'Appointments', role:'Receptionist',
+    title:'Book appointment and assign token on check-in',
+    asA:'As a receptionist, I want to book an appointment and give the patient their token number when they arrive.',
+    pass:['Selecting department filters doctor list to that department only','Selecting doctor shows available time slots for the chosen date','Booking creates appointment with status = Scheduled','When patient arrives and I click Check In, token number is auto-assigned and displayed prominently'],
+    fail:['Trying to book a slot already taken shows "This slot is not available"','Trying to book for past date shows "Cannot book past appointments"','Checking in an already cancelled appointment shows "Cannot check in a cancelled appointment"'] },
+  { id:'APPT-02', cat:'appt', catLabel:'Appointments', role:'Receptionist',
+    title:'Cancel appointment with reason',
+    asA:'As a receptionist, I want to cancel an appointment and record why.',
+    pass:['Clicking Cancel opens reason input — dropdown + optional text','After save appointment shows Cancelled status with reason visible','Cancellation is logged in audit trail with my user_id'],
+    fail:['Clicking Cancel without entering reason shows "Cancellation reason is required"','Cannot cancel an appointment that is already Completed','Cannot delete appointment — only cancel (no delete button shown to receptionist)'] },
+  { id:'SVC-01', cat:'svc', catLabel:'Services', role:'Receptionist',
+    title:'Add lab and X-Ray services to a patient visit',
+    asA:'As a receptionist, I want to add services ordered by the doctor so they appear in the bill.',
+    pass:['Service tabs show: Lab | X-Ray | USG | OPD | Other','Selecting Lab shows available test items with rate from price list','Adding ESR (₹100) and CRP (₹350) shows total ₹450','Visit is created and visible to Lab Technician in their module immediately'],
+    fail:['Cannot add 0-item visit — Save button disabled with no items selected','Cannot modify a visit that has already been paid'] },
+  { id:'BILL-01', cat:'bill', catLabel:'Billing', role:'Receptionist',
+    title:'Generate invoice and collect cash payment',
+    asA:'As a receptionist, I want to generate a bill and collect payment from a patient.',
+    pass:['Invoice auto-generates from visit items — no manual entry needed','Total, discount, net, paid, due all calculated correctly','Selecting Cash payment type and entering amount saves receipt with auto-generated receipt number','Invoice status changes to Paid if full amount collected','Receipt shows: date, receipt no, patient name, amount, payment type'],
+    fail:['Entering payment amount more than due shows "Amount exceeds due balance"','Selecting Cheque without entering cheque number shows "Cheque number is required"','Receptionist cannot issue refund — "Refund requires admin approval" message'] },
+  { id:'BILL-02', cat:'bill', catLabel:'Billing', role:'Receptionist',
+    title:'Send receipt via WhatsApp',
+    asA:'As a receptionist, I want to send the receipt to the patient\'s WhatsApp after payment.',
+    pass:['Clicking WhatsApp button sends receipt to patient\'s registered number','Success shows "Receipt sent to +91 ****6789"','If patient has no phone number, button is disabled with tooltip "No phone number registered"'],
+    fail:['If WhatsApp API fails, user sees "WhatsApp not sent. Please print instead." — payment is not reversed','whatsapp_sent flag stays false if delivery fails'] },
+  { id:'SEC-01', cat:'sec', catLabel:'Security', role:'Receptionist',
+    title:'Receptionist cannot access clinical data',
+    asA:'As a security requirement, receptionists must never see diagnosis, lab results, or prescriptions.',
+    pass:['Patient lookup shows only: name, phone (masked), ID, city, last visit, due amount'],
+    fail:['Navigating to GET /api/patients/:id (full profile) returns 403 Forbidden','GET /api/patients/:id/history (medical) returns 403 Forbidden','No clinical fields appear anywhere in the receptionist UI — not even empty fields','Accessing another branch\'s patient returns 403'] },
+];
+
+// ── Render tasks ──
+let checked = {};
+function renderTasks(){
+  const groups = [
+    {track:'DB', label:'Database tasks', icon:'DB', cls:'tg-db'},
+    {track:'API', label:'API tasks — Backend', icon:'API', cls:'tg-api'},
+    {track:'UI', label:'UI tasks — Frontend', icon:'UI', cls:'tg-ui'},
+  ];
+  const container = document.getElementById('task-container');
+  let html = '';
+  groups.forEach(g => {
+    const tasks = TASKS.filter(t=>t.track===g.track);
+    html += `<div class="task-group" id="tg-${g.track}">
+      <div class="tg-head ${g.cls}" onclick="toggleGroup('tg-${g.track}')">
+        <div class="tg-icon">${g.icon}</div>
+        <div class="tg-title">${g.label}</div>
+        <div class="tg-count">${tasks.length} tasks</div>
+        <span class="tg-chev">▼</span>
+      </div>
+      <div class="task-list">`;
+    tasks.forEach(t => {
+      const done = checked[t.id] || false;
+      const pCls = t.p==='P1'?'b-p1':t.p==='P2'?'b-p2':'b-p3';
+      const tags = t.tags.map(tag => {
+        const isEnc = tag.toLowerCase().includes('encrypt') || tag.toLowerCase().includes('dpdp') || tag.toLowerCase().includes('compliance');
+        const isDep = tag.toLowerCase().includes('depend');
+        return `<span class="b ${isEnc?'b-enc':isDep?'b-post':'b-api'}" style="font-size:9px;">${tag}</span>`;
+      }).join('');
+      html += `<div class="task-item${done?' done':''}" id="ti-${t.id}">
+        <div class="ti-check${done?' done':''}" onclick="toggleTask(event,'${t.id}')"></div>
+        <span class="ti-id">${t.id}</span>
+        <div class="ti-body">
+          <div class="ti-title">${t.title}</div>
+          <div class="ti-desc">${t.desc}</div>
+          ${tags?`<div class="ti-tags">${tags}</div>`:''}
+        </div>
+        <div class="ti-meta">
+          <span class="b ${pCls}">${t.p}</span>
+          <span class="est">${t.est}</span>
+        </div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+  container.innerHTML = html;
+  updateProgress();
+}
+
+function toggleTask(e, id){
+  e.stopPropagation();
+  checked[id] = !checked[id];
+  const el = document.getElementById('ti-'+id);
+  const box = el.querySelector('.ti-check');
+  el.classList.toggle('done', checked[id]);
+  box.classList.toggle('done', checked[id]);
+  updateProgress();
+}
+
+function updateProgress(){
+  const total = TASKS.length;
+  const done = Object.values(checked).filter(Boolean).length;
+  const pct = total>0?Math.round(done/total*100):0;
+  document.getElementById('prog').style.width = pct+'%';
+  document.getElementById('prog-label').textContent = `${done} / ${total} tasks completed`;
+}
+
+function toggleGroup(id){
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+// ── Render stories ──
+function renderStories(){
+  const catColors = {reg:'sid-reg',appt:'sid-appt',bill:'sid-bill',svc:'sid-svc',sec:'sid-sec'};
+  const container = document.getElementById('story-container');
+  let html = '';
+  STORIES.forEach((s,i) => {
+    const passItems = s.pass.map(p=>`<div class="ac-item ac-pass"><span class="ac-icon">✓</span>${p}</div>`).join('');
+    const failItems = s.fail.map(f=>`<div class="ac-item ac-fail"><span class="ac-icon">✗</span>${f}</div>`).join('');
+    html += `<div class="story" id="story-${i}">
+      <div class="story-head" onclick="toggleStory('story-${i}')">
+        <span class="story-id ${catColors[s.cat]}">${s.id}</span>
+        <span class="story-title">${s.title}</span>
+        <span class="b rp-rec">${s.role}</span>
+        <span class="story-chev">▼</span>
+      </div>
+      <div class="story-body">
+        <div class="as-a">${s.asA}</div>
+        <div class="ac-label">Pass — happy path</div>
+        <div class="ac-list">${passItems}</div>
+        ${failItems?`<div class="ac-label" style="margin-top:10px;">Fail — edge cases &amp; security</div><div class="ac-list">${failItems}</div>`:''}
+      </div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function toggleStory(id){ document.getElementById(id).classList.toggle('open'); }
+
+renderTasks();
+renderStories();
+</script>
+</body>
+</html>
