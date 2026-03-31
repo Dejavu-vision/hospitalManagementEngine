@@ -159,7 +159,8 @@ public class AuthService {
         Set<String> effectivePageKeys = accessControlService.computeEffectivePageKeys(user);
         List<String> pageKeys = new ArrayList<>(effectivePageKeys);
 
-        // Build authorities = role names only (no permissions in JWT)
+        // Build authorities = role names for Spring Security hasRole() checks
+        // RoleName enum already includes ROLE_ prefix (e.g. ROLE_RECEPTIONIST)
         List<String> authorities = user.getRoles().stream()
                 .map(Role::getName)
                 .map(Enum::name)

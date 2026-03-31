@@ -29,4 +29,9 @@ public class AppointmentResponse {
     private AppointmentStatus status;
     private String notes;
     private LocalDateTime createdAt;
+    private String cancellationReason;
+    private LocalDateTime checkedInAt;
+    private LocalDateTime consultationStart;
+    private LocalDateTime consultationEnd;
+    private LocalDateTime noShowMarkedAt;
 }

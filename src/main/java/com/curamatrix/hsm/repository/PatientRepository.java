@@ -18,4 +18,12 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
 
     boolean existsByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirthAndTenantId(
             String firstName, String lastName, java.time.LocalDate dateOfBirth, Long tenantId);
+
+    @Query("SELECT p FROM Patient p WHERE p.tenantId = :tenantId AND (" +
+           "LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
+           "p.phone LIKE CONCAT('%', :q, '%') OR " +
+           "CAST(p.id AS string) LIKE CONCAT('%', :q, '%'))")
+    Page<Patient> searchByTenant(@Param("q") String query,
+                                  @Param("tenantId") Long tenantId,
+                                  Pageable pageable);
 }

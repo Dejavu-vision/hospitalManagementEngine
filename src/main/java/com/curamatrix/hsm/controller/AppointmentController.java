@@ -4,6 +4,7 @@ import com.curamatrix.hsm.dto.request.AppointmentRequest;
 import com.curamatrix.hsm.dto.request.WalkInRequest;
 import com.curamatrix.hsm.dto.response.AppointmentResponse;
 import com.curamatrix.hsm.dto.response.SlotResponse;
+import com.curamatrix.hsm.dto.response.StatusLogResponse;
 import com.curamatrix.hsm.enums.AppointmentStatus;
 import com.curamatrix.hsm.enums.AppointmentType;
 import com.curamatrix.hsm.service.AppointmentService;
@@ -91,9 +92,24 @@ public class AppointmentController {
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR')")
     public ResponseEntity<AppointmentResponse> updateStatus(
             @PathVariable Long id,
-            @RequestParam AppointmentStatus status) {
+            @RequestParam AppointmentStatus status,
+            @RequestParam(required = false) String cancellationReason) {
         log.info("Updating appointment {} status to {}", id, status);
-        AppointmentResponse response = appointmentService.updateStatus(id, status);
+        AppointmentResponse response = appointmentService.updateStatus(id, status, cancellationReason);
         return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}/reassign")
+    @PreAuthorize("hasRole('RECEPTIONIST')")
+    public ResponseEntity<AppointmentResponse> reassignDoctor(
+            @PathVariable Long id,
+            @RequestParam Long newDoctorId) {
+        return ResponseEntity.ok(appointmentService.reassignDoctor(id, newDoctorId));
+    }
+
+    @GetMapping("/{id}/status-log")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR', 'ADMIN')")
+    public ResponseEntity<List<StatusLogResponse>> getStatusLog(@PathVariable Long id) {
+        return ResponseEntity.ok(appointmentService.getStatusLog(id));
     }
 }

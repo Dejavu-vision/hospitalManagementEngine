@@ -1,22 +1,28 @@
 package com.curamatrix.hsm.service;
 
+import com.curamatrix.hsm.context.TenantContext;
 import com.curamatrix.hsm.dto.request.AppointmentRequest;
 import com.curamatrix.hsm.dto.request.WalkInRequest;
 import com.curamatrix.hsm.dto.response.AppointmentResponse;
 import com.curamatrix.hsm.dto.response.SlotResponse;
+import com.curamatrix.hsm.dto.response.StatusLogResponse;
 import com.curamatrix.hsm.entity.Appointment;
+import com.curamatrix.hsm.entity.AppointmentStatusLog;
 import com.curamatrix.hsm.entity.Doctor;
 import com.curamatrix.hsm.entity.Patient;
 import com.curamatrix.hsm.entity.User;
+import com.curamatrix.hsm.entity.WalkInTokenSequence;
 import com.curamatrix.hsm.enums.AppointmentStatus;
 import com.curamatrix.hsm.enums.AppointmentType;
 import com.curamatrix.hsm.exception.DuplicateResourceException;
 import com.curamatrix.hsm.exception.InvalidStateTransitionException;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.AppointmentRepository;
+import com.curamatrix.hsm.repository.AppointmentStatusLogRepository;
 import com.curamatrix.hsm.repository.DoctorRepository;
 import com.curamatrix.hsm.repository.PatientRepository;
 import com.curamatrix.hsm.repository.UserRepository;
+import com.curamatrix.hsm.repository.WalkInTokenSequenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -26,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +47,8 @@ public class AppointmentService {
     private final PatientRepository patientRepository;
     private final DoctorRepository doctorRepository;
     private final UserRepository userRepository;
+    private final AppointmentStatusLogRepository statusLogRepository;
+    private final WalkInTokenSequenceRepository tokenSequenceRepository;
 
     @Transactional
     public AppointmentResponse bookAppointment(AppointmentRequest request) {
@@ -82,25 +91,26 @@ public class AppointmentService {
         Doctor doctor = doctorRepository.findById(request.getDoctorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", request.getDoctorId()));
         User bookedBy = getCurrentUser();
-
+        Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
-        Integer maxToken = appointmentRepository.findMaxTokenNumber(request.getDoctorId(), today);
-        int nextToken = (maxToken == null) ? 1 : maxToken + 1;
+
+        // Atomic token increment via pessimistic lock
+        WalkInTokenSequence seq = tokenSequenceRepository
+                .findForUpdate(request.getDoctorId(), today, tenantId)
+                .orElseGet(() -> WalkInTokenSequence.builder()
+                        .doctor(doctor).appointmentDate(today).lastToken(0).build());
+        seq.setLastToken(seq.getLastToken() + 1);
+        seq = tokenSequenceRepository.save(seq);
+        int nextToken = seq.getLastToken();
 
         Appointment appointment = Appointment.builder()
-                .patient(patient)
-                .doctor(doctor)
-                .bookedBy(bookedBy)
-                .appointmentDate(today)
-                .type(AppointmentType.WALK_IN)
-                .tokenNumber(nextToken)
-                .status(AppointmentStatus.BOOKED)
-                .notes(request.getNotes())
-                .build();
-
+                .patient(patient).doctor(doctor).bookedBy(bookedBy)
+                .appointmentDate(today).type(AppointmentType.WALK_IN)
+                .tokenNumber(nextToken).status(AppointmentStatus.BOOKED)
+                .notes(request.getNotes()).build();
         appointment = appointmentRepository.save(appointment);
-        log.info("Walk-in appointment created with token: {}", nextToken);
 
+        recordStatusLog(appointment, null, AppointmentStatus.BOOKED, bookedBy);
         return mapToResponse(appointment);
     }
 
@@ -152,29 +162,82 @@ public class AppointmentService {
 
     /**
      * Updates the appointment status with strict state machine validation.
-     * Valid transitions (per product guide):
-     *   BOOKED → CHECKED_IN | CANCELLED
-     *   CHECKED_IN → IN_PROGRESS | CANCELLED
-     *   IN_PROGRESS → COMPLETED
-     *   COMPLETED → (terminal)
-     *   CANCELLED → (terminal)
+     * Records lifecycle timestamps and a status log entry on each transition.
      */
     @Transactional
-    public AppointmentResponse updateStatus(Long id, AppointmentStatus newStatus) {
+    public AppointmentResponse updateStatus(Long id, AppointmentStatus newStatus,
+                                             String cancellationReason) {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", id));
+        AppointmentStatus current = appointment.getStatus();
 
-        AppointmentStatus currentStatus = appointment.getStatus();
-        if (!currentStatus.canTransitionTo(newStatus)) {
+        if (!current.canTransitionTo(newStatus)) {
             throw new InvalidStateTransitionException("appointment status",
-                    currentStatus.name(), newStatus.name());
+                    current.name(), newStatus.name());
+        }
+        if (newStatus == AppointmentStatus.CANCELLED) {
+            if (cancellationReason == null || cancellationReason.isBlank()) {
+                throw new IllegalArgumentException("cancellationReason is required when cancelling");
+            }
+            appointment.setCancellationReason(cancellationReason);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        switch (newStatus) {
+            case CHECKED_IN  -> appointment.setCheckedInAt(now);
+            case IN_PROGRESS -> appointment.setConsultationStart(now);
+            case COMPLETED   -> appointment.setConsultationEnd(now);
+            case NO_SHOW     -> appointment.setNoShowMarkedAt(now);
+            default          -> {}
         }
 
         appointment.setStatus(newStatus);
         appointment = appointmentRepository.save(appointment);
-        log.info("Appointment {} status updated: {} → {}", id, currentStatus, newStatus);
-
+        recordStatusLog(appointment, current, newStatus, getCurrentUser());
         return mapToResponse(appointment);
+    }
+
+    @Transactional
+    public AppointmentResponse reassignDoctor(Long appointmentId, Long newDoctorId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
+        Doctor newDoctor = doctorRepository.findById(newDoctorId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", newDoctorId));
+        Long tenantId = TenantContext.getTenantId();
+        LocalDate today = LocalDate.now();
+
+        WalkInTokenSequence seq = tokenSequenceRepository
+                .findForUpdate(newDoctorId, today, tenantId)
+                .orElseGet(() -> WalkInTokenSequence.builder()
+                        .doctor(newDoctor).appointmentDate(today).lastToken(0).build());
+        seq.setLastToken(seq.getLastToken() + 1);
+        seq = tokenSequenceRepository.save(seq);
+
+        appointment.setDoctor(newDoctor);
+        appointment.setTokenNumber(seq.getLastToken());
+        appointment = appointmentRepository.save(appointment);
+        return mapToResponse(appointment);
+    }
+
+    public List<StatusLogResponse> getStatusLog(Long appointmentId) {
+        return statusLogRepository.findByAppointmentIdOrderByChangedAtAsc(appointmentId)
+                .stream()
+                .map(l -> StatusLogResponse.builder()
+                        .id(l.getId())
+                        .previousStatus(l.getPreviousStatus())
+                        .newStatus(l.getNewStatus())
+                        .changedByName(l.getChangedBy().getFullName())
+                        .changedAt(l.getChangedAt())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    private void recordStatusLog(Appointment appt, AppointmentStatus prev,
+                                  AppointmentStatus next, User changedBy) {
+        AppointmentStatusLog log = AppointmentStatusLog.builder()
+                .appointment(appt).previousStatus(prev)
+                .newStatus(next).changedBy(changedBy).build();
+        statusLogRepository.save(log);
     }
 
     private List<String> generateTimeSlots() {
@@ -211,6 +274,11 @@ public class AppointmentService {
                 .tokenNumber(appointment.getTokenNumber())
                 .status(appointment.getStatus())
                 .notes(appointment.getNotes())
+                .cancellationReason(appointment.getCancellationReason())
+                .checkedInAt(appointment.getCheckedInAt())
+                .consultationStart(appointment.getConsultationStart())
+                .consultationEnd(appointment.getConsultationEnd())
+                .noShowMarkedAt(appointment.getNoShowMarkedAt())
                 .createdAt(appointment.getCreatedAt())
                 .build();
     }

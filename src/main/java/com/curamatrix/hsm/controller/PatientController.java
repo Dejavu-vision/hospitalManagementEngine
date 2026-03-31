@@ -2,6 +2,7 @@ package com.curamatrix.hsm.controller;
 
 import com.curamatrix.hsm.dto.request.PatientRequest;
 import com.curamatrix.hsm.dto.response.PatientResponse;
+import com.curamatrix.hsm.dto.response.PatientVisitHistoryResponse;
 import com.curamatrix.hsm.service.PatientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -63,5 +64,11 @@ public class PatientController {
         log.info("Updating patient: {}", id);
         PatientResponse response = patientService.updatePatient(id, request);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/history")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR')")
+    public ResponseEntity<PatientVisitHistoryResponse> getVisitHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(patientService.getVisitHistory(id));
     }
 }

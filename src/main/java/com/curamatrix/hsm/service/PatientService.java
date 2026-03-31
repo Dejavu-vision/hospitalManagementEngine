@@ -3,6 +3,7 @@ package com.curamatrix.hsm.service;
 import com.curamatrix.hsm.context.TenantContext;
 import com.curamatrix.hsm.dto.request.PatientRequest;
 import com.curamatrix.hsm.dto.response.PatientResponse;
+import com.curamatrix.hsm.dto.response.PatientVisitHistoryResponse;
 import com.curamatrix.hsm.entity.Patient;
 import com.curamatrix.hsm.entity.Tenant;
 import com.curamatrix.hsm.entity.User;
@@ -13,6 +14,7 @@ import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.PatientRepository;
 import com.curamatrix.hsm.repository.TenantRepository;
 import com.curamatrix.hsm.repository.UserRepository;
+import com.curamatrix.hsm.repository.AppointmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -20,6 +22,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
 
 @Slf4j
 @Service
@@ -29,6 +33,7 @@ public class PatientService {
     private final PatientRepository patientRepository;
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
+    private final AppointmentRepository appointmentRepository;
 
     @Transactional
     public PatientResponse registerPatient(PatientRequest request) {
@@ -132,6 +137,29 @@ public class PatientService {
         log.info("Patient updated: {}", id);
 
         return mapToResponse(patient);
+    }
+
+    public PatientVisitHistoryResponse getVisitHistory(Long patientId) {
+        Long tenantId = TenantContext.getTenantId();
+        patientRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", patientId));
+        // findVisitSummaryByPatient returns List<Object[]> — get the first row
+        java.util.List<Object[]> rows = appointmentRepository.findVisitSummaryByPatient(patientId, tenantId);
+        long totalVisits = 0L;
+        LocalDate lastVisit = null;
+        if (rows != null && !rows.isEmpty()) {
+            Object[] row = rows.get(0);
+            totalVisits = row[0] != null ? ((Number) row[0]).longValue() : 0L;
+            if (row[1] != null) {
+                if (row[1] instanceof java.sql.Date) {
+                    lastVisit = ((java.sql.Date) row[1]).toLocalDate();
+                } else if (row[1] instanceof LocalDate) {
+                    lastVisit = (LocalDate) row[1];
+                }
+            }
+        }
+        return PatientVisitHistoryResponse.builder()
+                .patientId(patientId).totalVisits(totalVisits).lastVisitDate(lastVisit).build();
     }
 
     private PatientResponse mapToResponse(Patient patient) {

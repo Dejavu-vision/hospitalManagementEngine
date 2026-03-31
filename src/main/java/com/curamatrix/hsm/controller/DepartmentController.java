@@ -1,7 +1,9 @@
 package com.curamatrix.hsm.controller;
 
+import com.curamatrix.hsm.dto.response.DoctorWithAvailabilityResponse;
 import com.curamatrix.hsm.entity.Department;
 import com.curamatrix.hsm.repository.DepartmentRepository;
+import com.curamatrix.hsm.service.DepartmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,7 @@ import java.util.List;
 public class DepartmentController {
 
     private final DepartmentRepository departmentRepository;
+    private final DepartmentService departmentService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'SUPER_ADMIN')")
@@ -32,5 +35,12 @@ public class DepartmentController {
         Department department = departmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Department not found"));
         return ResponseEntity.ok(department);
+    }
+
+    @GetMapping("/{id}/doctors")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    public ResponseEntity<List<DoctorWithAvailabilityResponse>> getDoctorsByDepartment(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(departmentService.getDoctorsWithAvailability(id));
     }
 }

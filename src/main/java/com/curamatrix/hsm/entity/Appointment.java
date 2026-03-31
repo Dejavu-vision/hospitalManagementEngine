@@ -59,4 +59,19 @@ public class Appointment extends TenantAwareEntity {
     @Column(name = "created_at", updatable = false)
     @CreationTimestamp
     private LocalDateTime createdAt;
+
+    @Column(name = "cancellation_reason", columnDefinition = "TEXT")
+    private String cancellationReason;
+
+    @Column(name = "checked_in_at")
+    private LocalDateTime checkedInAt;
+
+    @Column(name = "consultation_start")
+    private LocalDateTime consultationStart;
+
+    @Column(name = "consultation_end")
+    private LocalDateTime consultationEnd;
+
+    @Column(name = "no_show_marked_at")
+    private LocalDateTime noShowMarkedAt;
 }
