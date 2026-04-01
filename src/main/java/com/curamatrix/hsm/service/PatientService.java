@@ -80,6 +80,12 @@ public class PatientService {
             }
         }
 
+        // Generate human-readable patient code before saving
+        // Format: PAT-{YEAR}-{zero-padded count per tenant}
+        String year = String.valueOf(java.time.Year.now().getValue());
+        long count = patientRepository.countByTenantId(effectiveTenantId != null ? effectiveTenantId : 0L) + 1;
+        String patientCode = "PAT-" + year + "-" + String.format("%05d", count);
+
         Patient patient = Patient.builder()
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
@@ -94,10 +100,11 @@ public class PatientService {
                 .allergies(request.getAllergies())
                 .medicalHistory(request.getMedicalHistory())
                 .registeredBy(registeredBy)
+                .patientCode(patientCode)
                 .build();
 
         patient = patientRepository.save(patient);
-        log.info("Patient registered: {} {}", patient.getFirstName(), patient.getLastName());
+        log.info("Patient registered: {} {} [{}]", patient.getFirstName(), patient.getLastName(), patient.getPatientCode());
 
         return mapToResponse(patient);
     }
@@ -165,6 +172,7 @@ public class PatientService {
     private PatientResponse mapToResponse(Patient patient) {
         return PatientResponse.builder()
                 .id(patient.getId())
+                .patientCode(patient.getPatientCode())
                 .firstName(patient.getFirstName())
                 .lastName(patient.getLastName())
                 .dateOfBirth(patient.getDateOfBirth())

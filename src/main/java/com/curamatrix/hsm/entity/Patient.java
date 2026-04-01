@@ -22,6 +22,9 @@ public class Patient extends TenantAwareEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "patient_code", unique = true, nullable = false)
+    private String patientCode;
+
     @Column(name = "first_name", nullable = false)
     private String firstName;
 

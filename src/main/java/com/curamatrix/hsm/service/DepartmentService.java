@@ -29,9 +29,10 @@ public class DepartmentService {
         LocalDate today = LocalDate.now();
         List<Doctor> doctors = doctorRepository.findByDepartmentId(departmentId);
         return doctors.stream().map(d -> {
+            // Default to true (present) when no record exists
             boolean present = availabilityRepository
                     .findByDoctorIdAndAvailabilityDateAndTenantId(d.getId(), today, tenantId)
-                    .map(DoctorAvailability::getIsPresent).orElse(false);
+                    .map(DoctorAvailability::getIsPresent).orElse(true);
             return DoctorWithAvailabilityResponse.builder()
                     .doctorId(d.getId())
                     .doctorName(d.getUser().getFullName())

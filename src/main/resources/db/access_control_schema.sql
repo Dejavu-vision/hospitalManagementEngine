@@ -45,7 +45,7 @@ INSERT IGNORE INTO ui_pages (page_key, route, display_name) VALUES
   ('RECEPTIONIST_APPOINTMENTS',  '/reception/appointments', 'Appointment Booking'),
   ('RECEPTIONIST_QUEUE',         '/reception/queue',        'Queue Management');
 
--- 3. Map Pages to Roles (ROLE_ADMIN)
+-- Map Pages to Roles (ROLE_ADMIN)
 INSERT IGNORE INTO role_pages (role_id, page_id)
   SELECT r.id, p.id FROM roles r, ui_pages p
   WHERE r.name = 'ROLE_ADMIN'
