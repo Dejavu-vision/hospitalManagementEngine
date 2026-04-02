@@ -80,7 +80,8 @@ public class SecurityConfig {
             "http://localhost:*",
             "http://127.0.0.1:*",
             "https://*.curamatrix.com",
-            "https://dnry1vs9w5nkw.cloudfront.net"
+            "https://dnry1vs9w5nkw.cloudfront.net",
+            "http://43.204.168.146:8080"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
