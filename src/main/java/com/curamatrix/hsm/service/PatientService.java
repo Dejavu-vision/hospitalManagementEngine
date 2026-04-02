@@ -81,10 +81,10 @@ public class PatientService {
         }
 
         // Generate human-readable patient code before saving
-        // Format: PAT-{YEAR}-{zero-padded count per tenant}
-        String year = String.valueOf(java.time.Year.now().getValue());
+        // Format: P{YY}{4-digit-sequence} e.g. P260001 — short, readable, fits on token slips
+        String yy = String.valueOf(java.time.Year.now().getValue()).substring(2); // "26"
         long count = patientRepository.countByTenantId(effectiveTenantId != null ? effectiveTenantId : 0L) + 1;
-        String patientCode = "PAT-" + year + "-" + String.format("%05d", count);
+        String patientCode = "P" + yy + String.format("%04d", count);
 
         Patient patient = Patient.builder()
                 .firstName(request.getFirstName())
@@ -109,11 +109,16 @@ public class PatientService {
         return mapToResponse(patient);
     }
 
-    public Page<PatientResponse> searchPatients(String search, Pageable pageable) {
-        if (search == null || search.trim().isEmpty()) {
-            return patientRepository.findAll(pageable).map(this::mapToResponse);
-        }
-        return patientRepository.searchPatients(search.trim(), pageable).map(this::mapToResponse);
+    public Page<PatientResponse> searchPatients(String search, String gender, String bloodGroup, Pageable pageable) {
+        Long tenantId = TenantContext.getTenantId();
+        // Use the filtered query
+        return patientRepository.searchWithFilters(
+                (search != null && search.trim().length() >= 2) ? search.trim() : null,
+                gender,
+                bloodGroup,
+                tenantId,
+                pageable
+        ).map(this::mapToResponse);
     }
 
     public PatientResponse getPatientById(Long id) {

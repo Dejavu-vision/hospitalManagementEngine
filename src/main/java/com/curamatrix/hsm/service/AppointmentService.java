@@ -94,11 +94,11 @@ public class AppointmentService {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
 
-        // Atomic token increment via pessimistic lock
+        // Atomic token increment — one sequence per (date, tenant) across ALL doctors
         WalkInTokenSequence seq = tokenSequenceRepository
-                .findForUpdate(request.getDoctorId(), today, tenantId)
+                .findForUpdate(today, tenantId)
                 .orElseGet(() -> WalkInTokenSequence.builder()
-                        .doctor(doctor).appointmentDate(today).lastToken(0).build());
+                        .appointmentDate(today).lastToken(0).build());
         seq.setLastToken(seq.getLastToken() + 1);
         seq = tokenSequenceRepository.save(seq);
         int nextToken = seq.getLastToken();
@@ -206,15 +206,8 @@ public class AppointmentService {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
 
-        WalkInTokenSequence seq = tokenSequenceRepository
-                .findForUpdate(newDoctorId, today, tenantId)
-                .orElseGet(() -> WalkInTokenSequence.builder()
-                        .doctor(newDoctor).appointmentDate(today).lastToken(0).build());
-        seq.setLastToken(seq.getLastToken() + 1);
-        seq = tokenSequenceRepository.save(seq);
-
+        // Reassign keeps the existing token — no new token needed, patient keeps their place
         appointment.setDoctor(newDoctor);
-        appointment.setTokenNumber(seq.getLastToken());
         appointment = appointmentRepository.save(appointment);
         return mapToResponse(appointment);
     }
@@ -264,6 +257,7 @@ public class AppointmentService {
                 .id(appointment.getId())
                 .patientId(appointment.getPatient().getId())
                 .patientName(appointment.getPatient().getFirstName() + " " + appointment.getPatient().getLastName())
+                .patientCode(appointment.getPatient().getPatientCode())
                 .doctorId(appointment.getDoctor().getId())
                 .doctorName(appointment.getDoctor().getUser().getFullName())
                 .department(appointment.getDoctor().getDepartment() != null ?

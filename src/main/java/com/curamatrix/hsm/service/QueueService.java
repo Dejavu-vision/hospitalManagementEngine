@@ -97,6 +97,7 @@ public class QueueService {
                 .appointmentId(a.getId())
                 .patientId(a.getPatient().getId())
                 .patientName(a.getPatient().getFirstName() + " " + a.getPatient().getLastName())
+                .patientCode(a.getPatient().getPatientCode())
                 .doctorId(a.getDoctor().getId())
                 .doctorName(a.getDoctor().getUser().getFullName())
                 .tokenNumber(a.getTokenNumber())

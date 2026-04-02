@@ -37,15 +37,16 @@ public class PatientController {
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR')")
     public ResponseEntity<Page<PatientResponse>> searchPatients(
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) String gender,
+            @RequestParam(required = false) String bloodGroup,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "registeredAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
-        
+
         Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        
-        Page<PatientResponse> patients = patientService.searchPatients(search, pageable);
+        Page<PatientResponse> patients = patientService.searchPatients(search, gender, bloodGroup, pageable);
         return ResponseEntity.ok(patients);
     }
 

@@ -12,6 +12,7 @@ public class QueueEntryResponse {
     private Long appointmentId;
     private Long patientId;
     private String patientName;
+    private String patientCode;
     private Long doctorId;
     private String doctorName;
     private Integer tokenNumber;

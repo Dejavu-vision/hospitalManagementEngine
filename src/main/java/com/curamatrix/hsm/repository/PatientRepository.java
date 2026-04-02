@@ -22,9 +22,20 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
     @Query("SELECT p FROM Patient p WHERE p.tenantId = :tenantId AND (" +
            "LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
            "p.phone LIKE CONCAT('%', :q, '%') OR " +
-           "CAST(p.id AS string) LIKE CONCAT('%', :q, '%') OR " +
            "LOWER(p.patientCode) LIKE LOWER(CONCAT('%', :q, '%')))")
     Page<Patient> searchByTenant(@Param("q") String query,
                                   @Param("tenantId") Long tenantId,
                                   Pageable pageable);
+
+    @Query("SELECT p FROM Patient p WHERE p.tenantId = :tenantId " +
+           "AND (:q IS NULL OR LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :q, '%')) " +
+           "     OR :q IS NULL OR p.phone LIKE CONCAT('%', :q, '%') " +
+           "     OR :q IS NULL OR LOWER(p.patientCode) LIKE LOWER(CONCAT('%', :q, '%'))) " +
+           "AND (:gender IS NULL OR p.gender = :gender) " +
+           "AND (:bloodGroup IS NULL OR p.bloodGroup = :bloodGroup)")
+    Page<Patient> searchWithFilters(@Param("q") String query,
+                                     @Param("gender") String gender,
+                                     @Param("bloodGroup") String bloodGroup,
+                                     @Param("tenantId") Long tenantId,
+                                     Pageable pageable);
 }

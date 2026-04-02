@@ -10,6 +10,7 @@ import java.time.LocalTime;
 public class DoctorAvailabilityResponse {
     private Long doctorId;
     private String doctorName;
+    private String departmentName;
     private LocalDate date;
     private Boolean isPresent;
     private DoctorStatus status;
