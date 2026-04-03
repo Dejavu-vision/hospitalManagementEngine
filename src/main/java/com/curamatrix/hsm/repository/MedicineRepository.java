@@ -19,9 +19,9 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
         SELECT DISTINCT m FROM Medicine m
         WHERE m.isActive = true
         AND (
-            LOWER(m.name) LIKE LOWER(CONCAT(:query, '%'))
-            OR LOWER(m.genericName) LIKE LOWER(CONCAT(:query, '%'))
-            OR LOWER(m.brand) LIKE LOWER(CONCAT(:query, '%'))
+            LOWER(m.name) LIKE LOWER(CONCAT('%', :query, '%'))
+            OR LOWER(m.genericName) LIKE LOWER(CONCAT('%', :query, '%'))
+            OR LOWER(m.brand) LIKE LOWER(CONCAT('%', :query, '%'))
         )
         ORDER BY 
             CASE 

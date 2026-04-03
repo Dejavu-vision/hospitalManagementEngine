@@ -91,4 +91,20 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Object[]> findQueueLengthsByDepartment(@Param("deptId") Long deptId,
                                                  @Param("date") LocalDate date,
                                                  @Param("tenantId") Long tenantId);
+
+    // Count remaining IN_PROGRESS appointments for a doctor excluding a given appointment
+    @Query("SELECT COUNT(a) FROM Appointment a WHERE a.doctor.id = :doctorId " +
+           "AND a.appointmentDate = :date AND a.tenantId = :tenantId " +
+           "AND a.status = 'IN_PROGRESS' AND a.id != :excludeId")
+    Long countOtherInProgressByDoctor(@Param("doctorId") Long doctorId,
+                                       @Param("date") LocalDate date,
+                                       @Param("tenantId") Long tenantId,
+                                       @Param("excludeId") Long excludeId);
+
+    // Distinct patients who have had appointments with a specific doctor (tenant-scoped)
+    @Query("SELECT DISTINCT a.patient FROM Appointment a WHERE a.doctor.id = :doctorId " +
+           "AND a.tenantId = :tenantId ORDER BY a.patient.firstName, a.patient.lastName")
+    List<com.curamatrix.hsm.entity.Patient> findDistinctPatientsByDoctor(
+            @Param("doctorId") Long doctorId,
+            @Param("tenantId") Long tenantId);
 }

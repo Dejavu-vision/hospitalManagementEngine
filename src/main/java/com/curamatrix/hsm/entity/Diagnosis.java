@@ -46,6 +46,18 @@ public class Diagnosis extends TenantAwareEntity {
     @Column(name = "follow_up_date")
     private LocalDate followUpDate;
 
+    @Column(name = "temperature", length = 20)
+    private String temperature;
+
+    @Column(name = "blood_pressure", length = 20)
+    private String bloodPressure;
+
+    @Column(name = "weight", length = 20)
+    private String weight;
+
+    @Column(name = "investigations", columnDefinition = "TEXT")
+    private String investigations;
+
     @OneToMany(mappedBy = "diagnosis", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Prescription> prescriptions = new ArrayList<>();

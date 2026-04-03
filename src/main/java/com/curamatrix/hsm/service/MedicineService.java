@@ -22,7 +22,7 @@ public class MedicineService {
     private final MedicineRepository medicineRepository;
     private final MedicineMapper medicineMapper;
 
-    private static final int MAX_SEARCH_RESULTS = 10;
+    private static final int MAX_SEARCH_RESULTS = 50;
     private static final int MIN_QUERY_LENGTH = 2;
 
     /**

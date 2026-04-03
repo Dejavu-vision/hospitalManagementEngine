@@ -66,6 +66,10 @@ public class DiagnosisService {
                 .clinicalNotes(request.getClinicalNotes())
                 .severity(request.getSeverity())
                 .followUpDate(request.getFollowUpDate())
+                .temperature(request.getTemperature())
+                .bloodPressure(request.getBloodPressure())
+                .weight(request.getWeight())
+                .investigations(request.getInvestigations())
                 .build();
 
         diagnosis = diagnosisRepository.save(diagnosis);
@@ -114,6 +118,10 @@ public class DiagnosisService {
         diagnosis.setClinicalNotes(request.getClinicalNotes());
         diagnosis.setSeverity(request.getSeverity());
         diagnosis.setFollowUpDate(request.getFollowUpDate());
+        diagnosis.setTemperature(request.getTemperature());
+        diagnosis.setBloodPressure(request.getBloodPressure());
+        diagnosis.setWeight(request.getWeight());
+        diagnosis.setInvestigations(request.getInvestigations());
 
         diagnosis = diagnosisRepository.save(diagnosis);
         log.info("Diagnosis updated: {}", id);
@@ -135,6 +143,10 @@ public class DiagnosisService {
                 .clinicalNotes(diagnosis.getClinicalNotes())
                 .severity(diagnosis.getSeverity())
                 .followUpDate(diagnosis.getFollowUpDate())
+                .temperature(diagnosis.getTemperature())
+                .bloodPressure(diagnosis.getBloodPressure())
+                .weight(diagnosis.getWeight())
+                .investigations(diagnosis.getInvestigations())
                 .prescriptions(diagnosis.getPrescriptions().stream()
                         .map(p -> PrescriptionResponse.builder()
                                 .id(p.getId())

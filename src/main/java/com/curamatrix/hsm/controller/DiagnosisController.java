@@ -17,13 +17,13 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/diagnoses")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('DOCTOR')")
-@io.swagger.v3.oas.annotations.tags.Tag(name = "5. Diagnosis", description = "Patient diagnosis management (Doctor only)")
+@io.swagger.v3.oas.annotations.tags.Tag(name = "5. Diagnosis", description = "Patient diagnosis management")
 public class DiagnosisController {
 
     private final DiagnosisService diagnosisService;
 
     @PostMapping
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<DiagnosisResponse> createDiagnosis(@Valid @RequestBody DiagnosisRequest request) {
         log.info("Creating diagnosis for appointment: {}", request.getAppointmentId());
         DiagnosisResponse response = diagnosisService.createDiagnosis(request);
@@ -31,18 +31,21 @@ public class DiagnosisController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<DiagnosisResponse> getDiagnosis(@PathVariable Long id) {
         DiagnosisResponse response = diagnosisService.getDiagnosisById(id);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/appointment/{appointmentId}")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<DiagnosisResponse> getDiagnosisByAppointment(@PathVariable Long appointmentId) {
         DiagnosisResponse response = diagnosisService.getDiagnosisByAppointmentId(appointmentId);
         return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<DiagnosisResponse> updateDiagnosis(
             @PathVariable Long id,
             @Valid @RequestBody DiagnosisRequest request) {
@@ -52,6 +55,7 @@ public class DiagnosisController {
     }
 
     @GetMapping("/patient/{patientId}")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<List<DiagnosisResponse>> getPatientDiagnosisHistory(@PathVariable Long patientId) {
         List<DiagnosisResponse> responses = diagnosisService.getDiagnosesByPatientId(patientId);
         return ResponseEntity.ok(responses);

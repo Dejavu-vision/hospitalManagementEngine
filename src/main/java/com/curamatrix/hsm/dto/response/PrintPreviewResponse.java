@@ -7,29 +7,27 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DiagnosisResponse {
-    private Long id;
-    private Long appointmentId;
-    private Long doctorId;
+public class PrintPreviewResponse {
+    private String hospitalName;
     private String doctorName;
-    private Long patientId;
+    private String doctorSpecialization;
     private String patientName;
+    private String patientCode;
+    private LocalDate consultationDate;
+    private String temperature;
+    private String bloodPressure;
+    private String weight;
     private String symptoms;
+    private String investigations;
     private String diagnosis;
     private String clinicalNotes;
     private Severity severity;
     private LocalDate followUpDate;
-    private String temperature;
-    private String bloodPressure;
-    private String weight;
-    private String investigations;
     private List<PrescriptionResponse> prescriptions;
-    private LocalDateTime createdAt;
 }
