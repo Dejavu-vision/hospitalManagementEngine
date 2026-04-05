@@ -8,6 +8,7 @@ import com.curamatrix.hsm.entity.Patient;
 import com.curamatrix.hsm.entity.Tenant;
 import com.curamatrix.hsm.entity.User;
 import com.curamatrix.hsm.enums.SubscriptionPlan;
+import com.curamatrix.hsm.enums.AppointmentStatus;
 import com.curamatrix.hsm.exception.DuplicateResourceException;
 import com.curamatrix.hsm.exception.QuotaExceededException;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
@@ -198,9 +199,25 @@ public class PatientService {
     public PatientResponse checkOutPatient(Long id) {
         Patient patient = patientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", id));
+        
+        // Fulfill user request: checkin should be false
+        patient.setCheckedIn(false);
         patient.setCheckedOut(true);
         patient = patientRepository.save(patient);
-        log.info("Patient checked out: {}", id);
+
+        // Also complete any IN_PROGRESS appointments for this patient
+        // We use the existing filter query pattern
+        List<Appointment> inProgressAppts = appointmentRepository.findByFilters(
+                null, null, id, AppointmentStatus.IN_PROGRESS, null, org.springframework.data.domain.PageRequest.of(0, 10)
+        ).getContent();
+
+        for (Appointment appt : inProgressAppts) {
+            appt.setStatus(AppointmentStatus.COMPLETED);
+            appt.setConsultationEnd(java.time.LocalDateTime.now());
+            appointmentRepository.save(appt);
+        }
+
+        log.info("Patient checked out and {} active appointments completed: {}", inProgressAppts.size(), id);
         return mapToResponse(patient);
     }
 
