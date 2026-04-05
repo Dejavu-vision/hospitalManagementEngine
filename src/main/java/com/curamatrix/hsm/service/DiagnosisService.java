@@ -3,24 +3,23 @@ package com.curamatrix.hsm.service;
 import com.curamatrix.hsm.dto.request.DiagnosisRequest;
 import com.curamatrix.hsm.dto.response.DiagnosisResponse;
 import com.curamatrix.hsm.dto.response.PrescriptionResponse;
-import com.curamatrix.hsm.entity.Appointment;
-import com.curamatrix.hsm.entity.Diagnosis;
-import com.curamatrix.hsm.entity.Doctor;
+import com.curamatrix.hsm.entity.*;
 import com.curamatrix.hsm.enums.AppointmentStatus;
+import com.curamatrix.hsm.enums.AppointmentType;
 import com.curamatrix.hsm.exception.DuplicateResourceException;
 import com.curamatrix.hsm.exception.InvalidStateTransitionException;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
-import com.curamatrix.hsm.repository.AppointmentRepository;
-import com.curamatrix.hsm.repository.DiagnosisRepository;
-import com.curamatrix.hsm.repository.DoctorRepository;
-import com.curamatrix.hsm.repository.UserRepository;
+import com.curamatrix.hsm.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -32,28 +31,54 @@ public class DiagnosisService {
     private final AppointmentRepository appointmentRepository;
     private final DoctorRepository doctorRepository;
     private final UserRepository userRepository;
+    private final PatientRepository patientRepository;
 
     @Transactional
     public DiagnosisResponse createDiagnosis(DiagnosisRequest request) {
+        // 1. If diagnosis already exists for this appointmentId, just update it! (prevents unique constraint error)
+        Optional<Diagnosis> existingDiagnosis = diagnosisRepository.findByAppointmentId(request.getAppointmentId());
+        if (existingDiagnosis.isPresent()) {
+            log.info("Diagnosis already exists for appointmentId: {}. Redirecting to update.", request.getAppointmentId());
+            return updateDiagnosis(existingDiagnosis.get().getId(), request);
+        }
+
+        // 2. Find the appointment or handle direct patientId
         Appointment appointment = appointmentRepository.findById(request.getAppointmentId())
                 .orElse(null);
 
         if (appointment == null) {
-            // Find an alternative appointment for this patient or create one to avoid restrictions!
-            List<Appointment> patientAppts = appointmentRepository.findByPatientId(request.getAppointmentId(), org.springframework.data.domain.PageRequest.of(0, 10)).getContent();
-            if (!patientAppts.isEmpty()) {
-                appointment = patientAppts.get(0);
-            } else {
-                // We need to create a dummy appointment. We find the doctor
+            // Check if the ID provided is actually a Patient ID
+            Patient patient = patientRepository.findById(request.getAppointmentId()).orElse(null);
+            
+            if (patient != null) {
+                log.info("No appointment found for ID {}, but patient found. Creating a quick appointment.", request.getAppointmentId());
+                // Create a "Quick Consultation" appointment for today
                 String email = SecurityContextHolder.getContext().getAuthentication().getName();
-                Doctor doctor = doctorRepository.findByUserId(
-                        userRepository.findByEmail(email).orElseThrow().getId()).orElseThrow();
-                User user = userRepository.findByEmail(email).get();
+                User currentUser = userRepository.findByEmail(email).orElse(null);
+                Doctor doctor = doctorRepository.findByUserId(currentUser != null ? currentUser.getId() : null).orElse(null);
+
+                appointment = Appointment.builder()
+                        .patient(patient)
+                        .doctor(doctor)
+                        .bookedBy(currentUser)
+                        .appointmentDate(LocalDate.now())
+                        .appointmentTime(LocalTime.now())
+                        .type(AppointmentType.WALK_IN)
+                        .status(AppointmentStatus.IN_PROGRESS)
+                        .notes("Quick Auto-Consultation")
+                        .build();
                 
-                // Let's create an appointment but first we need a patient. 
-                // Since we don't have PatientRepository, we can just throw exception or let's use appointmentRepository to find a patient? We can't really do that without PatientRepository.
-                // Wait, I can inject PatientRepository...
-                throw new ResourceNotFoundException("Appointment", "id", request.getAppointmentId());
+                // Copy tenant ID if applicable
+                appointment.setTenantId(patient.getTenantId());
+                appointment = appointmentRepository.save(appointment);
+            } else {
+                // Last fallback: check if patient has any appointments
+                List<Appointment> patientAppts = appointmentRepository.findByPatientId(request.getAppointmentId(), org.springframework.data.domain.PageRequest.of(0, 1)).getContent();
+                if (!patientAppts.isEmpty()) {
+                    appointment = patientAppts.get(0);
+                } else {
+                    throw new ResourceNotFoundException("Appointment/Patient", "id", request.getAppointmentId());
+                }
             }
         }
 
