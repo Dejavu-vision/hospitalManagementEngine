@@ -67,6 +67,20 @@ public class PatientController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/{id}/checkin")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR')")
+    public ResponseEntity<PatientResponse> checkInPatient(@PathVariable Long id) {
+        log.info("Checking in patient: {}", id);
+        return ResponseEntity.ok(patientService.checkInPatient(id));
+    }
+
+    @PutMapping("/{id}/checkout")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR')")
+    public ResponseEntity<PatientResponse> checkOutPatient(@PathVariable Long id) {
+        log.info("Checking out patient: {}", id);
+        return ResponseEntity.ok(patientService.checkOutPatient(id));
+    }
+
     @GetMapping("/{id}/history")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR')")
     public ResponseEntity<PatientVisitHistoryResponse> getVisitHistory(@PathVariable Long id) {

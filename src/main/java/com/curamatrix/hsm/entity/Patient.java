@@ -66,6 +66,11 @@ public class Patient extends TenantAwareEntity {
     @CreationTimestamp
     private LocalDateTime registeredAt;
 
+    @Column(name = "checked_in")
+    private Boolean checkedIn = false;
+
+    @Column(name = "checked_out")
+    private Boolean checkedOut = false;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "registered_by")
     private User registeredBy;
