@@ -30,4 +30,7 @@ public class PatientResponse {
     private String allergies;
     private String medicalHistory;
     private LocalDateTime registeredAt;
+    private Boolean checkedIn;
+    private Boolean checkedOut;
+    private Long activeAppointmentId;
 }

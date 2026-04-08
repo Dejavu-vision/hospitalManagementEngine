@@ -8,13 +8,16 @@ import com.curamatrix.hsm.entity.Patient;
 import com.curamatrix.hsm.entity.Tenant;
 import com.curamatrix.hsm.entity.User;
 import com.curamatrix.hsm.enums.SubscriptionPlan;
+import com.curamatrix.hsm.enums.AppointmentStatus;
 import com.curamatrix.hsm.exception.DuplicateResourceException;
 import com.curamatrix.hsm.exception.QuotaExceededException;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
+import com.curamatrix.hsm.entity.Appointment;
 import com.curamatrix.hsm.repository.PatientRepository;
 import com.curamatrix.hsm.repository.TenantRepository;
 import com.curamatrix.hsm.repository.UserRepository;
 import com.curamatrix.hsm.repository.AppointmentRepository;
+import com.curamatrix.hsm.repository.DoctorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -34,6 +37,7 @@ public class PatientService {
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
     private final AppointmentRepository appointmentRepository;
+    private final DoctorRepository doctorRepository;
 
     @Transactional
     public PatientResponse registerPatient(PatientRequest request) {
@@ -151,6 +155,72 @@ public class PatientService {
         return mapToResponse(patient);
     }
 
+    @Transactional
+    public PatientResponse checkInPatient(Long id) {
+        Patient patient = patientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", id));
+        patient.setCheckedIn(true);
+        // Usually checkedOut is reset when checked in for a new visit
+        patient.setCheckedOut(false);
+        patient = patientRepository.save(patient);
+        log.info("Patient checked in: {}", id);
+
+        // Auto-create an IN_PROGRESS appointment
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        
+        com.curamatrix.hsm.entity.Doctor doctor = doctorRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new com.curamatrix.hsm.exception.InvalidStateTransitionException(
+                        "Check-in failed: Your user account is not linked to a Doctor profile. " +
+                        "Only full Doctors can execute direct check-ins."
+                ));
+
+        Appointment appt = Appointment.builder()
+                .patient(patient)
+                .doctor(doctor)
+                .bookedBy(user)
+                .appointmentDate(java.time.LocalDate.now())
+                .appointmentTime(java.time.LocalTime.now())
+                .type(com.curamatrix.hsm.enums.AppointmentType.WALK_IN)
+                .status(com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS)
+                .consultationStart(java.time.LocalDateTime.now())
+                .build();
+        
+        appt = appointmentRepository.save(appt);
+        Long activeAppointmentId = appt.getId();
+
+        PatientResponse resp = mapToResponse(patient);
+        resp.setActiveAppointmentId(activeAppointmentId);
+        return resp;
+    }
+
+    @Transactional
+    public PatientResponse checkOutPatient(Long id) {
+        Patient patient = patientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", id));
+        
+        // Fulfill user request: checkin should be false
+        patient.setCheckedIn(false);
+        patient.setCheckedOut(true);
+        patient = patientRepository.save(patient);
+
+        // Also complete any IN_PROGRESS appointments for this patient
+        // We use the existing filter query pattern
+        List<Appointment> inProgressAppts = appointmentRepository.findByFilters(
+                null, null, id, AppointmentStatus.IN_PROGRESS, null, org.springframework.data.domain.PageRequest.of(0, 10)
+        ).getContent();
+
+        for (Appointment appt : inProgressAppts) {
+            appt.setStatus(AppointmentStatus.COMPLETED);
+            appt.setConsultationEnd(java.time.LocalDateTime.now());
+            appointmentRepository.save(appt);
+        }
+
+        log.info("Patient checked out and {} active appointments completed: {}", inProgressAppts.size(), id);
+        return mapToResponse(patient);
+    }
+
     public PatientVisitHistoryResponse getVisitHistory(Long patientId) {
         Long tenantId = TenantContext.getTenantId();
         patientRepository.findById(patientId)
@@ -191,6 +261,8 @@ public class PatientService {
                 .allergies(patient.getAllergies())
                 .medicalHistory(patient.getMedicalHistory())
                 .registeredAt(patient.getRegisteredAt())
+                .checkedIn(patient.getCheckedIn())
+                .checkedOut(patient.getCheckedOut())
                 .build();
     }
 }

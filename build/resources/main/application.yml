@@ -3,7 +3,7 @@ spring:
     name: hsm
 
   datasource:
-    url: jdbc:mysql://13.203.229.244:3306/hospitalsystems
+    url: jdbc:mysql://43.204.168.146:3306/hospitalsystems
     username: backenduser
     password: backenduser
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -20,6 +20,15 @@ jwt:
 
 server:
   port: 8080
+
+logging:
+  file:
+    path: /app/logs
+  logback:
+    rollingpolicy:
+      file-name-pattern: /app/logs/hsm-%d{yyyy-MM-dd}.log
+      max-history: 30
+      clean-history-on-start: false
 
 springdoc:
   api-docs:
