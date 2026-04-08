@@ -12,4 +12,6 @@ public class WalkInRequest {
     private Long doctorId;
 
     private String notes;
+
+    private boolean payNow;
 }

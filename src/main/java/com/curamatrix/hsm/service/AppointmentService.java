@@ -49,6 +49,7 @@ public class AppointmentService {
     private final UserRepository userRepository;
     private final AppointmentStatusLogRepository statusLogRepository;
     private final WalkInTokenSequenceRepository tokenSequenceRepository;
+    private final BillingService billingService;
 
     @Transactional
     public AppointmentResponse bookAppointment(AppointmentRequest request) {
@@ -81,6 +82,9 @@ public class AppointmentService {
         appointment = appointmentRepository.save(appointment);
         log.info("Appointment booked: {}", appointment.getId());
 
+        // Create billing
+        billingService.createAppointmentBilling(appointment, request.isPayNow());
+
         return mapToResponse(appointment);
     }
 
@@ -109,6 +113,9 @@ public class AppointmentService {
                 .tokenNumber(nextToken).status(AppointmentStatus.BOOKED)
                 .notes(request.getNotes()).build();
         appointment = appointmentRepository.save(appointment);
+
+        // Create billing
+        billingService.createAppointmentBilling(appointment, request.isPayNow());
 
         recordStatusLog(appointment, null, AppointmentStatus.BOOKED, bookedBy);
         return mapToResponse(appointment);

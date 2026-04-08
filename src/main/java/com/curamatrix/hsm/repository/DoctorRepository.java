@@ -13,6 +13,9 @@ public interface DoctorRepository extends JpaRepository<Doctor, Long> {
 
     List<Doctor> findByDepartmentId(Long departmentId);
 
+    @Query(value = "SELECT d.* FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.department_id = :departmentId AND u.tenant_id = :tenantId", nativeQuery = true)
+    List<Doctor> findByDepartmentIdAndTenantId(@Param("departmentId") Long departmentId, @Param("tenantId") Long tenantId);
+
     @Query(value = "SELECT d.* FROM doctors d JOIN users u ON d.user_id = u.id WHERE u.tenant_id = :tenantId", nativeQuery = true)
     List<Doctor> findByTenantId(@Param("tenantId") Long tenantId);
 }

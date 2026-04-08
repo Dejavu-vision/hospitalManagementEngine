@@ -27,7 +27,7 @@ public class DepartmentService {
     public List<DoctorWithAvailabilityResponse> getDoctorsWithAvailability(Long departmentId) {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
-        List<Doctor> doctors = doctorRepository.findByDepartmentId(departmentId);
+        List<Doctor> doctors = doctorRepository.findByDepartmentIdAndTenantId(departmentId, tenantId);
         return doctors.stream().map(d -> {
             // Default to true (present) when no record exists
             boolean present = availabilityRepository

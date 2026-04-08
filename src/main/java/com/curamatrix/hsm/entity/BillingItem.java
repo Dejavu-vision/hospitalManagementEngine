@@ -34,6 +34,6 @@ public class BillingItem {
     private Integer quantity = 1;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "item_type", nullable = false)
+    @Column(name = "item_type", nullable = false, length = 50)
     private BillingItemType itemType;
 }
