@@ -92,6 +92,14 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
                                                  @Param("date") LocalDate date,
                                                  @Param("tenantId") Long tenantId);
 
+    // Tenant-wide queue lengths for all doctors (for composite booking context API)
+    @Query("SELECT a.doctor.id, COUNT(a) FROM Appointment a " +
+           "WHERE a.appointmentDate = :date AND a.tenantId = :tenantId " +
+           "AND a.status IN ('BOOKED', 'CHECKED_IN', 'IN_PROGRESS') " +
+           "GROUP BY a.doctor.id")
+    List<Object[]> findQueueLengthsByTenant(@Param("date") LocalDate date,
+                                            @Param("tenantId") Long tenantId);
+
     // Count remaining IN_PROGRESS appointments for a doctor excluding a given appointment
     @Query("SELECT COUNT(a) FROM Appointment a WHERE a.doctor.id = :doctorId " +
            "AND a.appointmentDate = :date AND a.tenantId = :tenantId " +

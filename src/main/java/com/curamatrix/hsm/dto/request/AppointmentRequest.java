@@ -23,4 +23,6 @@ public class AppointmentRequest {
     private LocalTime appointmentTime;
 
     private String notes;
+
+    private boolean payNow;
 }
