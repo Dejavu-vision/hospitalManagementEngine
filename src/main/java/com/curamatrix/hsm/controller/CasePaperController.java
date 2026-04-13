@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -25,13 +26,22 @@ public class CasePaperController {
     private final TenantRepository tenantRepository;
 
     @GetMapping("/patient/{patientId}")
-    public ResponseEntity<?> getCasePaperData(@PathVariable Long patientId) {
+    public ResponseEntity<?> getCasePaperData(
+            @PathVariable Long patientId,
+            @RequestParam(required = false) Long registrationId) {
         Long tenantId = TenantContext.getTenantId();
         Patient patient = patientRepository.findByIdAndTenantId(patientId, tenantId)
                 .orElseThrow(() -> new RuntimeException("Patient not found"));
 
-        PatientRegistration registration = registrationRepository.findLatestActiveRegistration(patientId, tenantId)
-                .orElse(null);
+        PatientRegistration registration;
+        if (registrationId != null) {
+            registration = registrationRepository.findById(registrationId)
+                    .filter(r -> r.getPatient().getId().equals(patientId) && r.getTenantId().equals(tenantId))
+                    .orElseThrow(() -> new RuntimeException("Case paper not found"));
+        } else {
+            registration = registrationRepository.findLatestActiveRegistration(patientId, tenantId)
+                    .orElse(null);
+        }
 
         Map<String, Object> regDto = null;
         if (registration != null) {
@@ -74,6 +84,26 @@ public class CasePaperController {
         result.put("registration", regDto);
         result.put("hospital", hospitalMap);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/patient/{patientId}/history")
+    public ResponseEntity<?> getCasePaperHistory(@PathVariable Long patientId) {
+        Long tenantId = TenantContext.getTenantId();
+        patientRepository.findByIdAndTenantId(patientId, tenantId)
+                .orElseThrow(() -> new RuntimeException("Patient not found"));
+
+        return ResponseEntity.ok(registrationRepository.findByPatientIdAndTenantIdOrderByIssuedAtDesc(patientId, tenantId)
+                .stream()
+                .map(r -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("id", r.getId());
+                    m.put("issuedAt", r.getIssuedAt() != null ? r.getIssuedAt().toString() : null);
+                    m.put("expiresAt", r.getExpiresAt() != null ? r.getExpiresAt().toString() : null);
+                    m.put("active", r.isActive());
+                    m.put("notes", r.getNotes());
+                    return m;
+                })
+                .toList());
     }
 
     @DeleteMapping("/patient/{patientId}")

@@ -57,7 +57,7 @@ public class DoctorAvailabilityController {
     }
 
     @PatchMapping("/api/doctors/{doctorId}/status")
-    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN', 'DOCTOR')")
     public ResponseEntity<DoctorAvailabilityResponse> updateStatus(
             @PathVariable Long doctorId,
             @Valid @RequestBody DoctorStatusUpdateRequest request) {

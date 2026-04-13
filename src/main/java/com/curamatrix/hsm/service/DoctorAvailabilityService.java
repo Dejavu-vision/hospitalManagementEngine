@@ -39,6 +39,7 @@ public class DoctorAvailabilityService {
         // Default: present and ON_DUTY when no record exists
         return record.map(r -> toResponse(r, doctor))
                 .orElseGet(() -> DoctorAvailabilityResponse.builder()
+                        .userId(doctor.getUser().getId())
                         .doctorId(doctorId)
                         .doctorName(doctor.getUser().getFullName())
                         .departmentName(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
@@ -58,6 +59,7 @@ public class DoctorAvailabilityService {
                     .findByDoctorIdAndAvailabilityDateAndTenantId(doctor.getId(), today, tenantId);
             return record.map(r -> toResponse(r, doctor))
                     .orElseGet(() -> DoctorAvailabilityResponse.builder()
+                            .userId(doctor.getUser().getId())
                             .doctorId(doctor.getId())
                             .doctorName(doctor.getUser().getFullName())
                             .departmentName(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
@@ -114,6 +116,7 @@ public class DoctorAvailabilityService {
 
     private DoctorAvailabilityResponse toResponse(DoctorAvailability r, Doctor doctor) {
         return DoctorAvailabilityResponse.builder()
+                .userId(doctor.getUser().getId())
                 .doctorId(r.getDoctor().getId())
                 .doctorName(doctor.getUser().getFullName())
                 .departmentName(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)

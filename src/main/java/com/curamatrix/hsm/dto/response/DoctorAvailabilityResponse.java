@@ -8,6 +8,7 @@ import java.time.LocalTime;
 
 @Data @Builder @NoArgsConstructor @AllArgsConstructor
 public class DoctorAvailabilityResponse {
+    private Long userId;
     private Long doctorId;
     private String doctorName;
     private String departmentName;
