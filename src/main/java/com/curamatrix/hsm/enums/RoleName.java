@@ -4,5 +4,6 @@ public enum RoleName {
     ROLE_SUPER_ADMIN,  // Platform-level admin (manages all tenants)
     ROLE_ADMIN,        // Tenant-level admin (manages single hospital)
     ROLE_DOCTOR,
-    ROLE_RECEPTIONIST
+    ROLE_RECEPTIONIST,
+    ROLE_LAB_STAFF     // Laboratory personnel
 }

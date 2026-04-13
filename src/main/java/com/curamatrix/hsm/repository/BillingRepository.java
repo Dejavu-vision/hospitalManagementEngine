@@ -9,4 +9,5 @@ public interface BillingRepository extends JpaRepository<Billing, Long> {
     java.util.List<Billing> findAllByTenantIdOrderByCreatedAtDesc(Long tenantId);
     java.util.List<Billing> findAllByPatientIdAndTenantId(Long patientId, Long tenantId);
     Page<Billing> findByPatientId(Long patientId, Pageable pageable);
+    java.util.Optional<Billing> findByAppointmentIdAndTenantId(Long appointmentId, Long tenantId);
 }
