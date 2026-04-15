@@ -6,10 +6,12 @@ import com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest;
 import com.curamatrix.hsm.dto.response.DoctorAvailabilityResponse;
 import com.curamatrix.hsm.entity.Doctor;
 import com.curamatrix.hsm.entity.DoctorAvailability;
+import com.curamatrix.hsm.entity.User;
 import com.curamatrix.hsm.enums.DoctorStatus;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.DoctorAvailabilityRepository;
 import com.curamatrix.hsm.repository.DoctorRepository;
+import com.curamatrix.hsm.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,19 @@ public class DoctorAvailabilityService {
 
     private final DoctorAvailabilityRepository availabilityRepository;
     private final DoctorRepository doctorRepository;
+    private final UserRepository userRepository;
+
+    public DoctorAvailabilityResponse getAvailabilityByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        return getAvailabilityForUserId(user.getId());
+    }
+
+    public DoctorAvailabilityResponse getAvailabilityForUserId(Long userId) {
+        Doctor doctor = doctorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor", "userId", userId));
+        return getAvailability(doctor.getId(), LocalDate.now());
+    }
 
     /** Get today's availability for a single doctor */
     public DoctorAvailabilityResponse getAvailability(Long doctorId, LocalDate date) {
@@ -44,8 +59,8 @@ public class DoctorAvailabilityService {
                         .doctorName(doctor.getUser().getFullName())
                         .departmentName(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
                         .date(date)
-                        .isPresent(true)
-                        .status(DoctorStatus.ON_DUTY)
+                        .isPresent(false)
+                        .status(DoctorStatus.OFF_DUTY)
                         .build());
     }
 
@@ -64,8 +79,8 @@ public class DoctorAvailabilityService {
                             .doctorName(doctor.getUser().getFullName())
                             .departmentName(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
                             .date(today)
-                            .isPresent(true)
-                            .status(DoctorStatus.ON_DUTY)
+                            .isPresent(false)
+                            .status(DoctorStatus.OFF_DUTY)
                             .build());
         }).collect(Collectors.toList());
     }

@@ -26,13 +26,13 @@ public class DoctorAvailability extends TenantAwareEntity {
 
     @Column(name = "is_present", nullable = false)
     @Builder.Default
-    private Boolean isPresent = true;
+    private Boolean isPresent = false;
 
     /** Real-time status during the duty day */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     @Builder.Default
-    private DoctorStatus status = DoctorStatus.ON_DUTY;
+    private DoctorStatus status = DoctorStatus.OFF_DUTY;
 
     /** Optional note — e.g. "Back in 30 min", "Emergency surgery" */
     @Column(name = "status_note")
