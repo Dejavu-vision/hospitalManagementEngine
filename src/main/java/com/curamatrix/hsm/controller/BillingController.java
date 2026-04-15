@@ -1,17 +1,22 @@
 package com.curamatrix.hsm.controller;
 
+import com.curamatrix.hsm.dto.request.AddBillingItemRequest;
+import com.curamatrix.hsm.dto.request.CollectPaymentRequest;
+import com.curamatrix.hsm.dto.response.BillingResponse;
+import com.curamatrix.hsm.dto.response.BillingSummaryResponse;
 import com.curamatrix.hsm.entity.Billing;
 import com.curamatrix.hsm.entity.HospitalService;
 import com.curamatrix.hsm.entity.Patient;
-import com.curamatrix.hsm.repository.BillingRepository;
 import com.curamatrix.hsm.repository.HospitalServiceRepository;
 import com.curamatrix.hsm.repository.PatientRepository;
 import com.curamatrix.hsm.service.BillingService;
 import com.curamatrix.hsm.context.TenantContext;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -21,35 +26,44 @@ import java.util.Map;
 public class BillingController {
 
     private final BillingService billingService;
-    private final BillingRepository billingRepository;
     private final HospitalServiceRepository hospitalServiceRepository;
     private final PatientRepository patientRepository;
 
-    // --- Registration / Case Paper Billing ---
+    // ─── Dashboard Summary ───────────────────────────────────────────────────
 
-    @PostMapping("/register/{patientId}")
-    public ResponseEntity<Billing> createRegistrationBilling(
-            @PathVariable Long patientId,
-            @RequestBody(required = false) Map<String, String> body) {
-        Long tenantId = TenantContext.getTenantId();
-        Patient patient = patientRepository.findByIdAndTenantId(patientId, tenantId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
-        String paymentMethod = body != null ? body.get("paymentMethod") : null;
-        Billing billing = billingService.createRegistrationBilling(patient, tenantId, paymentMethod);
-        return ResponseEntity.ok(billing);
+    @GetMapping("/dashboard")
+    public ResponseEntity<BillingSummaryResponse> getDashboardSummary() {
+        return ResponseEntity.ok(billingService.getDashboardSummary(TenantContext.getTenantId()));
     }
 
-    // --- Invoice Endpoints ---
+    // ─── Invoice Endpoints ───────────────────────────────────────────────────
 
     @GetMapping("/invoices")
-    public ResponseEntity<List<Billing>> getAllInvoices() {
-        return ResponseEntity.ok(billingRepository.findAllByTenantIdOrderByCreatedAtDesc(TenantContext.getTenantId()));
+    public ResponseEntity<List<BillingResponse>> getAllInvoices(
+            @RequestParam(required = false, defaultValue = "ALL") String status) {
+        return ResponseEntity.ok(billingService.getAllInvoices(TenantContext.getTenantId(), status));
+    }
+
+    @GetMapping("/invoices/{id}")
+    public ResponseEntity<BillingResponse> getInvoiceById(@PathVariable Long id) {
+        return ResponseEntity.ok(billingService.getInvoiceById(id, TenantContext.getTenantId()));
     }
 
     @GetMapping("/invoices/patient/{patientId}")
-    public ResponseEntity<List<Billing>> getPatientInvoices(@PathVariable Long patientId) {
-        return ResponseEntity.ok(billingRepository.findAllByPatientIdAndTenantId(patientId, TenantContext.getTenantId()));
+    public ResponseEntity<List<BillingResponse>> getPatientInvoices(@PathVariable Long patientId) {
+        return ResponseEntity.ok(billingService.getPatientInvoices(patientId, TenantContext.getTenantId()));
     }
+
+    // ─── Payment Collection ──────────────────────────────────────────────────
+
+    @PostMapping("/invoices/{id}/collect-payment")
+    public ResponseEntity<BillingResponse> collectPayment(
+            @PathVariable Long id,
+            @Valid @RequestBody CollectPaymentRequest request) {
+        return ResponseEntity.ok(billingService.collectPayment(id, request, TenantContext.getTenantId()));
+    }
+
+    // ─── Legacy Pay (backward compatibility) ─────────────────────────────────
 
     @PutMapping("/invoices/{id}/pay")
     public ResponseEntity<Void> markAsPaid(@PathVariable Long id) {
@@ -57,12 +71,45 @@ public class BillingController {
         return ResponseEntity.noContent().build();
     }
 
+    // ─── Add Item ────────────────────────────────────────────────────────────
+
+    @PostMapping("/invoices/{id}/items")
+    public ResponseEntity<BillingResponse> addBillingItem(
+            @PathVariable Long id,
+            @Valid @RequestBody AddBillingItemRequest request) {
+        return ResponseEntity.ok(billingService.addBillingItem(id, request, TenantContext.getTenantId()));
+    }
+
+    // ─── Discount ────────────────────────────────────────────────────────────
+
+    @PatchMapping("/invoices/{id}/discount")
+    public ResponseEntity<BillingResponse> applyDiscount(
+            @PathVariable Long id,
+            @RequestBody Map<String, BigDecimal> body) {
+        BigDecimal discount = body.getOrDefault("discount", BigDecimal.ZERO);
+        return ResponseEntity.ok(billingService.applyDiscount(id, discount, TenantContext.getTenantId()));
+    }
+
+    // ─── Registration / Case Paper Billing ───────────────────────────────────
+
+    @PostMapping("/register/{patientId}")
+    public ResponseEntity<BillingResponse> createRegistrationBilling(
+            @PathVariable Long patientId,
+            @RequestBody(required = false) Map<String, String> body) {
+        Long tenantId = TenantContext.getTenantId();
+        Patient patient = patientRepository.findByIdAndTenantId(patientId, tenantId)
+                .orElseThrow(() -> new RuntimeException("Patient not found"));
+        String paymentMethod = body != null ? body.get("paymentMethod") : null;
+        Billing billing = billingService.createRegistrationBilling(patient, tenantId, paymentMethod);
+        return ResponseEntity.ok(billingService.mapToResponse(billing));
+    }
+
     @GetMapping("/registration-status/{patientId}")
     public ResponseEntity<Boolean> checkRegistration(@PathVariable Long patientId) {
         return ResponseEntity.ok(billingService.isRegistrationValid(patientId, TenantContext.getTenantId()));
     }
 
-    // --- Hospital Service Management (Admin) ---
+    // ─── Hospital Service Management (Admin) ─────────────────────────────────
 
     @GetMapping("/services")
     public ResponseEntity<List<HospitalService>> getServices() {
@@ -73,12 +120,12 @@ public class BillingController {
     public ResponseEntity<HospitalService> updateService(@PathVariable Long id, @RequestBody HospitalService serviceData) {
         HospitalService service = hospitalServiceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service not found"));
-        
+
         service.setPrice(serviceData.getPrice());
         service.setServiceName(serviceData.getServiceName());
         service.setDescription(serviceData.getDescription());
         service.setValidityPeriodDays(serviceData.getValidityPeriodDays());
-        
+
         return ResponseEntity.ok(hospitalServiceRepository.save(service));
     }
 }

@@ -58,6 +58,16 @@ public class Billing extends TenantAwareEntity {
     @Column(name = "payment_method")
     private PaymentMethod paymentMethod;
 
+    @Column(name = "paid_amount", nullable = false)
+    @Builder.Default
+    private BigDecimal paidAmount = BigDecimal.ZERO;
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
+
+    @Column(name = "remarks", columnDefinition = "TEXT")
+    private String remarks;
+
     @Column(name = "created_at", updatable = false)
     @CreationTimestamp
     private LocalDateTime createdAt;
