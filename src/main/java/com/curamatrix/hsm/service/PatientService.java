@@ -39,6 +39,7 @@ public class PatientService {
     private final TenantRepository tenantRepository;
     private final AppointmentRepository appointmentRepository;
     private final DoctorRepository doctorRepository;
+    private final DoctorAvailabilityService doctorAvailabilityService;
 
     @Transactional
     public PatientResponse registerPatient(PatientRequest request) {
@@ -191,6 +192,16 @@ public class PatientService {
         appt = appointmentRepository.save(appt);
         Long activeAppointmentId = appt.getId();
 
+        // Update the doctor's global status to IN_CONSULTATION
+        try {
+            com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest statusReq = 
+                    new com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest();
+            statusReq.setStatus(com.curamatrix.hsm.enums.DoctorStatus.IN_CONSULTATION);
+            doctorAvailabilityService.updateStatus(doctor.getId(), statusReq);
+        } catch (Exception e) {
+            log.warn("Could not update doctor status to IN_CONSULTATION on patient checkin: {}", e.getMessage());
+        }
+
         PatientResponse resp = mapToResponse(patient);
         resp.setActiveAppointmentId(activeAppointmentId);
         return resp;
@@ -216,6 +227,20 @@ public class PatientService {
             appt.setStatus(AppointmentStatus.COMPLETED);
             appt.setConsultationEnd(java.time.LocalDateTime.now());
             appointmentRepository.save(appt);
+            
+            // Revert doctor status to ON_DUTY if this was their last IN_PROGRESS appointment
+            try {
+                Long remainingInProgress = appointmentRepository.countOtherInProgressByDoctor(
+                        appt.getDoctor().getId(), LocalDate.now(), appt.getTenantId(), appt.getId());
+                if (remainingInProgress == 0) {
+                    com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest statusReq = 
+                            new com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest();
+                    statusReq.setStatus(com.curamatrix.hsm.enums.DoctorStatus.ON_DUTY);
+                    doctorAvailabilityService.updateStatus(appt.getDoctor().getId(), statusReq);
+                }
+            } catch (Exception e) {
+                log.warn("Could not revert doctor status on checkout: {}", e.getMessage());
+            }
         }
 
         log.info("Patient checked out and {} active appointments completed: {}", inProgressAppts.size(), id);
