@@ -252,6 +252,21 @@ public class BillingService {
     }
 
     // ─── NEW: Apply Discount ─────────────────────────────────────────────────
+    
+    @Transactional
+    public void cancelBilling(Long billingId, Long tenantId) {
+        Billing billing = billingRepository.findByIdAndTenantId(billingId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Billing", "id", billingId));
+
+        if (billing.getPaymentStatus() == PaymentStatus.CANCELLED) {
+            return;
+        }
+
+        billing.setPaymentStatus(PaymentStatus.CANCELLED);
+        billing.setRemarks((billing.getRemarks() != null ? billing.getRemarks() + "\n" : "") + "Cancelled due to case paper cancellation");
+        billingRepository.save(billing);
+        log.info("Billing {} cancelled", billingId);
+    }
 
     @Transactional
     public BillingResponse applyDiscount(Long billingId, BigDecimal discount, Long tenantId) {

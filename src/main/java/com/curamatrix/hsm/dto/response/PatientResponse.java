@@ -33,4 +33,6 @@ public class PatientResponse {
     private Boolean checkedIn;
     private Boolean checkedOut;
     private Long activeAppointmentId;
+    private Long activeAppointmentDoctorId;
+    private String activeAppointmentDoctorName;
 }

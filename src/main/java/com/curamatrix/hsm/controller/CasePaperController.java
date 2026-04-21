@@ -8,6 +8,7 @@ import com.curamatrix.hsm.repository.PatientRepository;
 import com.curamatrix.hsm.repository.TenantRepository;
 import com.curamatrix.hsm.entity.Tenant;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/case-paper")
 @RequiredArgsConstructor
@@ -24,6 +26,7 @@ public class CasePaperController {
     private final PatientRepository patientRepository;
     private final PatientRegistrationRepository registrationRepository;
     private final TenantRepository tenantRepository;
+    private final com.curamatrix.hsm.service.ReceptionDeskService receptionDeskService;
 
     @GetMapping("/patient/{patientId}")
     public ResponseEntity<?> getCasePaperData(
@@ -108,19 +111,11 @@ public class CasePaperController {
 
     @DeleteMapping("/patient/{patientId}")
     public ResponseEntity<?> deleteCasePaper(@PathVariable Long patientId) {
-        Long tenantId = TenantContext.getTenantId();
-        patientRepository.findByIdAndTenantId(patientId, tenantId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
-
-        PatientRegistration registration = registrationRepository.findLatestActiveRegistration(patientId, tenantId)
-                .orElseThrow(() -> new RuntimeException("No active case paper found"));
-
-        registration.setActive(false);
-        registrationRepository.save(registration);
+        log.info("Request to cancel case paper for patient: {}", patientId);
+        receptionDeskService.cancelCasePaper(patientId);
 
         Map<String, Object> response = new HashMap<>();
-        response.put("message", "Case paper deactivated successfully");
-        response.put("registrationId", registration.getId());
+        response.put("message", "Case paper and associated invoice cancelled successfully");
         return ResponseEntity.ok(response);
     }
 }

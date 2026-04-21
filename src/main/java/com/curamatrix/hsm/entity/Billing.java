@@ -26,7 +26,11 @@ public class Billing extends TenantAwareEntity {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "appointment_id")
-    private Appointment appointment;
+    private Appointment appointment; // For OPD visits
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ipd_admission_id")
+    private IpdAdmission ipdAdmission; // For IPD Running Bills
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "patient_id", nullable = false)

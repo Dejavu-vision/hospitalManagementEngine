@@ -97,8 +97,10 @@ public class ReceptionDeskService {
                     List<BookingContextResponse.DoctorInfo> doctorInfos = deptDoctors.stream()
                             .map(doctor -> {
                                 DoctorAvailability avail = availabilityByDoctorId.get(doctor.getId());
-                                boolean presentToday = avail != null && Boolean.TRUE.equals(avail.getIsPresent());
-                                DoctorStatus status = avail != null ? avail.getStatus() : DoctorStatus.OFF_DUTY;
+                                // Default: if no availability record, doctor is assumed present & ON_DUTY.
+                                // The receptionist can explicitly mark OFF_DUTY if needed.
+                                boolean presentToday = avail == null || Boolean.TRUE.equals(avail.getIsPresent());
+                                DoctorStatus status = avail != null ? avail.getStatus() : DoctorStatus.ON_DUTY;
                                 String statusNote = avail != null ? avail.getStatusNote() : null;
                                 int queueLength = queueLengthByDoctorId
                                         .getOrDefault(doctor.getId(), 0L).intValue();
@@ -165,6 +167,23 @@ public class ReceptionDeskService {
                 .amount(billing.getTotalAmount())
                 .paymentStatus(billing.getPaymentStatus())
                 .build();
+    }
+
+    @Transactional
+    public void cancelCasePaper(Long patientId) {
+        Long tenantId = TenantContext.getTenantId();
+        log.info("Cancelling case paper for patient {} in tenant {}", patientId, tenantId);
+
+        PatientRegistration registration = patientRegistrationRepository
+                .findLatestActiveRegistration(patientId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Active Case Paper", "patientId", patientId));
+
+        registration.setActive(false);
+        patientRegistrationRepository.save(registration);
+
+        if (registration.getBilling() != null) {
+            billingService.cancelBilling(registration.getBilling().getId(), tenantId);
+        }
     }
 
 

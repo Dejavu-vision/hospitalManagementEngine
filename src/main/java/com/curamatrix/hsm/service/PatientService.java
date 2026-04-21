@@ -271,7 +271,7 @@ public class PatientService {
     }
 
     private PatientResponse mapToResponse(Patient patient) {
-        return PatientResponse.builder()
+        PatientResponse resp = PatientResponse.builder()
                 .id(patient.getId())
                 .patientCode(patient.getPatientCode())
                 .firstName(patient.getFirstName())
@@ -290,5 +290,27 @@ public class PatientService {
                 .checkedIn(patient.getCheckedIn())
                 .checkedOut(patient.getCheckedOut())
                 .build();
+                
+        // Inject active appointment info if the patient is checked in
+        if (Boolean.TRUE.equals(patient.getCheckedIn())) {
+            try {
+                // Find any IN_PROGRESS or CHECKED_IN appointment for this patient
+                appointmentRepository.findByFilters(
+                    null, null, patient.getId(), null, null, org.springframework.data.domain.PageRequest.of(0, 10))
+                .getContent().stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS || a.getStatus() == AppointmentStatus.CHECKED_IN)
+                .findFirst()
+                .ifPresent(appt -> {
+                    resp.setActiveAppointmentId(appt.getId());
+                    if (appt.getDoctor() != null) {
+                        resp.setActiveAppointmentDoctorId(appt.getDoctor().getId());
+                        resp.setActiveAppointmentDoctorName(appt.getDoctor().getUser().getFullName());
+                    }
+                });
+            } catch (Exception e) {
+                log.warn("Could not fetch active appointment for patient: {}", e.getMessage());
+            }
+        }
+        return resp;
     }
 }

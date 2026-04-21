@@ -77,7 +77,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     // Tenant-scoped today queue per doctor
     @Query("SELECT a FROM Appointment a WHERE a.doctor.id = :doctorId " +
            "AND a.appointmentDate = :date AND a.tenantId = :tenantId " +
-           "AND a.status NOT IN ('CANCELLED', 'NO_SHOW') " +
            "ORDER BY CASE WHEN a.type = 'WALK_IN' THEN a.tokenNumber ELSE 999999 END, a.appointmentTime")
     List<Appointment> findTodayQueueByDoctorAndTenant(@Param("doctorId") Long doctorId,
                                                        @Param("date") LocalDate date,
