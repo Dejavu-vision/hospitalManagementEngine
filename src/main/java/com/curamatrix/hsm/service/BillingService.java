@@ -113,10 +113,8 @@ public class BillingService {
 
     @Transactional
     public Billing createRegistrationBilling(Patient patient, Long tenantId, String paymentMethodStr) {
-        if (isRegistrationValid(patient.getId(), tenantId)) {
-            throw new RuntimeException("Patient already has a valid registration / case paper");
-        }
-
+        // Validation removed as per request to allow re-registration even if valid paper exists
+        
         Optional<HospitalService> regService = hospitalServiceRepository.findByServiceCodeAndTenantId("REG_FEE", tenantId);
         if (regService.isEmpty()) {
             throw new RuntimeException("Registration fee service not configured");
@@ -140,20 +138,18 @@ public class BillingService {
                 .invoiceNumber("INV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                 .totalAmount(amount)
                 .netAmount(amount)
-                .paymentStatus(PaymentStatus.PAID)
+                .paymentStatus(PaymentStatus.PENDING) // Start as PENDING
                 .paymentMethod(paymentMethod)
-                .paidAmount(amount)
-                .paidAt(LocalDateTime.now())
+                .paidAmount(BigDecimal.ZERO)          // No payment yet
+                .paidAt(null)
                 .items(List.of(regItem))
                 .build();
 
         billing.setTenantId(tenantId);
         regItem.setBilling(billing);
 
-        Billing savedBilling = billingRepository.save(billing);
-        issueNewCasePaper(patient, savedBilling, tenantId);
-
-        return savedBilling;
+        return billingRepository.save(billing);
+        // Note: issueNewCasePaper will be called in collectPayment() once status becomes PAID
     }
 
     private void issueNewCasePaper(Patient patient, Billing billing, Long tenantId) {

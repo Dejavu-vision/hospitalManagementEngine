@@ -35,4 +35,6 @@ public class PatientResponse {
     private Long activeAppointmentId;
     private Long activeAppointmentDoctorId;
     private String activeAppointmentDoctorName;
+    private Integer activeTokenNumber;
+    private String activeAppointmentStatus;
 }

@@ -16,6 +16,7 @@ import com.curamatrix.hsm.enums.AppointmentStatus;
 import com.curamatrix.hsm.enums.AppointmentType;
 import com.curamatrix.hsm.exception.DuplicateResourceException;
 import com.curamatrix.hsm.exception.InvalidStateTransitionException;
+import com.curamatrix.hsm.exception.RegistrationPaymentPendingException;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.AppointmentRepository;
 import com.curamatrix.hsm.repository.AppointmentStatusLogRepository;
@@ -97,6 +98,14 @@ public class AppointmentService {
         User bookedBy = getCurrentUser();
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
+
+        // 1. Enforce Registration Payment
+        if (!billingService.isRegistrationValid(patient.getId(), tenantId)) {
+            throw new RegistrationPaymentPendingException(
+                "Patient registration fee / case paper is not paid or has expired. " +
+                "Please complete registration and payment before issuing a token."
+            );
+        }
 
         // Atomic token increment — one sequence per (date, tenant) across ALL doctors
         WalkInTokenSequence seq = tokenSequenceRepository

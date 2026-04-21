@@ -291,25 +291,27 @@ public class PatientService {
                 .checkedOut(patient.getCheckedOut())
                 .build();
                 
-        // Inject active appointment info if the patient is checked in
-        if (Boolean.TRUE.equals(patient.getCheckedIn())) {
-            try {
-                // Find any IN_PROGRESS or CHECKED_IN appointment for this patient
-                appointmentRepository.findByFilters(
-                    null, null, patient.getId(), null, null, org.springframework.data.domain.PageRequest.of(0, 10))
-                .getContent().stream()
-                .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS || a.getStatus() == AppointmentStatus.CHECKED_IN)
-                .findFirst()
-                .ifPresent(appt -> {
-                    resp.setActiveAppointmentId(appt.getId());
-                    if (appt.getDoctor() != null) {
-                        resp.setActiveAppointmentDoctorId(appt.getDoctor().getId());
-                        resp.setActiveAppointmentDoctorName(appt.getDoctor().getUser().getFullName());
-                    }
-                });
-            } catch (Exception e) {
-                log.warn("Could not fetch active appointment for patient: {}", e.getMessage());
-            }
+        // Inject active appointment info for today's visits (Booked, Checked-In, or In-Progress)
+        try {
+            LocalDate today = LocalDate.now();
+            appointmentRepository.findByFilters(
+                today, null, patient.getId(), null, null, org.springframework.data.domain.PageRequest.of(0, 10))
+            .getContent().stream()
+            .filter(a -> a.getStatus() == AppointmentStatus.BOOKED || 
+                         a.getStatus() == AppointmentStatus.CHECKED_IN || 
+                         a.getStatus() == AppointmentStatus.IN_PROGRESS)
+            .findFirst()
+            .ifPresent(appt -> {
+                resp.setActiveAppointmentId(appt.getId());
+                resp.setActiveAppointmentStatus(appt.getStatus().name());
+                resp.setActiveTokenNumber(appt.getTokenNumber());
+                if (appt.getDoctor() != null) {
+                    resp.setActiveAppointmentDoctorId(appt.getDoctor().getId());
+                    resp.setActiveAppointmentDoctorName(appt.getDoctor().getUser().getFullName());
+                }
+            });
+        } catch (Exception e) {
+            log.warn("Could not fetch active appointment for patient: {}", e.getMessage());
         }
         return resp;
     }

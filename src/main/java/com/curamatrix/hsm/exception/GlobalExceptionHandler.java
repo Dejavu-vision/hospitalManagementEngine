@@ -111,6 +111,14 @@ public class GlobalExceptionHandler {
                 request.getRequestURI());
     }
 
+    // ─── Registration Pending (403) ──────────────────────────────
+
+    @ExceptionHandler(RegistrationPaymentPendingException.class)
+    public ResponseEntity<Map<String, Object>> handleRegistrationPending(RegistrationPaymentPendingException ex,
+                                                                         HttpServletRequest request) {
+        return build(HttpStatus.FORBIDDEN, ex.getMessage(), request.getRequestURI());
+    }
+
     // ─── Generic RuntimeException (400 / 409) ────────────────────
 
     @ExceptionHandler(RuntimeException.class)
