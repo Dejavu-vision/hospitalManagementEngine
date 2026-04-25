@@ -2,6 +2,7 @@ package com.curamatrix.hsm.service;
 
 import com.curamatrix.hsm.context.TenantContext;
 import com.curamatrix.hsm.dto.request.PatientRequest;
+import com.curamatrix.hsm.dto.response.DuplicateCheckResponse;
 import com.curamatrix.hsm.dto.response.PatientResponse;
 import com.curamatrix.hsm.dto.response.PatientVisitHistoryResponse;
 import com.curamatrix.hsm.entity.Patient;
@@ -13,11 +14,7 @@ import com.curamatrix.hsm.exception.DuplicateResourceException;
 import com.curamatrix.hsm.exception.QuotaExceededException;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.entity.Appointment;
-import com.curamatrix.hsm.repository.PatientRepository;
-import com.curamatrix.hsm.repository.TenantRepository;
-import com.curamatrix.hsm.repository.UserRepository;
-import com.curamatrix.hsm.repository.AppointmentRepository;
-import com.curamatrix.hsm.repository.DoctorRepository;
+import com.curamatrix.hsm.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -28,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -39,6 +37,7 @@ public class PatientService {
     private final TenantRepository tenantRepository;
     private final AppointmentRepository appointmentRepository;
     private final DoctorRepository doctorRepository;
+    private final PatientRegistrationRepository patientRegistrationRepository;
     private final DoctorAvailabilityService doctorAvailabilityService;
 
     @Transactional
@@ -70,21 +69,9 @@ public class PatientService {
             }
         }
 
-        // ─── Duplicate detection: warn when name + DOB match exists ─
-        if (effectiveTenantId != null && request.getFirstName() != null && request.getLastName() != null
-                && request.getDateOfBirth() != null) {
-            boolean duplicateExists = patientRepository
-                    .existsByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirthAndTenantId(
-                            request.getFirstName(), request.getLastName(),
-                            request.getDateOfBirth(), effectiveTenantId);
-            if (duplicateExists) {
-                throw new DuplicateResourceException(
-                        "A patient with the same name and date of birth already exists: " +
-                        request.getFirstName() + " " + request.getLastName() +
-                        " (DOB: " + request.getDateOfBirth() + "). " +
-                        "Please verify this is not a duplicate registration.");
-            }
-        }
+        // ─── Duplicate detection handled via explicit /check-duplicate API ─
+        // We removed the strict exception here to allow receptionists to manually bypass 
+        // the warning if they confirm it is a different person.
 
         // Generate human-readable patient code before saving
         // Format: P{YY}{4-digit-sequence} e.g. P260001 — short, readable, fits on token slips
@@ -103,6 +90,7 @@ public class PatientService {
                 .bloodGroup(request.getBloodGroup())
                 .emergencyContactName(request.getEmergencyContactName())
                 .emergencyContactPhone(request.getEmergencyContactPhone())
+                .guardianName(request.getGuardianName())
                 .allergies(request.getAllergies())
                 .medicalHistory(request.getMedicalHistory())
                 .registeredBy(registeredBy)
@@ -148,6 +136,7 @@ public class PatientService {
         patient.setBloodGroup(request.getBloodGroup());
         patient.setEmergencyContactName(request.getEmergencyContactName());
         patient.setEmergencyContactPhone(request.getEmergencyContactPhone());
+        patient.setGuardianName(request.getGuardianName());
         patient.setAllergies(request.getAllergies());
         patient.setMedicalHistory(request.getMedicalHistory());
 
@@ -270,6 +259,32 @@ public class PatientService {
                 .patientId(patientId).totalVisits(totalVisits).lastVisitDate(lastVisit).build();
     }
 
+    public DuplicateCheckResponse checkDuplicate(PatientRequest request) {
+        Long tenantId = TenantContext.getTenantId();
+        
+        List<Patient> duplicates = patientRepository.findDuplicates(
+                request.getGender(), request.getDateOfBirth(), tenantId);
+        
+        if (duplicates.isEmpty()) {
+            return DuplicateCheckResponse.builder().exists(false).build();
+        }
+        
+        // Take the most recent duplicate (assuming ID is sequential)
+        Patient patient = duplicates.get(0);
+        Optional<com.curamatrix.hsm.entity.PatientRegistration> reg = 
+                patientRegistrationRepository.findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(patient.getId(), tenantId);
+        
+        boolean isValid = reg.isPresent() && !reg.get().isExpired();
+        java.time.LocalDateTime expiresAt = reg.map(com.curamatrix.hsm.entity.PatientRegistration::getExpiresAt).orElse(null);
+        
+        return DuplicateCheckResponse.builder()
+                .exists(true)
+                .patient(mapToResponse(patient))
+                .isCasePaperValid(isValid)
+                .expiresAt(expiresAt != null ? expiresAt.toString() : null)
+                .build();
+    }
+
     private PatientResponse mapToResponse(Patient patient) {
         PatientResponse resp = PatientResponse.builder()
                 .id(patient.getId())
@@ -284,6 +299,7 @@ public class PatientService {
                 .bloodGroup(patient.getBloodGroup())
                 .emergencyContactName(patient.getEmergencyContactName())
                 .emergencyContactPhone(patient.getEmergencyContactPhone())
+                .guardianName(patient.getGuardianName())
                 .allergies(patient.getAllergies())
                 .medicalHistory(patient.getMedicalHistory())
                 .registeredAt(patient.getRegisteredAt())

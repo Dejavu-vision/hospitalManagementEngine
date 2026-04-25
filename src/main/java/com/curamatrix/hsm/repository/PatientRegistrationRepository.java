@@ -12,8 +12,7 @@ import java.util.Optional;
 @Repository
 public interface PatientRegistrationRepository extends JpaRepository<PatientRegistration, Long> {
     
-    @Query("SELECT pr FROM PatientRegistration pr WHERE pr.patient.id = :patientId AND pr.tenantId = :tenantId AND pr.active = true ORDER BY pr.expiresAt DESC LIMIT 1")
-    Optional<PatientRegistration> findLatestActiveRegistration(@Param("patientId") Long patientId, @Param("tenantId") Long tenantId);
+    Optional<PatientRegistration> findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(Long patientId, Long tenantId);
 
     List<PatientRegistration> findByPatientIdAndTenantIdOrderByIssuedAtDesc(Long patientId, Long tenantId);
 }

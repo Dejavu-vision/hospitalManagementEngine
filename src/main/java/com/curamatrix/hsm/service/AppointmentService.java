@@ -8,6 +8,7 @@ import com.curamatrix.hsm.dto.response.SlotResponse;
 import com.curamatrix.hsm.dto.response.StatusLogResponse;
 import com.curamatrix.hsm.entity.Appointment;
 import com.curamatrix.hsm.entity.AppointmentStatusLog;
+import com.curamatrix.hsm.entity.Billing;
 import com.curamatrix.hsm.entity.Doctor;
 import com.curamatrix.hsm.entity.Patient;
 import com.curamatrix.hsm.entity.User;
@@ -84,9 +85,14 @@ public class AppointmentService {
         log.info("Appointment booked: {}", appointment.getId());
 
         // Create billing
-        billingService.createAppointmentBilling(appointment, request.isPayNow());
+        Billing billing = null;
+        if (!request.isFollowUp()) {
+            billing = billingService.createAppointmentBilling(appointment, request.isPayNow());
+        }
 
-        return mapToResponse(appointment);
+        AppointmentResponse response = mapToResponse(appointment);
+        if (billing != null) response.setBillingId(billing.getId());
+        return response;
     }
 
     @Transactional
@@ -99,13 +105,8 @@ public class AppointmentService {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
 
-        // 1. Enforce Registration Payment
-        if (!billingService.isRegistrationValid(patient.getId(), tenantId)) {
-            throw new RegistrationPaymentPendingException(
-                "Patient registration fee / case paper is not paid or has expired. " +
-                "Please complete registration and payment before issuing a token."
-            );
-        }
+        // 1. Registration Fee logic is handled inside billingService.createAppointmentBilling
+        // which adds 'REG_FEE' if not valid. We allow token issuance even for pending bills.
 
         // Atomic token increment — one sequence per (date, tenant) across ALL doctors
         WalkInTokenSequence seq = tokenSequenceRepository
@@ -123,11 +124,17 @@ public class AppointmentService {
                 .notes(request.getNotes()).build();
         appointment = appointmentRepository.save(appointment);
 
-        // Create billing
-        billingService.createAppointmentBilling(appointment, request.isPayNow());
+        // 2. Create billing
+        Billing billing = null;
+        if (!request.isFollowUp()) {
+            billing = billingService.createAppointmentBilling(appointment, request.isPayNow());
+        }
 
         recordStatusLog(appointment, null, AppointmentStatus.BOOKED, bookedBy);
-        return mapToResponse(appointment);
+        
+        AppointmentResponse response = mapToResponse(appointment);
+        if (billing != null) response.setBillingId(billing.getId());
+        return response;
     }
 
     public AppointmentResponse getAppointmentById(Long id) {

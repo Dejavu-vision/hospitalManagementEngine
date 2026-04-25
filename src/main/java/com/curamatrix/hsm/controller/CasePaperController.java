@@ -42,7 +42,7 @@ public class CasePaperController {
                     .filter(r -> r.getPatient().getId().equals(patientId) && r.getTenantId().equals(tenantId))
                     .orElseThrow(() -> new RuntimeException("Case paper not found"));
         } else {
-            registration = registrationRepository.findLatestActiveRegistration(patientId, tenantId)
+            registration = registrationRepository.findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(patientId, tenantId)
                     .orElse(null);
         }
 

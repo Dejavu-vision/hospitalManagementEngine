@@ -25,4 +25,5 @@ public class AppointmentRequest {
     private String notes;
 
     private boolean payNow;
+    private boolean followUp;
 }

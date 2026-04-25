@@ -14,4 +14,5 @@ public class WalkInRequest {
     private String notes;
 
     private boolean payNow;
+    private boolean followUp;
 }

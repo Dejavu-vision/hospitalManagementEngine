@@ -35,4 +35,5 @@ public class AppointmentResponse {
     private LocalDateTime consultationStart;
     private LocalDateTime consultationEnd;
     private LocalDateTime noShowMarkedAt;
+    private Long billingId;
 }

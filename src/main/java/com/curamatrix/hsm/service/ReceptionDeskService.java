@@ -67,7 +67,7 @@ public class ReceptionDeskService {
 
         // Query 5: Patient's latest active registration (case paper)
         Optional<PatientRegistration> registration = patientRegistrationRepository
-                .findLatestActiveRegistration(patientId, tenantId);
+                .findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(patientId, tenantId);
 
         // Build lookup maps for efficient assembly
         Map<Long, DoctorAvailability> availabilityByDoctorId = availabilities.stream()
@@ -155,7 +155,7 @@ public class ReceptionDeskService {
 
         // Fetch the newly created patient registration to get issuedAt and expiresAt
         PatientRegistration registration = patientRegistrationRepository
-                .findLatestActiveRegistration(patientId, tenantId)
+                .findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(patientId, tenantId)
                 .orElseThrow(() -> new RuntimeException("Case paper was not created successfully"));
 
         return CasePaperResponse.builder()
@@ -175,7 +175,7 @@ public class ReceptionDeskService {
         log.info("Cancelling case paper for patient {} in tenant {}", patientId, tenantId);
 
         PatientRegistration registration = patientRegistrationRepository
-                .findLatestActiveRegistration(patientId, tenantId)
+                .findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(patientId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Active Case Paper", "patientId", patientId));
 
         registration.setActive(false);

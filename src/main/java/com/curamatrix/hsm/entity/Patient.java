@@ -55,6 +55,9 @@ public class Patient extends TenantAwareEntity {
     @Column(name = "emergency_contact_phone")
     private String emergencyContactPhone;
 
+    @Column(name = "guardian_name")
+    private String guardianName;
+
     @Column(columnDefinition = "TEXT")
     private String allergies;
 

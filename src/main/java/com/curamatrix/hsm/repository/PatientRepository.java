@@ -40,4 +40,11 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
                                      @Param("bloodGroup") String bloodGroup,
                                      @Param("tenantId") Long tenantId,
                                      Pageable pageable);
+    @Query("SELECT p FROM Patient p WHERE p.tenantId = :tenantId AND p.gender = :gender " +
+           "AND (p.dateOfBirth = :dob OR YEAR(p.dateOfBirth) = YEAR(:dob)) " +
+           "ORDER BY p.id DESC")
+    java.util.List<Patient> findDuplicates(
+            @Param("gender") com.curamatrix.hsm.enums.Gender gender,
+            @Param("dob") java.time.LocalDate dob,
+            @Param("tenantId") Long tenantId);
 }

@@ -27,6 +27,7 @@ public class PatientResponse {
     private BloodGroup bloodGroup;
     private String emergencyContactName;
     private String emergencyContactPhone;
+    private String guardianName;
     private String allergies;
     private String medicalHistory;
     private LocalDateTime registeredAt;

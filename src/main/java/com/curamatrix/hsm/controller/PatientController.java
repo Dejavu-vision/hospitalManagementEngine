@@ -33,6 +33,12 @@ public class PatientController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PostMapping("/check-duplicate")
+    @PreAuthorize("hasRole('RECEPTIONIST')")
+    public ResponseEntity<com.curamatrix.hsm.dto.response.DuplicateCheckResponse> checkDuplicate(@RequestBody PatientRequest request) {
+        return ResponseEntity.ok(patientService.checkDuplicate(request));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR')")
     public ResponseEntity<Page<PatientResponse>> searchPatients(

@@ -41,7 +41,7 @@ public class BillingService {
 
     @Transactional(readOnly = true)
     public boolean isRegistrationValid(Long patientId, Long tenantId) {
-        Optional<PatientRegistration> latest = patientRegistrationRepository.findLatestActiveRegistration(patientId, tenantId);
+        Optional<PatientRegistration> latest = patientRegistrationRepository.findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(patientId, tenantId);
         return latest.isPresent() && !latest.get().isExpired();
     }
 
@@ -163,7 +163,7 @@ public class BillingService {
                 .patient(patient)
                 .billing(billing)
                 .issuedAt(LocalDateTime.now())
-                .expiresAt(LocalDateTime.now().plusDays(validityDays))
+                .expiresAt(LocalDateTime.now().plusMonths(1).toLocalDate().atTime(23, 59, 59))
                 .active(true)
                 .build();
         registration.setTenantId(tenantId);

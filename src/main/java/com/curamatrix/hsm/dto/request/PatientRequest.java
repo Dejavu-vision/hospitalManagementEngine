@@ -29,6 +29,7 @@ public class PatientRequest {
     private BloodGroup bloodGroup;
     private String emergencyContactName;
     private String emergencyContactPhone;
+    private String guardianName;
     private String allergies;
     private String medicalHistory;
 }
