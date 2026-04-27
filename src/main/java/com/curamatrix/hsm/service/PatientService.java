@@ -4,8 +4,10 @@ import com.curamatrix.hsm.context.TenantContext;
 import com.curamatrix.hsm.dto.request.PatientRequest;
 import com.curamatrix.hsm.dto.response.DuplicateCheckResponse;
 import com.curamatrix.hsm.dto.response.PatientResponse;
+import com.curamatrix.hsm.dto.response.PatientSummaryResponse;
 import com.curamatrix.hsm.dto.response.PatientVisitHistoryResponse;
 import com.curamatrix.hsm.entity.Patient;
+import com.curamatrix.hsm.entity.PatientRegistration;
 import com.curamatrix.hsm.entity.Tenant;
 import com.curamatrix.hsm.entity.User;
 import com.curamatrix.hsm.enums.SubscriptionPlan;
@@ -23,7 +25,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.PageRequest;
+
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -259,27 +266,117 @@ public class PatientService {
                 .patientId(patientId).totalVisits(totalVisits).lastVisitDate(lastVisit).build();
     }
 
+    /**
+     * Search patients by name / phone / patientCode and enrich each result with
+     * inline case paper status and last visit date.
+     * Used by GET /api/patients/search?q= (reception desk search bar).
+     */
+    @Transactional(readOnly = true)
+    public List<PatientSummaryResponse> searchPatientsWithCasePaper(String q, Long tenantId) {
+        if (q == null || q.trim().length() < 2) {
+            return new ArrayList<>();
+        }
+        // Reuse existing tenant-scoped search (page 0, size 20)
+        List<Patient> patients = patientRepository
+                .searchByTenant(q.trim(), tenantId, PageRequest.of(0, 20))
+                .getContent();
+
+        LocalDateTime now = LocalDateTime.now();
+        List<PatientSummaryResponse> results = new ArrayList<>();
+
+        for (Patient p : patients) {
+            // Case paper status — backend authoritative
+            Optional<PatientRegistration> regOpt = patientRegistrationRepository
+                    .findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(p.getId(), tenantId);
+
+            PatientSummaryResponse.CasePaperSummary casePaper;
+            if (regOpt.isEmpty()) {
+                casePaper = PatientSummaryResponse.CasePaperSummary.builder()
+                        .valid(false).remainingDays(-1).expiringSoon(false).build();
+            } else {
+                PatientRegistration reg = regOpt.get();
+                boolean valid = !reg.isExpired();
+                long remaining = valid ? ChronoUnit.DAYS.between(now, reg.getExpiresAt()) : -1;
+                casePaper = PatientSummaryResponse.CasePaperSummary.builder()
+                        .valid(valid)
+                        .expiresAt(reg.getExpiresAt())
+                        .remainingDays(remaining)
+                        .expiringSoon(valid && remaining <= 5)
+                        .build();
+            }
+
+            // Last visit date
+            LocalDate lastVisitDate = null;
+            try {
+                List<com.curamatrix.hsm.entity.Appointment> recent =
+                        appointmentRepository.findTopByPatientIdAndTenantIdOrderByAppointmentDateDesc(
+                                p.getId(), tenantId, PageRequest.of(0, 1));
+                if (!recent.isEmpty()) {
+                    lastVisitDate = recent.get(0).getAppointmentDate();
+                }
+            } catch (Exception e) {
+                log.warn("Could not fetch last visit for patient {}: {}", p.getId(), e.getMessage());
+            }
+
+            results.add(PatientSummaryResponse.builder()
+                    .id(p.getId())
+                    .patientCode(p.getPatientCode())
+                    .firstName(p.getFirstName())
+                    .lastName(p.getLastName())
+                    .phone(p.getPhone())
+                    .dateOfBirth(p.getDateOfBirth() != null ? p.getDateOfBirth().toString() : null)
+                    .gender(p.getGender() != null ? p.getGender().name() : null)
+                    .lastVisitDate(lastVisitDate)
+                    .casePaper(casePaper)
+                    .build());
+        }
+        return results;
+    }
+
     public DuplicateCheckResponse checkDuplicate(PatientRequest request) {
         Long tenantId = TenantContext.getTenantId();
-        
-        List<Patient> duplicates = patientRepository.findDuplicates(
-                request.getGender(), request.getDateOfBirth(), tenantId);
-        
+
+        if (request.getPhone() == null || request.getPhone().isBlank()) {
+            return DuplicateCheckResponse.builder().exists(false).build();
+        }
+
+        // Check by phone number only — the receptionist verifies other details orally
+        List<Patient> duplicates = patientRepository.findByPhoneAndTenantId(
+                request.getPhone().trim(), tenantId);
+
         if (duplicates.isEmpty()) {
             return DuplicateCheckResponse.builder().exists(false).build();
         }
-        
-        // Take the most recent duplicate (assuming ID is sequential)
-        Patient patient = duplicates.get(0);
-        Optional<com.curamatrix.hsm.entity.PatientRegistration> reg = 
-                patientRegistrationRepository.findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(patient.getId(), tenantId);
-        
-        boolean isValid = reg.isPresent() && !reg.get().isExpired();
-        java.time.LocalDateTime expiresAt = reg.map(com.curamatrix.hsm.entity.PatientRegistration::getExpiresAt).orElse(null);
-        
+
+        // Return ALL patients with this phone number so receptionist can verify
+        List<PatientResponse> patientResponses = duplicates.stream()
+                .map(patient -> {
+                    Optional<com.curamatrix.hsm.entity.PatientRegistration> reg =
+                            patientRegistrationRepository.findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(
+                                    patient.getId(), tenantId);
+                    
+                    boolean isValid = reg.isPresent() && !reg.get().isExpired();
+                    java.time.LocalDateTime expiresAt = reg.map(com.curamatrix.hsm.entity.PatientRegistration::getExpiresAt).orElse(null);
+                    
+                    PatientResponse response = mapToResponse(patient);
+                    // Add case paper validity info to each patient
+                    response.setCasePaperValid(isValid);
+                    response.setCasePaperExpiresAt(expiresAt != null ? expiresAt.toString() : null);
+                    return response;
+                })
+                .toList();
+
+        // For backward compatibility, set isCasePaperValid based on the most recent patient
+        Patient mostRecent = duplicates.get(0);
+        Optional<com.curamatrix.hsm.entity.PatientRegistration> mostRecentReg =
+                patientRegistrationRepository.findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(
+                        mostRecent.getId(), tenantId);
+        boolean isValid = mostRecentReg.isPresent() && !mostRecentReg.get().isExpired();
+        java.time.LocalDateTime expiresAt = mostRecentReg.map(com.curamatrix.hsm.entity.PatientRegistration::getExpiresAt).orElse(null);
+
         return DuplicateCheckResponse.builder()
                 .exists(true)
-                .patient(mapToResponse(patient))
+                .patients(patientResponses)
                 .isCasePaperValid(isValid)
                 .expiresAt(expiresAt != null ? expiresAt.toString() : null)
                 .build();

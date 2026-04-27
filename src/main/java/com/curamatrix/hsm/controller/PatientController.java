@@ -1,7 +1,9 @@
 package com.curamatrix.hsm.controller;
 
+import com.curamatrix.hsm.context.TenantContext;
 import com.curamatrix.hsm.dto.request.PatientRequest;
 import com.curamatrix.hsm.dto.response.PatientResponse;
+import com.curamatrix.hsm.dto.response.PatientSummaryResponse;
 import com.curamatrix.hsm.dto.response.PatientVisitHistoryResponse;
 import com.curamatrix.hsm.service.PatientService;
 import jakarta.validation.Valid;
@@ -15,6 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -91,5 +95,19 @@ public class PatientController {
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR')")
     public ResponseEntity<PatientVisitHistoryResponse> getVisitHistory(@PathVariable Long id) {
         return ResponseEntity.ok(patientService.getVisitHistory(id));
+    }
+
+    /**
+     * Reception desk search — returns patient list with inline case paper status.
+     * Used by the search bar (debounced 300ms) on ReceptionDesk.jsx.
+     * GET /api/patients/search?q={term}
+     */
+    @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR', 'ADMIN')")
+    public ResponseEntity<List<PatientSummaryResponse>> searchPatientsWithStatus(
+            @RequestParam(required = false, defaultValue = "") String q) {
+        List<PatientSummaryResponse> results =
+                patientService.searchPatientsWithCasePaper(q, TenantContext.getTenantId());
+        return ResponseEntity.ok(results);
     }
 }

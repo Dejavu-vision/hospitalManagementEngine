@@ -186,6 +186,18 @@ public class ReceptionDeskService {
         }
     }
 
+    /**
+     * Deactivates the active case paper for a patient (called from DELETE /api/reception/case-paper/patient/{id}).
+     */
+    @Transactional
+    public void deleteCasePaper(Long patientId, Long tenantId) {
+        log.info("Deactivating case paper for patient {} in tenant {}", patientId, tenantId);
+        PatientRegistration registration = patientRegistrationRepository
+                .findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(patientId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Active Case Paper", "patientId", patientId));
+        registration.setActive(false);
+        patientRegistrationRepository.save(registration);
+    }
 
     private BookingContextResponse.CasePaperStatus buildCasePaperStatus(
             Optional<PatientRegistration> registration) {

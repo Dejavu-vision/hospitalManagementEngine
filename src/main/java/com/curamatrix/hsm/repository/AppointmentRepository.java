@@ -114,4 +114,20 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<com.curamatrix.hsm.entity.Patient> findDistinctPatientsByDoctor(
             @Param("doctorId") Long doctorId,
             @Param("tenantId") Long tenantId);
+
+    // Most recent appointment date for a patient (for search result last visit date)
+    @Query("SELECT a FROM Appointment a WHERE a.patient.id = :patientId AND a.tenantId = :tenantId " +
+           "ORDER BY a.appointmentDate DESC")
+    List<Appointment> findTopByPatientIdAndTenantIdOrderByAppointmentDateDesc(
+            @Param("patientId") Long patientId,
+            @Param("tenantId") Long tenantId,
+            Pageable pageable);
+
+    // Count BOOKED appointments for a doctor today (for queue length in response)
+    @Query("SELECT COUNT(a) FROM Appointment a WHERE a.doctor.id = :doctorId " +
+           "AND a.appointmentDate = :date AND a.tenantId = :tenantId " +
+           "AND a.status IN ('BOOKED', 'CHECKED_IN', 'IN_PROGRESS')")
+    long countActiveByDoctorAndDate(@Param("doctorId") Long doctorId,
+                                     @Param("date") LocalDate date,
+                                     @Param("tenantId") Long tenantId);
 }

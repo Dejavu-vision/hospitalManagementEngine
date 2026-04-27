@@ -37,6 +37,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -97,23 +98,49 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponse createWalkIn(WalkInRequest request) {
-        Patient patient = patientRepository.findById(request.getPatientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", request.getPatientId()));
-        Doctor doctor = doctorRepository.findById(request.getDoctorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", request.getDoctorId()));
-        User bookedBy = getCurrentUser();
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
 
-        // 1. Registration Fee logic is handled inside billingService.createAppointmentBilling
-        // which adds 'REG_FEE' if not valid. We allow token issuance even for pending bills.
+        Patient patient = patientRepository.findById(request.getPatientId())
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", request.getPatientId()));
+
+        // ── Auto-assign doctor when doctorId is null ──────────────────────────
+        Doctor doctor;
+        if (request.getDoctorId() != null) {
+            doctor = doctorRepository.findById(request.getDoctorId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", request.getDoctorId()));
+        } else {
+            if (request.getDepartmentId() == null) {
+                throw new IllegalArgumentException("Either doctorId or departmentId must be provided");
+            }
+            List<Doctor> candidates = doctorRepository.findPresentDoctorsByDepartmentAndTenant(
+                    request.getDepartmentId(), tenantId);
+            if (candidates.isEmpty()) {
+                throw new ResourceNotFoundException("Doctor", "departmentId", request.getDepartmentId());
+            }
+            // Pick least-busy doctor (fewest active appointments today)
+            doctor = candidates.stream()
+                    .min(Comparator.comparingLong(d ->
+                            appointmentRepository.countActiveByDoctorAndDate(d.getId(), today, tenantId)))
+                    .orElse(candidates.get(0));
+        }
+
+        User bookedBy = getCurrentUser();
+
+        // ── Encode counter into notes ─────────────────────────────────────────
+        String encodedNotes = encodeCounter(request.getCounter(), request.getNotes());
 
         // Atomic token increment — one sequence per (date, tenant) across ALL doctors
         WalkInTokenSequence seq = tokenSequenceRepository
                 .findForUpdate(today, tenantId)
-                .orElseGet(() -> WalkInTokenSequence.builder()
-                        .appointmentDate(today).lastToken(0).build());
+                .orElseGet(() -> {
+                    WalkInTokenSequence newSeq = WalkInTokenSequence.builder()
+                            .appointmentDate(today).lastToken(0).build();
+                    newSeq.setCounter(0); // Initialize counter field as well
+                    return newSeq;
+                });
         seq.setLastToken(seq.getLastToken() + 1);
+        seq.setCounter(seq.getLastToken()); // Keep counter in sync with lastToken
         seq = tokenSequenceRepository.save(seq);
         int nextToken = seq.getLastToken();
 
@@ -121,7 +148,7 @@ public class AppointmentService {
                 .patient(patient).doctor(doctor).bookedBy(bookedBy)
                 .appointmentDate(today).type(AppointmentType.WALK_IN)
                 .tokenNumber(nextToken).status(AppointmentStatus.BOOKED)
-                .notes(request.getNotes()).build();
+                .notes(encodedNotes).build();
         appointment = appointmentRepository.save(appointment);
 
         // 2. Create billing
@@ -131,7 +158,7 @@ public class AppointmentService {
         }
 
         recordStatusLog(appointment, null, AppointmentStatus.BOOKED, bookedBy);
-        
+
         AppointmentResponse response = mapToResponse(appointment);
         if (billing != null) response.setBillingId(billing.getId());
         return response;
@@ -275,7 +302,57 @@ public class AppointmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
     }
 
+    /**
+     * Encodes the counter label into the notes string as a prefix.
+     * Format: "COUNTER:{X}|{original notes}"
+     * Decoded in mapToResponse().
+     */
+    static String encodeCounter(String counter, String notes) {
+        String base = notes != null ? notes : "";
+        if (counter != null && !counter.isBlank()) {
+            return "COUNTER:" + counter + "|" + base;
+        }
+        return base;
+    }
+
+    /**
+     * Decodes the counter prefix from a notes string.
+     * Returns [counter, originalNotes] — counter may be null.
+     */
+    static String[] decodeCounter(String notes) {
+        if (notes != null && notes.startsWith("COUNTER:")) {
+            int sep = notes.indexOf('|');
+            if (sep > 8) {
+                return new String[]{ notes.substring(8, sep), notes.substring(sep + 1) };
+            }
+        }
+        return new String[]{ null, notes };
+    }
+
     private AppointmentResponse mapToResponse(Appointment appointment) {
+        // ── Decode counter from notes prefix ──────────────────────────────────
+        String counter = null;
+        String displayNotes = appointment.getNotes();
+        if (displayNotes != null && displayNotes.startsWith("COUNTER:")) {
+            int sep = displayNotes.indexOf('|');
+            if (sep > 8) {
+                counter = displayNotes.substring(8, sep);
+                displayNotes = displayNotes.substring(sep + 1);
+            }
+        }
+
+        // ── Active queue length for this doctor today ─────────────────────────
+        Integer activeQueueLength = null;
+        try {
+            Long tenantId = TenantContext.getTenantId();
+            if (tenantId != null && appointment.getDoctor() != null) {
+                activeQueueLength = (int) appointmentRepository.countActiveByDoctorAndDate(
+                        appointment.getDoctor().getId(), LocalDate.now(), tenantId);
+            }
+        } catch (Exception e) {
+            log.warn("Could not compute activeQueueLength: {}", e.getMessage());
+        }
+
         return AppointmentResponse.builder()
                 .id(appointment.getId())
                 .patientId(appointment.getPatient().getId())
@@ -290,7 +367,9 @@ public class AppointmentService {
                 .type(appointment.getType())
                 .tokenNumber(appointment.getTokenNumber())
                 .status(appointment.getStatus())
-                .notes(appointment.getNotes())
+                .notes(displayNotes)
+                .counter(counter)
+                .activeQueueLength(activeQueueLength)
                 .cancellationReason(appointment.getCancellationReason())
                 .checkedInAt(appointment.getCheckedInAt())
                 .consultationStart(appointment.getConsultationStart())

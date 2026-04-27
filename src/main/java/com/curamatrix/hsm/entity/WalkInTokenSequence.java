@@ -24,7 +24,12 @@ public class WalkInTokenSequence extends TenantAwareEntity {
     @Column(name = "appointment_date", nullable = false)
     private LocalDate appointmentDate;
 
+    // Database has both 'counter' and 'last_token' columns - keep them in sync
     @Column(name = "last_token", nullable = false)
     @Builder.Default
     private Integer lastToken = 0;
+
+    @Column(name = "counter", nullable = false)
+    @Builder.Default
+    private Integer counter = 0;
 }

@@ -1,6 +1,7 @@
 package com.curamatrix.hsm.dto.request;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 @Data
@@ -8,11 +9,17 @@ public class WalkInRequest {
     @NotNull(message = "Patient ID is required")
     private Long patientId;
 
-    @NotNull(message = "Doctor ID is required")
+    // Nullable — triggers auto-assign when null (departmentId must be provided instead)
     private Long doctorId;
+
+    // Required when doctorId is null — used for auto-assign
+    private Long departmentId;
 
     private String notes;
 
     private boolean payNow;
     private boolean followUp;
+
+    @Pattern(regexp = "^[ABC]$", message = "Counter must be A, B, or C")
+    private String counter;
 }

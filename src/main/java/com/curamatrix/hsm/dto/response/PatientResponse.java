@@ -38,4 +38,6 @@ public class PatientResponse {
     private String activeAppointmentDoctorName;
     private Integer activeTokenNumber;
     private String activeAppointmentStatus;
+    private Boolean casePaperValid;
+    private String casePaperExpiresAt;
 }

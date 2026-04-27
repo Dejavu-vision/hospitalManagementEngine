@@ -47,4 +47,13 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
             @Param("gender") com.curamatrix.hsm.enums.Gender gender,
             @Param("dob") java.time.LocalDate dob,
             @Param("tenantId") Long tenantId);
+
+    /**
+     * Find patients by exact phone number within a tenant.
+     * Used by checkDuplicate — phone is the only field checked for duplicates.
+     */
+    @Query("SELECT p FROM Patient p WHERE p.phone = :phone AND p.tenantId = :tenantId ORDER BY p.id DESC")
+    java.util.List<Patient> findByPhoneAndTenantId(
+            @Param("phone") String phone,
+            @Param("tenantId") Long tenantId);
 }

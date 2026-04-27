@@ -1,5 +1,6 @@
 package com.curamatrix.hsm.controller;
 
+import com.curamatrix.hsm.context.TenantContext;
 import com.curamatrix.hsm.dto.response.BookingContextResponse;
 import com.curamatrix.hsm.dto.response.CasePaperResponse;
 import com.curamatrix.hsm.service.ReceptionDeskService;
@@ -34,5 +35,18 @@ public class ReceptionDeskController {
         log.info("Creating case paper for patient: {}", patientId);
         CasePaperResponse response = receptionDeskService.createCasePaper(patientId, paymentMethod);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Deactivates the active case paper for a patient.
+     * Maps to the frontend ENDPOINTS.RECEPTION.DELETE_CASE_PAPER(patientId).
+     * DELETE /api/case-paper/patient/{patientId}
+     */
+    @DeleteMapping("/case-paper/patient/{patientId}")
+    @PreAuthorize("hasRole('RECEPTIONIST')")
+    public ResponseEntity<Void> deleteCasePaper(@PathVariable Long patientId) {
+        log.info("Deactivating case paper for patient: {}", patientId);
+        receptionDeskService.deleteCasePaper(patientId, TenantContext.getTenantId());
+        return ResponseEntity.noContent().build();
     }
 }
