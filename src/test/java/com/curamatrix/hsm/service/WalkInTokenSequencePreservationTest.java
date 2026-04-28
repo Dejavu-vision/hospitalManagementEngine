@@ -243,8 +243,8 @@ class WalkInTokenSequencePreservationTest {
      */
     private void insertTokenSequenceDirectly(LocalDate date, Long tenantId, int counter) {
         entityManager.createNativeQuery(
-                "INSERT INTO walk_in_token_sequence (appointment_date, tenant_id, counter, created_at, updated_at) " +
-                "VALUES (:date, :tenantId, :counter, NOW(), NOW())")
+                "INSERT INTO walk_in_token_sequence (appointment_date, tenant_id, counter, last_token, created_at, updated_at) " +
+                "VALUES (:date, :tenantId, :counter, :counter, NOW(), NOW())")
                 .setParameter("date", date)
                 .setParameter("tenantId", tenantId)
                 .setParameter("counter", counter)
