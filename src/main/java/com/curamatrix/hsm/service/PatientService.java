@@ -100,6 +100,8 @@ public class PatientService {
                 .guardianName(request.getGuardianName())
                 .allergies(request.getAllergies())
                 .medicalHistory(request.getMedicalHistory())
+                .insuranceProvider(request.getInsuranceProvider())
+                .insurancePolicyNumber(request.getInsurancePolicyNumber())
                 .registeredBy(registeredBy)
                 .patientCode(patientCode)
                 .build();
@@ -146,6 +148,8 @@ public class PatientService {
         patient.setGuardianName(request.getGuardianName());
         patient.setAllergies(request.getAllergies());
         patient.setMedicalHistory(request.getMedicalHistory());
+        patient.setInsuranceProvider(request.getInsuranceProvider());
+        patient.setInsurancePolicyNumber(request.getInsurancePolicyNumber());
 
         patient = patientRepository.save(patient);
         log.info("Patient updated: {}", id);
@@ -402,6 +406,8 @@ public class PatientService {
                 .registeredAt(patient.getRegisteredAt())
                 .checkedIn(patient.getCheckedIn())
                 .checkedOut(patient.getCheckedOut())
+                .insuranceProvider(patient.getInsuranceProvider())
+                .insurancePolicyNumber(patient.getInsurancePolicyNumber())
                 .build();
                 
         // Inject active appointment info for today's visits (Booked, Checked-In, or In-Progress)

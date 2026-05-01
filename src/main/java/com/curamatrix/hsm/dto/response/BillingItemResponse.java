@@ -16,5 +16,6 @@ public class BillingItemResponse {
     private BigDecimal amount;
     private Integer quantity;
     private String itemType;
+    private String insuranceCoverage;
     private BigDecimal subtotal;
 }

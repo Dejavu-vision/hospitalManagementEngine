@@ -40,4 +40,6 @@ public class PatientResponse {
     private String activeAppointmentStatus;
     private Boolean casePaperValid;
     private String casePaperExpiresAt;
+    private String insuranceProvider;
+    private String insurancePolicyNumber;
 }

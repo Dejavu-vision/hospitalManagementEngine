@@ -25,6 +25,7 @@ public class BillingResponse {
     private BigDecimal totalAmount;
     private BigDecimal discount;
     private BigDecimal tax;
+    private BigDecimal insuranceAdjustment;
     private BigDecimal netAmount;
     private BigDecimal paidAmount;
     private BigDecimal balanceAmount;

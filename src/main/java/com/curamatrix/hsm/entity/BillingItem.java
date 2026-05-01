@@ -1,6 +1,7 @@
 package com.curamatrix.hsm.entity;
 
 import com.curamatrix.hsm.enums.BillingItemType;
+import com.curamatrix.hsm.enums.InsuranceCoverage;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -36,4 +37,8 @@ public class BillingItem {
     @Enumerated(EnumType.STRING)
     @Column(name = "item_type", nullable = false, length = 50)
     private BillingItemType itemType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "insurance_coverage", length = 50)
+    private InsuranceCoverage insuranceCoverage;
 }

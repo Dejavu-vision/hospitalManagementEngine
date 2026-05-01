@@ -50,6 +50,10 @@ public class Billing extends TenantAwareEntity {
     @Builder.Default
     private BigDecimal tax = BigDecimal.ZERO;
 
+    @Column(name = "insurance_adjustment", nullable = false)
+    @Builder.Default
+    private BigDecimal insuranceAdjustment = BigDecimal.ZERO;
+
     @Column(name = "net_amount", nullable = false)
     private BigDecimal netAmount;
 

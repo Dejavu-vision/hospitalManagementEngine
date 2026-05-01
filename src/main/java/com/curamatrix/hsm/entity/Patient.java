@@ -76,4 +76,10 @@ public class Patient extends TenantAwareEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "registered_by")
     private User registeredBy;
+
+    @Column(name = "insurance_provider")
+    private String insuranceProvider;
+
+    @Column(name = "insurance_policy_number")
+    private String insurancePolicyNumber;
 }

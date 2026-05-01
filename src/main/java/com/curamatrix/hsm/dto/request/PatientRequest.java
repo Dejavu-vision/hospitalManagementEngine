@@ -32,4 +32,6 @@ public class PatientRequest {
     private String guardianName;
     private String allergies;
     private String medicalHistory;
+    private String insuranceProvider;
+    private String insurancePolicyNumber;
 }

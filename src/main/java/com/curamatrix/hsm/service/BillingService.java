@@ -59,11 +59,15 @@ public class BillingService {
         if (!isRegistrationValid(patient.getId(), tenantId)) {
             Optional<HospitalService> regService = hospitalServiceRepository.findByServiceCodeAndTenantId("REG_FEE", tenantId);
             if (regService.isPresent()) {
+                com.curamatrix.hsm.enums.InsuranceCoverage coverage = patient.getInsuranceProvider() != null && !patient.getInsuranceProvider().isEmpty() 
+                        ? com.curamatrix.hsm.enums.InsuranceCoverage.COVERED 
+                        : com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED;
                 BillingItem regItem = BillingItem.builder()
                         .description("Patient Registration / Case Paper")
                         .amount(regService.get().getPrice())
                         .itemType(BillingItemType.REGISTRATION)
                         .quantity(1)
+                        .insuranceCoverage(coverage)
                         .build();
                 items.add(regItem);
                 totalAmount = totalAmount.add(regItem.getAmount());
@@ -73,22 +77,39 @@ public class BillingService {
         // 2. Add Consultation Fee
         Optional<HospitalService> consultService = hospitalServiceRepository.findByServiceCodeAndTenantId("CONSULT", tenantId);
         if (consultService.isPresent()) {
+            com.curamatrix.hsm.enums.InsuranceCoverage coverage = patient.getInsuranceProvider() != null && !patient.getInsuranceProvider().isEmpty() 
+                    ? com.curamatrix.hsm.enums.InsuranceCoverage.COVERED 
+                    : com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED;
             BillingItem consultItem = BillingItem.builder()
                     .description("Consultation - " + appointment.getDoctor().getUser().getFullName())
                     .amount(consultService.get().getPrice())
                     .itemType(BillingItemType.CONSULTATION)
                     .quantity(1)
+                    .insuranceCoverage(coverage)
                     .build();
             items.add(consultItem);
             totalAmount = totalAmount.add(consultItem.getAmount());
         }
+
+        BigDecimal insuranceAdjustment = BigDecimal.ZERO;
+        for (BillingItem item : items) {
+            if (item.getInsuranceCoverage() == com.curamatrix.hsm.enums.InsuranceCoverage.COVERED) {
+                insuranceAdjustment = insuranceAdjustment.add(item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity())));
+            } else if (item.getInsuranceCoverage() == com.curamatrix.hsm.enums.InsuranceCoverage.PARTIAL) {
+                insuranceAdjustment = insuranceAdjustment.add(item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity())).multiply(new BigDecimal("0.5")));
+            }
+        }
+
+        BigDecimal netAmount = totalAmount.subtract(insuranceAdjustment);
+        if (netAmount.compareTo(BigDecimal.ZERO) < 0) netAmount = BigDecimal.ZERO;
 
         Billing billing = Billing.builder()
                 .appointment(appointment)
                 .patient(patient)
                 .invoiceNumber("INV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                 .totalAmount(totalAmount)
-                .netAmount(totalAmount)
+                .insuranceAdjustment(insuranceAdjustment)
+                .netAmount(netAmount)
                 .paymentStatus(payNow ? PaymentStatus.PAID : PaymentStatus.PENDING)
                 .paidAmount(payNow ? totalAmount : BigDecimal.ZERO)
                 .paidAt(payNow ? LocalDateTime.now() : null)
@@ -121,11 +142,16 @@ public class BillingService {
         }
 
         BigDecimal amount = regService.get().getPrice();
+        com.curamatrix.hsm.enums.InsuranceCoverage coverage = patient.getInsuranceProvider() != null && !patient.getInsuranceProvider().isEmpty() 
+                ? com.curamatrix.hsm.enums.InsuranceCoverage.COVERED 
+                : com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED;
+
         BillingItem regItem = BillingItem.builder()
                 .description("Patient Registration / Case Paper")
                 .amount(amount)
                 .itemType(BillingItemType.REGISTRATION)
                 .quantity(1)
+                .insuranceCoverage(coverage)
                 .build();
 
         PaymentMethod paymentMethod = null;
@@ -133,11 +159,20 @@ public class BillingService {
             paymentMethod = PaymentMethod.valueOf(paymentMethodStr.toUpperCase());
         }
 
+        BigDecimal insuranceAdjustment = BigDecimal.ZERO;
+        if (coverage == com.curamatrix.hsm.enums.InsuranceCoverage.COVERED) {
+            insuranceAdjustment = amount;
+        }
+
+        BigDecimal netAmount = amount.subtract(insuranceAdjustment);
+        if (netAmount.compareTo(BigDecimal.ZERO) < 0) netAmount = BigDecimal.ZERO;
+
         Billing billing = Billing.builder()
                 .patient(patient)
                 .invoiceNumber("INV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                 .totalAmount(amount)
-                .netAmount(amount)
+                .insuranceAdjustment(insuranceAdjustment)
+                .netAmount(netAmount)
                 .paymentStatus(PaymentStatus.PENDING) // Start as PENDING
                 .paymentMethod(paymentMethod)
                 .paidAmount(BigDecimal.ZERO)          // No payment yet
@@ -366,6 +401,7 @@ public class BillingService {
     private void recalculateNetAmount(Billing billing) {
         BigDecimal net = billing.getTotalAmount()
                 .subtract(billing.getDiscount())
+                .subtract(billing.getInsuranceAdjustment() != null ? billing.getInsuranceAdjustment() : BigDecimal.ZERO)
                 .add(billing.getTax());
         if (net.compareTo(BigDecimal.ZERO) < 0) {
             net = BigDecimal.ZERO;
@@ -395,6 +431,7 @@ public class BillingService {
                 .totalAmount(billing.getTotalAmount())
                 .discount(billing.getDiscount())
                 .tax(billing.getTax())
+                .insuranceAdjustment(billing.getInsuranceAdjustment())
                 .netAmount(billing.getNetAmount())
                 .paidAmount(billing.getPaidAmount())
                 .balanceAmount(balance)
@@ -416,6 +453,7 @@ public class BillingService {
                 .amount(item.getAmount())
                 .quantity(item.getQuantity())
                 .itemType(item.getItemType().name())
+                .insuranceCoverage(item.getInsuranceCoverage() != null ? item.getInsuranceCoverage().name() : null)
                 .subtotal(subtotal)
                 .build();
     }
