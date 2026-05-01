@@ -51,6 +51,7 @@ public class PatientService {
     private final PatientRegistrationRepository patientRegistrationRepository;
     private final DoctorAvailabilityService doctorAvailabilityService;
     private final PayerMasterRepository payerMasterRepository;
+    private final PatientFinancialAccountRepository patientFinancialAccountRepository;
 
     @Transactional
     public PatientResponse registerPatient(PatientRequest request) {
@@ -376,6 +377,9 @@ public class PatientService {
                 log.warn("Could not fetch last visit for patient {}: {}", p.getId(), e.getMessage());
             }
 
+            com.curamatrix.hsm.entity.PatientFinancialAccount account = patientFinancialAccountRepository
+                    .findByPatientIdAndTenantId(p.getId(), tenantId).orElse(null);
+            
             results.add(PatientSummaryResponse.builder()
                     .id(p.getId())
                     .patientCode(p.getPatientCode())
@@ -386,6 +390,8 @@ public class PatientService {
                     .gender(p.getGender() != null ? p.getGender().name() : null)
                     .lastVisitDate(lastVisitDate)
                     .casePaper(casePaper)
+                    .financialStatus(account != null ? account.getFinancialStatus().name() : com.curamatrix.hsm.enums.FinancialStatus.REGISTERED_UNPAID.name())
+                    .currentOutstanding(account != null ? account.getCurrentOutstanding() : java.math.BigDecimal.ZERO)
                     .build());
         }
         return results;
@@ -503,6 +509,24 @@ public class PatientService {
         } catch (Exception e) {
             log.warn("Could not fetch active appointment for patient: {}", e.getMessage());
         }
+
+        // Add financial status
+        try {
+            com.curamatrix.hsm.entity.PatientFinancialAccount account = patientFinancialAccountRepository
+                    .findByPatientIdAndTenantId(patient.getId(), com.curamatrix.hsm.context.TenantContext.getTenantId()).orElse(null);
+            if (account != null) {
+                resp.setFinancialStatus(account.getFinancialStatus().name());
+                resp.setCurrentOutstanding(account.getCurrentOutstanding());
+            } else {
+                resp.setFinancialStatus(com.curamatrix.hsm.enums.FinancialStatus.REGISTERED_UNPAID.name());
+                resp.setCurrentOutstanding(java.math.BigDecimal.ZERO);
+            }
+        } catch (Exception e) {
+            log.warn("Could not fetch financial account for patient: {}", e.getMessage());
+            resp.setFinancialStatus(com.curamatrix.hsm.enums.FinancialStatus.REGISTERED_UNPAID.name());
+            resp.setCurrentOutstanding(java.math.BigDecimal.ZERO);
+        }
+
         return resp;
     }
 }

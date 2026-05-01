@@ -43,4 +43,6 @@ public class PatientResponse {
     private String insuranceProvider;
     private String insurancePolicyNumber;
     private java.util.List<InsurancePolicyResponse> insurancePolicies;
+    private String financialStatus;
+    private java.math.BigDecimal currentOutstanding;
 }

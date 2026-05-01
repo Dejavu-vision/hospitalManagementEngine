@@ -41,6 +41,7 @@ public class BillingService {
     private final HospitalServiceRepository hospitalServiceRepository;
     private final PatientRegistrationRepository patientRegistrationRepository;
     private final InsurancePolicyRepository insurancePolicyRepository;
+    private final PatientFinancialAccountService accountService;
 
     // ─── Registration Validation ─────────────────────────────────────────────
 
@@ -128,6 +129,8 @@ public class BillingService {
             issueNewCasePaper(patient, savedBilling, tenantId);
         }
 
+        accountService.recalculateAccountStatus(patient, tenantId);
+
         return savedBilling;
     }
 
@@ -179,7 +182,10 @@ public class BillingService {
         billing.setTenantId(tenantId);
         regItem.setBilling(billing);
 
-        return billingRepository.save(billing);
+        Billing savedBilling = billingRepository.save(billing);
+        accountService.recalculateAccountStatus(patient, tenantId);
+        
+        return savedBilling;
         // Note: issueNewCasePaper will be called in collectPayment() once status becomes PAID
     }
 
@@ -275,6 +281,8 @@ public class BillingService {
         log.info("Payment collected for billing {}: amount={}, method={}, status={}",
                 billingId, request.getAmount(), paymentMethod, billing.getPaymentStatus());
 
+        accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
+
         return mapToResponse(billing);
     }
 
@@ -292,6 +300,9 @@ public class BillingService {
         billing.setPaymentStatus(PaymentStatus.CANCELLED);
         billing.setRemarks((billing.getRemarks() != null ? billing.getRemarks() + "\n" : "") + "Cancelled due to case paper cancellation");
         billingRepository.save(billing);
+        
+        accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
+        
         log.info("Billing {} cancelled", billingId);
     }
 
@@ -307,6 +318,8 @@ public class BillingService {
         billing.setDiscount(discount);
         recalculateNetAmount(billing);
         billing = billingRepository.save(billing);
+
+        accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
 
         log.info("Discount applied to billing {}: discount={}, newNet={}", billingId, discount, billing.getNetAmount());
         return mapToResponse(billing);
@@ -338,6 +351,8 @@ public class BillingService {
         billing.setTotalAmount(billing.getTotalAmount().add(request.getAmount().multiply(BigDecimal.valueOf(quantity))));
         recalculateNetAmount(billing);
         billing = billingRepository.save(billing);
+
+        accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
 
         log.info("Item added to billing {}: desc={}, amount={}", billingId, request.getDescription(), request.getAmount());
         return mapToResponse(billing);

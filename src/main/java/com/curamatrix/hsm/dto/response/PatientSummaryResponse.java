@@ -27,6 +27,8 @@ public class PatientSummaryResponse {
     private String dateOfBirth;
     private String gender;
     private LocalDate lastVisitDate;
+    private String financialStatus;
+    private java.math.BigDecimal currentOutstanding;
 
     /** Backend-computed case paper status — never trust the frontend for this. */
     private CasePaperSummary casePaper;
