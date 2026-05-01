@@ -44,4 +44,8 @@ public class HospitalService extends TenantAwareEntity {
 
     @Column(name = "validity_period_days")
     private Integer validityPeriodDays;
+
+    @Builder.Default
+    @Column(name = "is_insurance_payable")
+    private Boolean isInsurancePayable = true;
 }

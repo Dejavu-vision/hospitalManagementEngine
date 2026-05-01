@@ -32,4 +32,8 @@ public class Medicine {
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
+
+    @Builder.Default
+    @Column(name = "is_insurance_payable")
+    private Boolean isInsurancePayable = true;
 }

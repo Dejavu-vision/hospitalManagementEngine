@@ -34,4 +34,5 @@ public class PatientRequest {
     private String medicalHistory;
     private String insuranceProvider;
     private String insurancePolicyNumber;
+    private InsurancePolicyRequest insuranceDetails;
 }

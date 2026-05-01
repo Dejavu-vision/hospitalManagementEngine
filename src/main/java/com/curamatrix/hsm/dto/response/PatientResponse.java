@@ -42,4 +42,5 @@ public class PatientResponse {
     private String casePaperExpiresAt;
     private String insuranceProvider;
     private String insurancePolicyNumber;
+    private java.util.List<InsurancePolicyResponse> insurancePolicies;
 }

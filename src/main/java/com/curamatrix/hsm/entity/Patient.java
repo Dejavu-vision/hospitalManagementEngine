@@ -82,4 +82,8 @@ public class Patient extends TenantAwareEntity {
 
     @Column(name = "insurance_policy_number")
     private String insurancePolicyNumber;
+
+    @OneToMany(mappedBy = "patient", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private java.util.List<InsurancePolicy> insurancePolicies = new java.util.ArrayList<>();
 }

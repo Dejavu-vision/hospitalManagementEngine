@@ -9,6 +9,10 @@ import com.curamatrix.hsm.dto.response.PatientVisitHistoryResponse;
 import com.curamatrix.hsm.entity.Patient;
 import com.curamatrix.hsm.entity.PatientRegistration;
 import com.curamatrix.hsm.entity.Tenant;
+import com.curamatrix.hsm.entity.InsurancePolicy;
+import com.curamatrix.hsm.entity.PayerMaster;
+import com.curamatrix.hsm.dto.request.InsurancePolicyRequest;
+import com.curamatrix.hsm.dto.response.InsurancePolicyResponse;
 import com.curamatrix.hsm.entity.User;
 import com.curamatrix.hsm.enums.SubscriptionPlan;
 import com.curamatrix.hsm.enums.AppointmentStatus;
@@ -46,6 +50,7 @@ public class PatientService {
     private final DoctorRepository doctorRepository;
     private final PatientRegistrationRepository patientRegistrationRepository;
     private final DoctorAvailabilityService doctorAvailabilityService;
+    private final PayerMasterRepository payerMasterRepository;
 
     @Transactional
     public PatientResponse registerPatient(PatientRequest request) {
@@ -105,6 +110,28 @@ public class PatientService {
                 .registeredBy(registeredBy)
                 .patientCode(patientCode)
                 .build();
+                
+        if (request.getInsuranceDetails() != null) {
+            InsurancePolicyRequest insReq = request.getInsuranceDetails();
+            PayerMaster payer = null;
+            if (insReq.getPayerId() != null) {
+                payer = payerMasterRepository.findById(insReq.getPayerId()).orElse(null);
+            }
+            InsurancePolicy policy = InsurancePolicy.builder()
+                    .patient(patient)
+                    .payer(payer)
+                    .policyNumber(insReq.getPolicyNumber())
+                    .memberId(insReq.getMemberId())
+                    .sumInsured(insReq.getSumInsured())
+                    .roomRentLimit(insReq.getRoomRentLimit())
+                    .copayPct(insReq.getCopayPct())
+                    .validFrom(insReq.getValidFrom())
+                    .validTo(insReq.getValidTo())
+                    .policyType(insReq.getPolicyType())
+                    .build();
+            policy.setTenantId(effectiveTenantId);
+            patient.getInsurancePolicies().add(policy);
+        }
 
         patient = patientRepository.save(patient);
         log.info("Patient registered: {} {} [{}]", patient.getFirstName(), patient.getLastName(), patient.getPatientCode());
@@ -150,6 +177,33 @@ public class PatientService {
         patient.setMedicalHistory(request.getMedicalHistory());
         patient.setInsuranceProvider(request.getInsuranceProvider());
         patient.setInsurancePolicyNumber(request.getInsurancePolicyNumber());
+
+        if (request.getInsuranceDetails() != null) {
+            InsurancePolicyRequest insReq = request.getInsuranceDetails();
+            PayerMaster payer = null;
+            if (insReq.getPayerId() != null) {
+                payer = payerMasterRepository.findById(insReq.getPayerId()).orElse(null);
+            }
+            // For simplicity, we just add the new policy. In a full implementation we might update or deactivate old ones.
+            InsurancePolicy policy = InsurancePolicy.builder()
+                    .patient(patient)
+                    .payer(payer)
+                    .policyNumber(insReq.getPolicyNumber())
+                    .memberId(insReq.getMemberId())
+                    .sumInsured(insReq.getSumInsured())
+                    .roomRentLimit(insReq.getRoomRentLimit())
+                    .copayPct(insReq.getCopayPct())
+                    .validFrom(insReq.getValidFrom())
+                    .validTo(insReq.getValidTo())
+                    .policyType(insReq.getPolicyType())
+                    .build();
+            policy.setTenantId(TenantContext.getTenantId());
+            
+            // clear old policies or just add? 
+            // since one patient typically has one active, we can clear to update if it exists.
+            patient.getInsurancePolicies().clear();
+            patient.getInsurancePolicies().add(policy);
+        }
 
         patient = patientRepository.save(patient);
         log.info("Patient updated: {}", id);
@@ -408,6 +462,23 @@ public class PatientService {
                 .checkedOut(patient.getCheckedOut())
                 .insuranceProvider(patient.getInsuranceProvider())
                 .insurancePolicyNumber(patient.getInsurancePolicyNumber())
+                .insurancePolicies(
+                    patient.getInsurancePolicies().stream().map(ip -> InsurancePolicyResponse.builder()
+                        .id(ip.getId())
+                        .payerId(ip.getPayer() != null ? ip.getPayer().getId() : null)
+                        .insurerName(ip.getPayer() != null ? ip.getPayer().getInsurerName() : null)
+                        .tpaName(ip.getPayer() != null ? ip.getPayer().getTpaName() : null)
+                        .policyNumber(ip.getPolicyNumber())
+                        .memberId(ip.getMemberId())
+                        .sumInsured(ip.getSumInsured())
+                        .roomRentLimit(ip.getRoomRentLimit())
+                        .copayPct(ip.getCopayPct())
+                        .validFrom(ip.getValidFrom())
+                        .validTo(ip.getValidTo())
+                        .policyType(ip.getPolicyType())
+                        .build()
+                    ).toList()
+                )
                 .build();
                 
         // Inject active appointment info for today's visits (Booked, Checked-In, or In-Progress)

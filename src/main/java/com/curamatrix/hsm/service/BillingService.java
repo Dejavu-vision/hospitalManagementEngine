@@ -5,13 +5,16 @@ import com.curamatrix.hsm.dto.request.CollectPaymentRequest;
 import com.curamatrix.hsm.dto.response.BillingItemResponse;
 import com.curamatrix.hsm.dto.response.BillingResponse;
 import com.curamatrix.hsm.dto.response.BillingSummaryResponse;
+import com.curamatrix.hsm.dto.response.InsuranceSplitResponse;
 import com.curamatrix.hsm.entity.*;
 import com.curamatrix.hsm.enums.BillingItemType;
 import com.curamatrix.hsm.enums.PaymentMethod;
 import com.curamatrix.hsm.enums.PaymentStatus;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.BillingRepository;
+import com.curamatrix.hsm.repository.BillInsuranceSplitRepository;
 import com.curamatrix.hsm.repository.HospitalServiceRepository;
+import com.curamatrix.hsm.repository.InsurancePolicyRepository;
 import com.curamatrix.hsm.repository.PatientRegistrationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,8 +37,10 @@ import java.util.stream.Collectors;
 public class BillingService {
 
     private final BillingRepository billingRepository;
+    private final BillInsuranceSplitRepository splitRepository;
     private final HospitalServiceRepository hospitalServiceRepository;
     private final PatientRegistrationRepository patientRegistrationRepository;
+    private final InsurancePolicyRepository insurancePolicyRepository;
 
     // ─── Registration Validation ─────────────────────────────────────────────
 
@@ -59,15 +64,13 @@ public class BillingService {
         if (!isRegistrationValid(patient.getId(), tenantId)) {
             Optional<HospitalService> regService = hospitalServiceRepository.findByServiceCodeAndTenantId("REG_FEE", tenantId);
             if (regService.isPresent()) {
-                com.curamatrix.hsm.enums.InsuranceCoverage coverage = patient.getInsuranceProvider() != null && !patient.getInsuranceProvider().isEmpty() 
-                        ? com.curamatrix.hsm.enums.InsuranceCoverage.COVERED 
-                        : com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED;
+                // Registration fee is ALWAYS patient-pay regardless of insurance
                 BillingItem regItem = BillingItem.builder()
                         .description("Patient Registration / Case Paper")
                         .amount(regService.get().getPrice())
                         .itemType(BillingItemType.REGISTRATION)
                         .quantity(1)
-                        .insuranceCoverage(coverage)
+                        .insuranceCoverage(com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED)
                         .build();
                 items.add(regItem);
                 totalAmount = totalAmount.add(regItem.getAmount());
@@ -77,15 +80,13 @@ public class BillingService {
         // 2. Add Consultation Fee
         Optional<HospitalService> consultService = hospitalServiceRepository.findByServiceCodeAndTenantId("CONSULT", tenantId);
         if (consultService.isPresent()) {
-            com.curamatrix.hsm.enums.InsuranceCoverage coverage = patient.getInsuranceProvider() != null && !patient.getInsuranceProvider().isEmpty() 
-                    ? com.curamatrix.hsm.enums.InsuranceCoverage.COVERED 
-                    : com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED;
+            // Consultation is NOT_COVERED for now — insurance billing engine (Phase 3) will handle splits
             BillingItem consultItem = BillingItem.builder()
                     .description("Consultation - " + appointment.getDoctor().getUser().getFullName())
                     .amount(consultService.get().getPrice())
                     .itemType(BillingItemType.CONSULTATION)
                     .quantity(1)
-                    .insuranceCoverage(coverage)
+                    .insuranceCoverage(com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED)
                     .build();
             items.add(consultItem);
             totalAmount = totalAmount.add(consultItem.getAmount());
@@ -141,27 +142,22 @@ public class BillingService {
             throw new RuntimeException("Registration fee service not configured");
         }
 
+        // Registration fee is always patient-pay — insurance adjustment is never applied here.
+        // Phase 3 billing engine will handle clinical item splits.
         BigDecimal amount = regService.get().getPrice();
-        com.curamatrix.hsm.enums.InsuranceCoverage coverage = patient.getInsuranceProvider() != null && !patient.getInsuranceProvider().isEmpty() 
-                ? com.curamatrix.hsm.enums.InsuranceCoverage.COVERED 
-                : com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED;
+        BigDecimal insuranceAdjustment = BigDecimal.ZERO;
 
         BillingItem regItem = BillingItem.builder()
                 .description("Patient Registration / Case Paper")
                 .amount(amount)
                 .itemType(BillingItemType.REGISTRATION)
                 .quantity(1)
-                .insuranceCoverage(coverage)
+                .insuranceCoverage(com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED)
                 .build();
 
         PaymentMethod paymentMethod = null;
         if (paymentMethodStr != null) {
             paymentMethod = PaymentMethod.valueOf(paymentMethodStr.toUpperCase());
-        }
-
-        BigDecimal insuranceAdjustment = BigDecimal.ZERO;
-        if (coverage == com.curamatrix.hsm.enums.InsuranceCoverage.COVERED) {
-            insuranceAdjustment = amount;
         }
 
         BigDecimal netAmount = amount.subtract(insuranceAdjustment);
@@ -375,6 +371,74 @@ public class BillingService {
                 .build();
     }
 
+    // ─── Phase 3: Calculate Insurance Split ─────────────────────────────────
+
+    /**
+     * Called by billing controller when TPA has approved a pre-auth.
+     * Calculates exact patient liability from policy limits.
+     */
+    @Transactional
+    public BillingResponse calculateInsuranceSplit(Long billingId, Long policyId, Long tenantId) {
+        Billing billing = billingRepository.findByIdAndTenantId(billingId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Billing", "id", billingId));
+
+        InsurancePolicy policy = insurancePolicyRepository.findByIdAndTenantId(policyId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("InsurancePolicy", "id", policyId));
+
+        BigDecimal gross = billing.getTotalAmount();
+        BigDecimal nonPayable = BigDecimal.ZERO;
+        BigDecimal roomRentDeductible = BigDecimal.ZERO;
+
+        // Step 1: Separate non-payable items
+        for (BillingItem item : billing.getItems()) {
+            boolean itemPayable = item.getInsuranceCoverage() != com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED;
+            if (!itemPayable) {
+                nonPayable = nonPayable.add(item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity())));
+            }
+        }
+
+        // Step 2: Room rent proportionality — future enhancement can pull actual room rent from admission
+        // For now, if roomRentLimit is set and > 0, we apply a placeholder calculation
+        // (Full implementation needs actual room rent from bed/ward)
+        // roomRentDeductible remains 0 for OPD; IPD will enhance this in Phase 4
+
+        // Step 3: Covered base
+        BigDecimal coveredBase = gross.subtract(nonPayable).subtract(roomRentDeductible);
+        if (coveredBase.compareTo(BigDecimal.ZERO) < 0) coveredBase = BigDecimal.ZERO;
+
+        // Step 4: Co-pay
+        BigDecimal copayPct = policy.getCopayPct() != null ? policy.getCopayPct() : BigDecimal.ZERO;
+        BigDecimal copayAmount = coveredBase.multiply(copayPct).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+
+        // Step 5: Patient liability and insurance claim
+        BigDecimal patientLiability = nonPayable.add(roomRentDeductible).add(copayAmount);
+        if (patientLiability.compareTo(BigDecimal.ZERO) < 0) patientLiability = BigDecimal.ZERO;
+        BigDecimal insuranceClaim = gross.subtract(patientLiability);
+        if (insuranceClaim.compareTo(BigDecimal.ZERO) < 0) insuranceClaim = BigDecimal.ZERO;
+
+        // Persist split
+        BillInsuranceSplit split = splitRepository.findByBillingId(billingId)
+                .orElse(BillInsuranceSplit.builder().billing(billing).build());
+        split.setInsurancePolicy(policy);
+        split.setGrossAmount(gross);
+        split.setNonPayableAmount(nonPayable);
+        split.setRoomRentDeductible(roomRentDeductible);
+        split.setCoveredBase(coveredBase);
+        split.setCopayAmount(copayAmount);
+        split.setPatientLiability(patientLiability);
+        split.setInsuranceClaim(insuranceClaim);
+        split.setTenantId(tenantId);
+        splitRepository.save(split);
+
+        // Update billing net amount to patient liability
+        billing.setInsuranceAdjustment(insuranceClaim);
+        billing.setNetAmount(patientLiability);
+        billingRepository.save(billing);
+
+        log.info("Insurance split calculated for billing {}: patient=₹{}, insurance=₹{}", billingId, patientLiability, insuranceClaim);
+        return mapToResponse(billing);
+    }
+
     // ─── Legacy markAsPaid (preserved for backward compat) ───────────────────
 
     @Transactional
@@ -421,7 +485,7 @@ public class BillingService {
 
         Patient patient = billing.getPatient();
 
-        return BillingResponse.builder()
+        BillingResponse resp = BillingResponse.builder()
                 .id(billing.getId())
                 .invoiceNumber(billing.getInvoiceNumber())
                 .patientId(patient.getId())
@@ -443,6 +507,26 @@ public class BillingService {
                 .createdByName(billing.getCreatedBy() != null ? billing.getCreatedBy().getFullName() : null)
                 .remarks(billing.getRemarks())
                 .build();
+
+        // Attach insurance split if present
+        splitRepository.findByBillingId(billing.getId()).ifPresent(split -> {
+            resp.setInsuranceSplit(InsuranceSplitResponse.builder()
+                    .splitId(split.getId())
+                    .insurancePolicyId(split.getInsurancePolicy() != null ? split.getInsurancePolicy().getId() : null)
+                    .insurerName(split.getInsurancePolicy() != null && split.getInsurancePolicy().getPayer() != null ? split.getInsurancePolicy().getPayer().getInsurerName() : null)
+                    .policyNumber(split.getInsurancePolicy() != null ? split.getInsurancePolicy().getPolicyNumber() : null)
+                    .grossAmount(split.getGrossAmount())
+                    .nonPayableAmount(split.getNonPayableAmount())
+                    .roomRentDeductible(split.getRoomRentDeductible())
+                    .coveredBase(split.getCoveredBase())
+                    .copayAmount(split.getCopayAmount())
+                    .patientLiability(split.getPatientLiability())
+                    .insuranceClaim(split.getInsuranceClaim())
+                    .calculatedAt(split.getCalculatedAt())
+                    .build());
+        });
+
+        return resp;
     }
 
     private BillingItemResponse mapItemToResponse(BillingItem item) {

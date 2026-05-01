@@ -128,4 +128,18 @@ public class BillingController {
 
         return ResponseEntity.ok(hospitalServiceRepository.save(service));
     }
+
+    // ─── Phase 3: Insurance Split Calculation ───────────────────────
+
+    /**
+     * Triggers the insurance split calculation for an invoice.
+     * Called from the Billing/TPA screen after policy is confirmed.
+     * POST /api/billing/invoices/{id}/insurance-split?policyId=123
+     */
+    @PostMapping("/invoices/{id}/insurance-split")
+    public ResponseEntity<BillingResponse> calculateInsuranceSplit(
+            @PathVariable Long id,
+            @RequestParam Long policyId) {
+        return ResponseEntity.ok(billingService.calculateInsuranceSplit(id, policyId, TenantContext.getTenantId()));
+    }
 }

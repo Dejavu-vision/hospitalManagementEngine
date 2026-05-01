@@ -39,4 +39,5 @@ public class BillingResponse {
     private LocalDateTime paidAt;
     private String createdByName;
     private String remarks;
+    private InsuranceSplitResponse insuranceSplit;
 }
