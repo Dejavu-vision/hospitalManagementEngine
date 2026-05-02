@@ -30,9 +30,10 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
                                   Pageable pageable);
 
     @Query("SELECT p FROM Patient p WHERE p.tenantId = :tenantId " +
-           "AND (:q IS NULL OR LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :q, '%')) " +
-           "     OR :q IS NULL OR p.phone LIKE CONCAT('%', :q, '%') " +
-           "     OR :q IS NULL OR LOWER(p.patientCode) LIKE LOWER(CONCAT('%', :q, '%'))) " +
+           "AND (:q IS NULL OR " +
+           "     LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
+           "     p.phone LIKE CONCAT('%', :q, '%') OR " +
+           "     LOWER(p.patientCode) LIKE LOWER(CONCAT('%', :q, '%'))) " +
            "AND (:gender IS NULL OR p.gender = :gender) " +
            "AND (:bloodGroup IS NULL OR p.bloodGroup = :bloodGroup)")
     Page<Patient> searchWithFilters(@Param("q") String query,
@@ -56,4 +57,23 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
     java.util.List<Patient> findByPhoneAndTenantId(
             @Param("phone") String phone,
             @Param("tenantId") Long tenantId);
+
+    /**
+     * Search patients scoped to a specific set of IDs (used when date-range filter is active).
+     * The patientIds list comes from AppointmentRepository.findDistinctPatientIdsByVisitDateRange.
+     */
+    @Query("SELECT p FROM Patient p WHERE p.tenantId = :tenantId " +
+           "AND p.id IN :patientIds " +
+           "AND (:q IS NULL OR " +
+           "     LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
+           "     p.phone LIKE CONCAT('%', :q, '%') OR " +
+           "     LOWER(p.patientCode) LIKE LOWER(CONCAT('%', :q, '%'))) " +
+           "AND (:gender IS NULL OR p.gender = :gender) " +
+           "AND (:bloodGroup IS NULL OR p.bloodGroup = :bloodGroup)")
+    Page<Patient> searchWithVisitFilter(@Param("q") String query,
+                                         @Param("gender") String gender,
+                                         @Param("bloodGroup") String bloodGroup,
+                                         @Param("tenantId") Long tenantId,
+                                         @Param("patientIds") java.util.List<Long> patientIds,
+                                         Pageable pageable);
 }

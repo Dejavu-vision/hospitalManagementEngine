@@ -140,16 +140,44 @@ public class PatientService {
         return mapToResponse(patient);
     }
 
-    public Page<PatientResponse> searchPatients(String search, String gender, String bloodGroup, Pageable pageable) {
+    public Page<PatientResponse> searchPatients(String search, String gender, String bloodGroup,
+                                                LocalDate fromDate, LocalDate toDate, Pageable pageable) {
         Long tenantId = TenantContext.getTenantId();
-        // Use the filtered query
-        return patientRepository.searchWithFilters(
-                (search != null && search.trim().length() >= 2) ? search.trim() : null,
-                gender,
-                bloodGroup,
-                tenantId,
-                pageable
-        ).map(this::mapToResponse);
+        String q = (search != null && search.trim().length() >= 2) ? search.trim() : null;
+
+        Page<Patient> patientPage;
+
+        if (fromDate != null && toDate != null) {
+            // Date-range mode: first get the patient IDs who visited in range, then filter
+            List<Long> visitedIds = appointmentRepository
+                    .findDistinctPatientIdsByVisitDateRange(tenantId, fromDate, toDate);
+            if (visitedIds.isEmpty()) {
+                return org.springframework.data.domain.Page.empty(pageable);
+            }
+            patientPage = patientRepository.searchWithVisitFilter(q, gender, bloodGroup, tenantId, visitedIds, pageable);
+        } else {
+            patientPage = patientRepository.searchWithFilters(q, gender, bloodGroup, tenantId, pageable);
+        }
+
+        // Enrich with last visit date in a single batch query
+        List<Long> pageIds = patientPage.getContent().stream().map(Patient::getId).toList();
+        java.util.Map<Long, LocalDate> lastVisitMap = new java.util.HashMap<>();
+        if (!pageIds.isEmpty()) {
+            appointmentRepository.findLastVisitDatesByPatientIds(pageIds, tenantId)
+                    .forEach(row -> {
+                        Long pid = ((Number) row[0]).longValue();
+                        LocalDate d = null;
+                        if (row[1] instanceof java.sql.Date) d = ((java.sql.Date) row[1]).toLocalDate();
+                        else if (row[1] instanceof LocalDate) d = (LocalDate) row[1];
+                        if (d != null) lastVisitMap.put(pid, d);
+                    });
+        }
+
+        return patientPage.map(p -> {
+            PatientResponse resp = mapToResponse(p);
+            resp.setLastVisitDate(lastVisitMap.get(p.getId()));
+            return resp;
+        });
     }
 
     public PatientResponse getPatientById(Long id) {

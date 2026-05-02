@@ -130,4 +130,26 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     long countActiveByDoctorAndDate(@Param("doctorId") Long doctorId,
                                      @Param("date") LocalDate date,
                                      @Param("tenantId") Long tenantId);
+
+    /**
+     * Distinct patient IDs who had at least one appointment within a date range for a tenant.
+     * Used by the Patients page date-range filter.
+     */
+    @Query("SELECT DISTINCT a.patient.id FROM Appointment a " +
+           "WHERE a.tenantId = :tenantId " +
+           "AND a.appointmentDate >= :fromDate " +
+           "AND a.appointmentDate <= :toDate")
+    List<Long> findDistinctPatientIdsByVisitDateRange(@Param("tenantId") Long tenantId,
+                                                       @Param("fromDate") LocalDate fromDate,
+                                                       @Param("toDate") LocalDate toDate);
+
+    /**
+     * Last visit date per patient for a list of patient IDs (used to enrich the patients table).
+     * Returns Object[]{patientId, maxAppointmentDate}.
+     */
+    @Query("SELECT a.patient.id, MAX(a.appointmentDate) FROM Appointment a " +
+           "WHERE a.patient.id IN :patientIds AND a.tenantId = :tenantId " +
+           "GROUP BY a.patient.id")
+    List<Object[]> findLastVisitDatesByPatientIds(@Param("patientIds") List<Long> patientIds,
+                                                   @Param("tenantId") Long tenantId);
 }

@@ -45,4 +45,5 @@ public class PatientResponse {
     private java.util.List<InsurancePolicyResponse> insurancePolicies;
     private String financialStatus;
     private java.math.BigDecimal currentOutstanding;
+    private LocalDate lastVisitDate;
 }
