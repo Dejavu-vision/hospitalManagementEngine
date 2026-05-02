@@ -11,6 +11,7 @@ import com.curamatrix.hsm.entity.Bed;
 import com.curamatrix.hsm.entity.Room;
 import com.curamatrix.hsm.entity.Ward;
 import com.curamatrix.hsm.enums.BedStatus;
+import com.curamatrix.hsm.enums.BedType;
 import com.curamatrix.hsm.exception.DuplicateResourceException;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.BedRepository;
@@ -110,6 +111,15 @@ public class BedManagementService {
                 .orElseThrow(() -> new ResourceNotFoundException("Bed", "id", id));
         bed.setStatus(status);
         return mapToResponse(bedRepository.save(bed));
+    }
+
+    @Transactional(readOnly = true)
+    public List<BedResponse> getAvailableBeds(Long wardId, com.curamatrix.hsm.enums.BedType roomType) {
+        Long tenantId = TenantContext.getTenantId();
+        return bedRepository.findAvailableBeds(tenantId, wardId, roomType)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     // --- Stats ---

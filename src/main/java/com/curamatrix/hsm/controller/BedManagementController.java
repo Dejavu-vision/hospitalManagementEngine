@@ -72,6 +72,15 @@ public class BedManagementController {
         return ResponseEntity.status(HttpStatus.CREATED).body(bedManagementService.createBed(request));
     }
 
+    @GetMapping("/beds/available")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR', 'ADMIN')")
+    @Operation(summary = "Get all available beds, optionally filtered by wardId and/or roomType")
+    public ResponseEntity<List<BedResponse>> getAvailableBeds(
+            @RequestParam(required = false) Long wardId,
+            @RequestParam(required = false) com.curamatrix.hsm.enums.BedType roomType) {
+        return ResponseEntity.ok(bedManagementService.getAvailableBeds(wardId, roomType));
+    }
+
     @PatchMapping("/beds/{id}/status")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     @Operation(summary = "Manually update bed status (e.g. mark for cleaning)")

@@ -2,12 +2,15 @@ package com.curamatrix.hsm.entity;
 
 import com.curamatrix.hsm.enums.AdmissionStatus;
 import com.curamatrix.hsm.enums.AdmissionType;
+import com.curamatrix.hsm.enums.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "ipd_admissions")
+@Table(name = "ipd_admissions",
+       uniqueConstraints = @UniqueConstraint(columnNames = {"admission_number", "tenant_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -56,4 +59,14 @@ public class IpdAdmission extends TenantAwareEntity {
     
     @Column(name = "admission_notes", columnDefinition = "TEXT")
     private String admissionNotes;
+
+    @Column(name = "deposit_amount", precision = 10, scale = 2)
+    private BigDecimal depositAmount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 50)
+    private PaymentMethod paymentMethod;
+
+    @Column(name = "pre_auth_id")
+    private Long preAuthId;
 }

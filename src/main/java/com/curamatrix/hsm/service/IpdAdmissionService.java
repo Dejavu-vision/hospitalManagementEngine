@@ -4,19 +4,18 @@ import com.curamatrix.hsm.context.TenantContext;
 import com.curamatrix.hsm.dto.request.AdmissionRequest;
 import com.curamatrix.hsm.dto.response.AdmissionResponse;
 import com.curamatrix.hsm.entity.*;
-import com.curamatrix.hsm.enums.AdmissionStatus;
-import com.curamatrix.hsm.enums.BedStatus;
+import com.curamatrix.hsm.enums.*;
 import com.curamatrix.hsm.exception.DuplicateResourceException;
 import com.curamatrix.hsm.exception.InvalidStateTransitionException;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.*;
-import com.curamatrix.hsm.enums.PaymentStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -29,17 +28,24 @@ import java.util.stream.Collectors;
 public class IpdAdmissionService {
 
     private final IpdAdmissionRepository admissionRepository;
+    private final IpdAdmissionSequenceRepository sequenceRepository;
     private final BedAllocationRepository allocationRepository;
     private final BedRepository bedRepository;
     private final PatientRepository patientRepository;
     private final DoctorRepository doctorRepository;
     private final AppointmentRepository appointmentRepository;
     private final BillingRepository billingRepository;
+    private final PreAuthRequestRepository preAuthRequestRepository;
 
     @Transactional
     public AdmissionResponse admitPatient(AdmissionRequest request) {
         Long tenantId = TenantContext.getTenantId();
-        
+
+        // Validate deposit is non-negative
+        if (request.getDepositAmount() != null && request.getDepositAmount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Deposit amount cannot be negative");
+        }
+
         // Prevent double admission
         if (admissionRepository.existsByPatientIdAndStatusAndTenantId(request.getPatientId(), AdmissionStatus.ADMITTED, tenantId)) {
             throw new DuplicateResourceException("Patient is already admitted. Please discharge before re-admitting.");
@@ -49,7 +55,7 @@ public class IpdAdmissionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", request.getPatientId()));
         Doctor doctor = doctorRepository.findById(request.getPrimaryDoctorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", request.getPrimaryDoctorId()));
-                
+
         Appointment opd = null;
         if (request.getOpdAppointmentId() != null) {
             opd = appointmentRepository.findById(request.getOpdAppointmentId()).orElse(null);
@@ -57,13 +63,15 @@ public class IpdAdmissionService {
 
         Bed bed = bedRepository.findById(request.getBedId())
                 .orElseThrow(() -> new ResourceNotFoundException("Bed", "id", request.getBedId()));
-                
+
         if (bed.getStatus() != BedStatus.AVAILABLE && bed.getStatus() != BedStatus.CLEANING) {
             throw new InvalidStateTransitionException("Bed Allocation", bed.getStatus().name(), "OCCUPIED");
         }
 
+        // Generate proper admission number (IPD-YYYY-NNNNN)
+        String admNumber = generateAdmissionNumber(tenantId);
+
         // Create Admission
-        String admNumber = "IPD-" + System.currentTimeMillis(); // basic uniqueness
         IpdAdmission admission = IpdAdmission.builder()
                 .admissionNumber(admNumber)
                 .patient(patient)
@@ -72,15 +80,19 @@ public class IpdAdmissionService {
                 .admissionType(request.getAdmissionType())
                 .status(AdmissionStatus.ADMITTED)
                 .admissionTime(LocalDateTime.now())
+                .expectedDischargeTime(request.getExpectedDischargeTime())
                 .admissionNotes(request.getAdmissionNotes())
+                .depositAmount(request.getDepositAmount())
+                .paymentMethod(request.getPaymentMethod())
+                .preAuthId(request.getPreAuthId())
                 .build();
         admission.setTenantId(tenantId);
         admission = admissionRepository.save(admission);
 
-        // Allocate Bed
+        // Allocate Bed — mark OCCUPIED and snapshot daily price
         bed.setStatus(BedStatus.OCCUPIED);
         bedRepository.save(bed);
-        
+
         BedAllocation allocation = BedAllocation.builder()
                 .admission(admission)
                 .bed(bed)
@@ -91,7 +103,7 @@ public class IpdAdmissionService {
         allocation.setTenantId(tenantId);
         allocationRepository.save(allocation);
 
-        // ─── Create Running Bill ─────────────────────────────────────────────
+        // Create Running IPD Bill
         Billing ipdBilling = Billing.builder()
                 .ipdAdmission(admission)
                 .patient(patient)
@@ -103,33 +115,78 @@ public class IpdAdmissionService {
                 .items(new ArrayList<>())
                 .build();
         ipdBilling.setTenantId(tenantId);
-        billingRepository.save(ipdBilling);
-        // ─────────────────────────────────────────────────────────────────────
-        
-        // TODO: Handle Deposit Billing if request.getDepositAmount() > 0
+        ipdBilling = billingRepository.save(ipdBilling);
+
+        // Add deposit billing item if deposit > 0
+        if (request.getDepositAmount() != null && request.getDepositAmount().compareTo(BigDecimal.ZERO) > 0) {
+            BillingItem depositItem = BillingItem.builder()
+                    .billing(ipdBilling)
+                    .description("Admission Deposit")
+                    .amount(request.getDepositAmount())
+                    .quantity(1)
+                    .itemType(BillingItemType.OTHER)
+                    .build();
+            ipdBilling.getItems().add(depositItem);
+            ipdBilling.setTotalAmount(request.getDepositAmount());
+            ipdBilling.setNetAmount(request.getDepositAmount());
+            ipdBilling.setPaidAmount(request.getDepositAmount());
+            ipdBilling.setPaymentStatus(PaymentStatus.PAID);
+            billingRepository.save(ipdBilling);
+        }
+
+        // Link pre-auth to this admission if provided
+        if (request.getPreAuthId() != null) {
+            final Long admissionId = admission.getId();
+            preAuthRequestRepository.findById(request.getPreAuthId()).ifPresent(preAuth -> {
+                preAuth.setAdmissionId(admissionId);
+                preAuthRequestRepository.save(preAuth);
+                log.info("Linked PreAuthRequest {} to Admission {}", preAuth.getId(), admissionId);
+            });
+        }
+
+        log.info("Patient {} admitted with admission number {} to bed {}",
+                patient.getId(), admNumber, bed.getBedNumber());
 
         return mapToResponse(admission, bed);
     }
-    
+
+    /**
+     * Generates a unique admission number in the format IPD-YYYY-NNNNN.
+     * Uses a pessimistic SELECT FOR UPDATE lock to prevent duplicates under concurrent load.
+     */
+    @Transactional
+    public String generateAdmissionNumber(Long tenantId) {
+        int year = LocalDate.now().getYear();
+        IpdAdmissionSequence seq = sequenceRepository.findForUpdate(year, tenantId)
+                .orElseGet(() -> {
+                    IpdAdmissionSequence s = IpdAdmissionSequence.builder().year(year).build();
+                    s.setTenantId(tenantId);
+                    return s;
+                });
+        seq.setLastSequence(seq.getLastSequence() + 1);
+        sequenceRepository.save(seq);
+        return String.format("IPD-%d-%05d", year, seq.getLastSequence());
+    }
+
     public AdmissionResponse getAdmission(Long id) {
         Long tenantId = TenantContext.getTenantId();
         IpdAdmission admission = admissionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", id));
-                
+
         Bed currentBed = null;
         BedAllocation alloc = allocationRepository.findByAdmissionIdAndIsCurrentTrueAndTenantId(id, tenantId).orElse(null);
         if (alloc != null) {
             currentBed = alloc.getBed();
         }
-        
+
         return mapToResponse(admission, currentBed);
     }
-    
+
     public AdmissionResponse getAdmissionByBedId(Long bedId) {
         Long tenantId = TenantContext.getTenantId();
         BedAllocation alloc = allocationRepository.findByBedIdAndIsCurrentTrueAndTenantId(bedId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bed Allocation", "bedId", bedId));
-        
+
         return mapToResponse(alloc.getAdmission(), alloc.getBed());
     }
 
@@ -178,6 +235,7 @@ public class IpdAdmissionService {
             row.put("primaryDoctorName", adm.getPrimaryDoctor().getUser().getFullName());
             row.put("admissionType", adm.getAdmissionType() != null ? adm.getAdmissionType().name() : null);
             row.put("admissionTime", adm.getAdmissionTime() != null ? adm.getAdmissionTime().toString() : null);
+            row.put("expectedDischargeTime", adm.getExpectedDischargeTime() != null ? adm.getExpectedDischargeTime().toString() : null);
 
             long daysAdmitted = adm.getAdmissionTime() != null
                     ? ChronoUnit.DAYS.between(adm.getAdmissionTime().toLocalDate(), LocalDateTime.now().toLocalDate()) + 1
@@ -208,7 +266,6 @@ public class IpdAdmissionService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> getAdmissionBilling(Long admissionId) {
-        Long tenantId = TenantContext.getTenantId();
         IpdAdmission admission = admissionRepository.findById(admissionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", admissionId));
 
@@ -252,19 +309,25 @@ public class IpdAdmissionService {
                 .admissionNumber(admission.getAdmissionNumber())
                 .patientId(admission.getPatient().getId())
                 .patientName(admission.getPatient().getFirstName() + " " + admission.getPatient().getLastName())
+                .patientCode(admission.getPatient().getPatientCode())
                 .primaryDoctorId(admission.getPrimaryDoctor().getId())
                 .primaryDoctorName(admission.getPrimaryDoctor().getUser().getFullName())
                 .opdAppointmentId(admission.getOpdAppointment() != null ? admission.getOpdAppointment().getId() : null)
                 .admissionType(admission.getAdmissionType())
                 .status(admission.getStatus())
-                .admissionTime(admission.getAdmissionTime());
-                
+                .admissionTime(admission.getAdmissionTime())
+                .expectedDischargeTime(admission.getExpectedDischargeTime())
+                .depositAmount(admission.getDepositAmount())
+                .preAuthId(admission.getPreAuthId());
+
         if (currentBed != null) {
             b.currentBedId(currentBed.getId())
              .currentBedNumber(currentBed.getBedNumber())
+             .currentRoomNumber(currentBed.getRoom().getRoomNumber())
+             .currentRoomType(currentBed.getRoom().getRoomType() != null ? currentBed.getRoom().getRoomType().name() : null)
              .currentWardName(currentBed.getRoom().getWard().getName());
         }
-        
+
         return b.build();
     }
 }
