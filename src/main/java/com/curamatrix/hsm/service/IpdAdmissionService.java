@@ -124,13 +124,13 @@ public class IpdAdmissionService {
                     .description("Admission Deposit")
                     .amount(request.getDepositAmount())
                     .quantity(1)
-                    .itemType(BillingItemType.OTHER)
+                    .itemType(BillingItemType.DEPOSIT)
                     .build();
             ipdBilling.getItems().add(depositItem);
-            ipdBilling.setTotalAmount(request.getDepositAmount());
-            ipdBilling.setNetAmount(request.getDepositAmount());
+            ipdBilling.setTotalAmount(BigDecimal.ZERO);   // charges not yet added — total stays 0
+            ipdBilling.setNetAmount(BigDecimal.ZERO);
             ipdBilling.setPaidAmount(request.getDepositAmount());
-            ipdBilling.setPaymentStatus(PaymentStatus.PAID);
+            ipdBilling.setPaymentStatus(PaymentStatus.PARTIAL); // deposit received, bill not settled
             billingRepository.save(ipdBilling);
         }
 
