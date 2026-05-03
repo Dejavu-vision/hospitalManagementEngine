@@ -69,4 +69,12 @@ public class IpdAdmission extends TenantAwareEntity {
 
     @Column(name = "pre_auth_id")
     private Long preAuthId;
+
+    /** Set to true by the doctor to signal all clinical work is done and discharge is cleared. */
+    @Column(name = "discharge_cleared", nullable = false)
+    private boolean dischargeCleared = false;
+
+    /** Set to true once Generate Invoice has been called and a final invoice exists. */
+    @Column(name = "invoice_generated", nullable = false)
+    private boolean invoiceGenerated = false;
 }

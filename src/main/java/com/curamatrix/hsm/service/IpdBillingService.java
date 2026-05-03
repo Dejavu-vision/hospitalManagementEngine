@@ -144,6 +144,68 @@ public class IpdBillingService {
         return buildEnrichedRunningBillSummary(admission, bill, preAuth, currentAllocation);
     }
 
+    // ── Clear discharge (doctor marks clinical work done) ─────────────────────
+
+    @Transactional
+    public Map<String, Object> clearDischarge(Long admissionId) {
+        Long tenantId = TenantContext.getTenantId();
+
+        IpdAdmission admission = admissionRepository.findById(admissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", admissionId));
+
+        if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
+            throw new InvalidStateTransitionException("Admission", "DISCHARGED", "CLEAR_DISCHARGE");
+        }
+
+        admission.setDischargeCleared(true);
+        admissionRepository.save(admission);
+        log.info("Discharge cleared for admission {}", admissionId);
+
+        Billing bill = billingRepository.findByIpdAdmissionId(admissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Running Bill", "admissionId", admissionId));
+        PreAuthRequest preAuth = loadPreAuth(admissionId, tenantId);
+        BedAllocation currentAllocation = allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admissionId, tenantId).orElse(null);
+        return buildEnrichedRunningBillSummary(admission, bill, preAuth, currentAllocation);
+    }
+
+    // ── Generate Invoice (freeze + mark invoice generated) ───────────────────
+
+    @Transactional
+    public Map<String, Object> generateInvoice(Long admissionId) {
+        Long tenantId = TenantContext.getTenantId();
+
+        IpdAdmission admission = admissionRepository.findById(admissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", admissionId));
+
+        if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
+            throw new InvalidStateTransitionException("Admission", "DISCHARGED", "GENERATE_INVOICE");
+        }
+
+        if (!admission.isDischargeCleared()) {
+            throw new InvalidStateTransitionException("Admission", "DISCHARGE_NOT_CLEARED", "GENERATE_INVOICE");
+        }
+
+        Billing bill = billingRepository.findByIpdAdmissionId(admissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Running Bill", "admissionId", admissionId));
+
+        // Freeze the bill if not already frozen
+        if (bill.getRemarks() == null || !bill.getRemarks().startsWith("FROZEN")) {
+            bill.setRemarks("FROZEN - " + LocalDateTime.now());
+        }
+        billingRepository.save(bill);
+
+        // Mark invoice as generated
+        admission.setInvoiceGenerated(true);
+        admissionRepository.save(admission);
+        log.info("Invoice generated for admission {}", admissionId);
+
+        PreAuthRequest preAuth = loadPreAuth(admissionId, tenantId);
+        BedAllocation currentAllocation = allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admissionId, tenantId).orElse(null);
+        return buildEnrichedRunningBillSummary(admission, bill, preAuth, currentAllocation);
+    }
+
     // ── Freeze bill (lock before discharge) ──────────────────────────────────
 
     @Transactional
@@ -441,6 +503,9 @@ public class IpdBillingService {
         result.put("stayDays", stayDays);
         result.put("depositReceiptNumber", depositReceiptNumber);
         result.put("preAuth", preAuthMap);
+        // Unlock gate fields for frontend button logic
+        result.put("dischargeCleared", admission.isDischargeCleared());
+        result.put("invoiceGenerated", admission.isInvoiceGenerated());
         return result;
     }
 

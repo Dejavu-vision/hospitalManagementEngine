@@ -117,6 +117,22 @@ public class IpdAdmissionService {
         ipdBilling.setTenantId(tenantId);
         ipdBilling = billingRepository.save(ipdBilling);
 
+        // Auto-post Day 1 bed charge if the bed has a daily price
+        if (bed.getDailyPrice() != null && bed.getDailyPrice().compareTo(BigDecimal.ZERO) > 0) {
+            BillingItem bedCharge = BillingItem.builder()
+                    .billing(ipdBilling)
+                    .description("Bed Charge - " + bed.getBedNumber() + " (Day 1)")
+                    .amount(bed.getDailyPrice())
+                    .quantity(1)
+                    .itemType(BillingItemType.BED_CHARGE)
+                    .build();
+            ipdBilling.getItems().add(bedCharge);
+            ipdBilling.setTotalAmount(bed.getDailyPrice());
+            ipdBilling.setNetAmount(bed.getDailyPrice());
+            billingRepository.save(ipdBilling);
+            log.info("Auto-posted Day 1 bed charge ₹{} for admission {}", bed.getDailyPrice(), admNumber);
+        }
+
         // Add deposit billing item if deposit > 0
         if (request.getDepositAmount() != null && request.getDepositAmount().compareTo(BigDecimal.ZERO) > 0) {
             BillingItem depositItem = BillingItem.builder()
@@ -127,8 +143,7 @@ public class IpdAdmissionService {
                     .itemType(BillingItemType.DEPOSIT)
                     .build();
             ipdBilling.getItems().add(depositItem);
-            ipdBilling.setTotalAmount(BigDecimal.ZERO);   // charges not yet added — total stays 0
-            ipdBilling.setNetAmount(BigDecimal.ZERO);
+            // Keep totalAmount as-is (bed charge already set it); only update paidAmount
             ipdBilling.setPaidAmount(request.getDepositAmount());
             ipdBilling.setPaymentStatus(PaymentStatus.PARTIAL); // deposit received, bill not settled
             billingRepository.save(ipdBilling);

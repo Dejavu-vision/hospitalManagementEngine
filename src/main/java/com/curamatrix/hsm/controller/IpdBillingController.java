@@ -59,6 +59,24 @@ public class IpdBillingController {
         return ResponseEntity.ok(ipdBillingService.freezeBill(admissionId));
     }
 
+    // ── Clear Discharge (Doctor action) ──────────────────────────────────────
+
+    @PatchMapping("/{admissionId}/clear-discharge")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR', 'ADMIN')")
+    @Operation(summary = "Doctor clears discharge — marks clinical work as done, unlocks Generate Invoice")
+    public ResponseEntity<Map<String, Object>> clearDischarge(@PathVariable Long admissionId) {
+        return ResponseEntity.ok(ipdBillingService.clearDischarge(admissionId));
+    }
+
+    // ── Generate Invoice ──────────────────────────────────────────────────────
+
+    @PostMapping("/{admissionId}/generate-invoice")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @Operation(summary = "Generate final invoice — freezes bill and marks invoiceGenerated=true, unlocks Discharge & Settle")
+    public ResponseEntity<Map<String, Object>> generateInvoice(@PathVariable Long admissionId) {
+        return ResponseEntity.ok(ipdBillingService.generateInvoice(admissionId));
+    }
+
     // ── Final Bill ────────────────────────────────────────────────────────────
 
     @GetMapping("/{admissionId}/final-bill")
