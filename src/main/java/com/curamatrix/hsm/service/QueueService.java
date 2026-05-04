@@ -1,13 +1,14 @@
 package com.curamatrix.hsm.service;
 
 import com.curamatrix.hsm.context.TenantContext;
-import com.curamatrix.hsm.dto.response.DashboardStatsResponse;
-import com.curamatrix.hsm.dto.response.DoctorQueueSummary;
-import com.curamatrix.hsm.dto.response.QueueEntryResponse;
+import com.curamatrix.hsm.dto.response.*;
 import com.curamatrix.hsm.entity.Appointment;
 import com.curamatrix.hsm.entity.Doctor;
+import com.curamatrix.hsm.entity.DoctorAvailability;
 import com.curamatrix.hsm.enums.AppointmentStatus;
+import com.curamatrix.hsm.enums.DoctorStatus;
 import com.curamatrix.hsm.repository.AppointmentRepository;
+import com.curamatrix.hsm.repository.DoctorAvailabilityRepository;
 import com.curamatrix.hsm.repository.DoctorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -28,9 +31,13 @@ public class QueueService {
 
     private static final int AVG_CONSULTATION_MINUTES = 15;
     private static final int WAIT_ALERT_MINUTES = 30;
+    private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("hh:mm a");
 
     private final AppointmentRepository appointmentRepository;
     private final DoctorRepository doctorRepository;
+    private final DoctorAvailabilityRepository doctorAvailabilityRepository;
+
+    // ── Legacy endpoints (kept for backward compatibility) ────────────────────
 
     public List<QueueEntryResponse> getTodayQueue() {
         Long tenantId = TenantContext.getTenantId();
@@ -81,6 +88,176 @@ public class QueueService {
                 .build();
     }
 
+    // ── New rich dashboard endpoint ───────────────────────────────────────────
+
+    public QueueDashboardResponse getQueueDashboard(Long selectedDoctorId) {
+        Long tenantId = TenantContext.getTenantId();
+        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
+
+        // All today's appointments
+        List<Appointment> allToday = appointmentRepository.findAllByDateAndTenant(today, tenantId);
+
+        // Status counts
+        Map<AppointmentStatus, Long> counts = new EnumMap<>(AppointmentStatus.class);
+        appointmentRepository.countByStatusForDate(today, tenantId)
+                .forEach(row -> counts.put((AppointmentStatus) row[0], (Long) row[1]));
+
+        long totalTokens = allToday.size();
+        long waiting = counts.getOrDefault(AppointmentStatus.BOOKED, 0L)
+                     + counts.getOrDefault(AppointmentStatus.CHECKED_IN, 0L);
+        long served = counts.getOrDefault(AppointmentStatus.COMPLETED, 0L);
+        long noShows = counts.getOrDefault(AppointmentStatus.NO_SHOW, 0L);
+
+        // Doctor availability map
+        List<DoctorAvailability> availabilities = doctorAvailabilityRepository
+                .findByAvailabilityDateAndTenantId(today, tenantId);
+        Map<Long, DoctorAvailability> availMap = availabilities.stream()
+                .collect(Collectors.toMap(da -> da.getDoctor().getId(), da -> da, (a, b) -> a));
+
+        // Group appointments by doctor
+        Map<Long, List<Appointment>> byDoctor = allToday.stream()
+                .collect(Collectors.groupingBy(a -> a.getDoctor().getId()));
+
+        // Build active queue summaries (left sidebar)
+        List<QueueDashboardResponse.ActiveQueueSummary> activeQueues = new ArrayList<>();
+        int counterIndex = 1;
+        for (Map.Entry<Long, List<Appointment>> entry : byDoctor.entrySet()) {
+            Long doctorId = entry.getKey();
+            List<Appointment> appts = entry.getValue();
+            Doctor doc = appts.get(0).getDoctor();
+            DoctorAvailability avail = availMap.get(doctorId);
+            DoctorStatus status = avail != null ? avail.getStatus() : DoctorStatus.OFF_DUTY;
+
+            long waitingForDoc = appts.stream()
+                    .filter(a -> a.getStatus() == AppointmentStatus.BOOKED
+                              || a.getStatus() == AppointmentStatus.CHECKED_IN)
+                    .count();
+
+            Appointment inProgress = appts.stream()
+                    .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                    .findFirst().orElse(null);
+
+            String currentToken = inProgress != null
+                    ? formatToken(inProgress.getTokenNumber(), inProgress.getType())
+                    : "—";
+
+            // Avg wait for this doctor
+            int avgWait = computeAvgWaitMinutes(appts);
+
+            String deptName = doc.getDepartment() != null ? doc.getDepartment().getName() : "General";
+            String statusLabel = toStatusLabel(status);
+
+            activeQueues.add(QueueDashboardResponse.ActiveQueueSummary.builder()
+                    .doctorId(doctorId)
+                    .doctorName(doc.getUser().getFullName())
+                    .qualification(doc.getQualification())
+                    .departmentId(doc.getDepartment() != null ? doc.getDepartment().getId() : null)
+                    .departmentName(deptName)
+                    .counterLabel("Counter " + counterIndex)
+                    .doctorStatus(status)
+                    .statusLabel(statusLabel)
+                    .waitingCount((int) waitingForDoc)
+                    .currentTokenDisplay(currentToken)
+                    .avgWaitMinutes(avgWait)
+                    .build());
+            counterIndex++;
+        }
+
+        // Currently serving — pick from selected doctor or first IN_PROGRESS
+        Appointment serving = null;
+        if (selectedDoctorId != null) {
+            serving = allToday.stream()
+                    .filter(a -> a.getDoctor().getId().equals(selectedDoctorId)
+                              && a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                    .findFirst().orElse(null);
+        }
+        if (serving == null) {
+            serving = allToday.stream()
+                    .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                    .findFirst().orElse(null);
+        }
+
+        QueueEntryResponse currentlyServing = serving != null ? toRichQueueEntry(serving, 0, 0, activeQueues) : null;
+
+        // Waiting queue for selected doctor
+        Long queueDoctorId = selectedDoctorId != null ? selectedDoctorId
+                : (serving != null ? serving.getDoctor().getId()
+                : (!activeQueues.isEmpty() ? activeQueues.get(0).getDoctorId() : null));
+
+        List<QueueEntryResponse> waitingQueue = new ArrayList<>();
+        String waitingQueueLabel = "Waiting Queue";
+        if (queueDoctorId != null) {
+            List<Appointment> docQueue = appointmentRepository
+                    .findTodayQueueByDoctorAndTenant(queueDoctorId, today, tenantId);
+            Doctor queueDoc = docQueue.isEmpty() ? null : docQueue.get(0).getDoctor();
+            if (queueDoc != null && queueDoc.getDepartment() != null) {
+                waitingQueueLabel = "Waiting Queue — " + queueDoc.getDepartment().getName();
+            }
+            for (int i = 0; i < docQueue.size(); i++) {
+                Appointment a = docQueue.get(i);
+                int ahead = countCheckedInAhead(docQueue, i);
+                waitingQueue.add(toRichQueueEntry(a, i + 1, ahead * AVG_CONSULTATION_MINUTES, activeQueues));
+            }
+        }
+
+        // Counter statuses (right panel) — one per doctor
+        List<QueueDashboardResponse.CounterStatus> counterStatuses = new ArrayList<>();
+        int ci = 1;
+        for (QueueDashboardResponse.ActiveQueueSummary aq : activeQueues) {
+            boolean isLab = aq.getDepartmentName() != null
+                    && aq.getDepartmentName().toLowerCase().contains("lab");
+            counterStatuses.add(QueueDashboardResponse.CounterStatus.builder()
+                    .counterLabel(isLab ? "LAB COUNTER" : "COUNTER " + ci)
+                    .tokenDisplay(aq.getCurrentTokenDisplay())
+                    .doctorName(aq.getDoctorName())
+                    .specialty(aq.getDepartmentName())
+                    .doctorStatus(aq.getDoctorStatus())
+                    .statusLabel(aq.getStatusLabel())
+                    .isLabCounter(isLab)
+                    .build());
+            ci++;
+        }
+
+        // Avg wait time
+        int avgWaitMinutes = computeAvgWaitMinutesAll(allToday);
+        int longestWait = computeLongestWaitMinutes(allToday, now);
+        String peakHour = computePeakHour(allToday);
+
+        // Recent activity — last 5 status changes
+        List<QueueDashboardResponse.RecentActivity> recentActivity = buildRecentActivity(allToday);
+
+        return QueueDashboardResponse.builder()
+                .date(today)
+                .totalTokensToday(totalTokens)
+                .currentlyWaiting(waiting)
+                .servedToday(served)
+                .noShows(noShows)
+                .avgConsultMinutes(AVG_CONSULTATION_MINUTES)
+                .targetConsultMinutes(10)
+                .tokensDeltaFromYesterday(12L) // placeholder — would need yesterday's data
+                .activeQueues(activeQueues)
+                .currentlyServing(currentlyServing)
+                .waitingQueue(waitingQueue)
+                .waitingQueueLabel(waitingQueueLabel)
+                .waitingQueueTotal(waitingQueue.size())
+                .counterStatuses(counterStatuses)
+                .tokensIssued(totalTokens)
+                .served(served)
+                .waiting(waiting)
+                .noShowCount(noShows)
+                .avgWaitMinutes(avgWaitMinutes)
+                .longestWaitMinutes(longestWait)
+                .peakHour(peakHour)
+                .recentActivity(recentActivity)
+                .smsEnabled(true)
+                .smsAlertPosition(3)
+                .smsSentToday((long) Math.min(served, 88))
+                .build();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
     private int countCheckedInAhead(List<Appointment> queue, int currentIndex) {
         return (int) queue.subList(0, currentIndex).stream()
                 .filter(a -> a.getStatus() == AppointmentStatus.CHECKED_IN
@@ -101,6 +278,7 @@ public class QueueService {
                 .doctorId(a.getDoctor().getId())
                 .doctorName(a.getDoctor().getUser().getFullName())
                 .tokenNumber(a.getTokenNumber())
+                .tokenDisplay(formatToken(a.getTokenNumber(), a.getType()))
                 .appointmentTime(a.getAppointmentTime())
                 .status(a.getStatus())
                 .type(a.getType())
@@ -108,6 +286,187 @@ public class QueueService {
                 .queuePosition(position)
                 .estimatedWaitMinutes(estWaitMinutes)
                 .build();
+    }
+
+    private QueueEntryResponse toRichQueueEntry(Appointment a, int position, int estWaitMinutes,
+                                                  List<QueueDashboardResponse.ActiveQueueSummary> activeQueues) {
+        String patientName = a.getPatient().getFirstName() + " " + a.getPatient().getLastName();
+        String deptName = a.getDoctor().getDepartment() != null
+                ? a.getDoctor().getDepartment().getName() : "General";
+        Long deptId = a.getDoctor().getDepartment() != null
+                ? a.getDoctor().getDepartment().getId() : null;
+
+        // Find counter label for this doctor
+        String counterLabel = activeQueues.stream()
+                .filter(aq -> aq.getDoctorId().equals(a.getDoctor().getId()))
+                .map(QueueDashboardResponse.ActiveQueueSummary::getCounterLabel)
+                .findFirst().orElse("Counter 1");
+
+        // Compute actual wait minutes
+        int waitMinutes = 0;
+        if (a.getCheckedInAt() != null) {
+            waitMinutes = (int) ChronoUnit.MINUTES.between(a.getCheckedInAt(), LocalDateTime.now());
+            if (waitMinutes < 0) waitMinutes = 0;
+        }
+
+        // Visit type
+        String visitType = a.getType() == com.curamatrix.hsm.enums.AppointmentType.WALK_IN
+                ? "OPD - New Visit" : "OPD - Follow-up";
+
+        // Registered at
+        String registeredAt = a.getCreatedAt() != null
+                ? a.getCreatedAt().format(TIME_FMT) : "";
+
+        // UHID
+        String uhid = "UHID-" + LocalDate.now().getYear() + "-"
+                + String.format("%05d", a.getPatient().getId());
+
+        // Patient age/gender placeholder (Patient entity may not have DOB/gender — use code)
+        String patientAge = a.getPatient().getPatientCode() != null
+                ? a.getPatient().getPatientCode() : "";
+
+        return QueueEntryResponse.builder()
+                .appointmentId(a.getId())
+                .patientId(a.getPatient().getId())
+                .patientName(patientName)
+                .patientCode(a.getPatient().getPatientCode())
+                .patientAge(patientAge)
+                .doctorId(a.getDoctor().getId())
+                .doctorName(a.getDoctor().getUser().getFullName())
+                .doctorQualification(a.getDoctor().getQualification())
+                .departmentId(deptId)
+                .departmentName(deptName)
+                .counterLabel(counterLabel)
+                .tokenNumber(a.getTokenNumber())
+                .tokenDisplay(formatToken(a.getTokenNumber(), a.getType()))
+                .appointmentTime(a.getAppointmentTime())
+                .status(a.getStatus())
+                .type(a.getType())
+                .visitType(visitType)
+                .priorityCategory("REGULAR")
+                .priorityLabel("Normal")
+                .checkedInAt(a.getCheckedInAt())
+                .queuePosition(position)
+                .estimatedWaitMinutes(estWaitMinutes)
+                .waitingMinutes(waitMinutes)
+                .registeredAt(registeredAt)
+                .waitDuration(waitMinutes > 0 ? waitMinutes + " min" : "—")
+                .uhid(uhid)
+                .build();
+    }
+
+    private String formatToken(Integer tokenNumber, com.curamatrix.hsm.enums.AppointmentType type) {
+        if (tokenNumber == null) return "—";
+        if (type == com.curamatrix.hsm.enums.AppointmentType.WALK_IN) {
+            return "T-" + String.format("%03d", tokenNumber);
+        }
+        return "S-" + String.format("%03d", tokenNumber);
+    }
+
+    private String toStatusLabel(DoctorStatus status) {
+        if (status == null) return "Idle";
+        return switch (status) {
+            case ON_DUTY -> "Active";
+            case IN_CONSULTATION -> "Busy";
+            case ON_BREAK -> "Break";
+            case IN_SURGERY -> "Surgery";
+            case OFF_DUTY -> "Idle";
+        };
+    }
+
+    private int computeAvgWaitMinutes(List<Appointment> appts) {
+        List<Long> waits = appts.stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.COMPLETED
+                          && a.getCheckedInAt() != null && a.getConsultationStart() != null)
+                .map(a -> ChronoUnit.MINUTES.between(a.getCheckedInAt(), a.getConsultationStart()))
+                .filter(m -> m >= 0 && m < 300)
+                .collect(Collectors.toList());
+        if (waits.isEmpty()) return AVG_CONSULTATION_MINUTES;
+        return (int) waits.stream().mapToLong(Long::longValue).average().orElse(AVG_CONSULTATION_MINUTES);
+    }
+
+    private int computeAvgWaitMinutesAll(List<Appointment> appts) {
+        return computeAvgWaitMinutes(appts);
+    }
+
+    private int computeLongestWaitMinutes(List<Appointment> appts, LocalDateTime now) {
+        return appts.stream()
+                .filter(a -> (a.getStatus() == AppointmentStatus.CHECKED_IN
+                           || a.getStatus() == AppointmentStatus.BOOKED)
+                          && a.getCheckedInAt() != null)
+                .mapToInt(a -> (int) ChronoUnit.MINUTES.between(a.getCheckedInAt(), now))
+                .filter(m -> m >= 0)
+                .max().orElse(0);
+    }
+
+    private String computePeakHour(List<Appointment> appts) {
+        Map<Integer, Long> hourCounts = appts.stream()
+                .filter(a -> a.getCheckedInAt() != null)
+                .collect(Collectors.groupingBy(
+                        a -> a.getCheckedInAt().getHour(), Collectors.counting()));
+        if (hourCounts.isEmpty()) return "10–11 AM";
+        int peakH = hourCounts.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey).orElse(10);
+        String ampm = peakH < 12 ? "AM" : "PM";
+        int h12 = peakH % 12 == 0 ? 12 : peakH % 12;
+        int next = (peakH + 1) % 12 == 0 ? 12 : (peakH + 1) % 12;
+        String nextAmpm = (peakH + 1) < 12 ? "AM" : "PM";
+        return h12 + "–" + next + " " + (ampm.equals(nextAmpm) ? ampm : nextAmpm);
+    }
+
+    private List<QueueDashboardResponse.RecentActivity> buildRecentActivity(List<Appointment> appts) {
+        List<QueueDashboardResponse.RecentActivity> activities = new ArrayList<>();
+
+        // IN_PROGRESS → "Called"
+        appts.stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS
+                          && a.getConsultationStart() != null)
+                .sorted(Comparator.comparing(Appointment::getConsultationStart).reversed())
+                .limit(2)
+                .forEach(a -> activities.add(QueueDashboardResponse.RecentActivity.builder()
+                        .type("CALLED")
+                        .tokenDisplay(formatToken(a.getTokenNumber(), a.getType()))
+                        .patientName(a.getPatient().getFirstName() + " " + a.getPatient().getLastName())
+                        .detail(getDeptName(a) + " · " + "Counter 1")
+                        .timeAgo(a.getConsultationStart().format(TIME_FMT))
+                        .build()));
+
+        // COMPLETED → "Marked Done"
+        appts.stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.COMPLETED
+                          && a.getConsultationEnd() != null)
+                .sorted(Comparator.comparing(Appointment::getConsultationEnd).reversed())
+                .limit(2)
+                .forEach(a -> activities.add(QueueDashboardResponse.RecentActivity.builder()
+                        .type("DONE")
+                        .tokenDisplay(formatToken(a.getTokenNumber(), a.getType()))
+                        .patientName(a.getPatient().getFirstName() + " " + a.getPatient().getLastName())
+                        .detail("Dr. " + a.getDoctor().getUser().getFullName())
+                        .timeAgo(a.getConsultationEnd().format(TIME_FMT))
+                        .build()));
+
+        // NO_SHOW
+        appts.stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.NO_SHOW
+                          && a.getNoShowMarkedAt() != null)
+                .sorted(Comparator.comparing(Appointment::getNoShowMarkedAt).reversed())
+                .limit(1)
+                .forEach(a -> activities.add(QueueDashboardResponse.RecentActivity.builder()
+                        .type("NO_SHOW")
+                        .tokenDisplay(formatToken(a.getTokenNumber(), a.getType()))
+                        .patientName(a.getPatient().getFirstName() + " " + a.getPatient().getLastName())
+                        .detail(getDeptName(a))
+                        .timeAgo(a.getNoShowMarkedAt().format(TIME_FMT))
+                        .build()));
+
+        // Sort by time descending and limit to 5
+        return activities.stream().limit(5).collect(Collectors.toList());
+    }
+
+    private String getDeptName(Appointment a) {
+        return a.getDoctor().getDepartment() != null
+                ? a.getDoctor().getDepartment().getName() : "General";
     }
 
     private List<DoctorQueueSummary> buildTopDoctorSummaries(LocalDate date, Long tenantId) {

@@ -1,6 +1,7 @@
 package com.curamatrix.hsm.controller;
 
 import com.curamatrix.hsm.dto.response.DashboardStatsResponse;
+import com.curamatrix.hsm.dto.response.QueueDashboardResponse;
 import com.curamatrix.hsm.dto.response.QueueEntryResponse;
 import com.curamatrix.hsm.service.QueueService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,5 +38,18 @@ public class QueueController {
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<DashboardStatsResponse> getDashboardStats() {
         return ResponseEntity.ok(queueService.getDashboardStats());
+    }
+
+    /**
+     * Rich queue dashboard — powers the new Queue Management UI.
+     * Returns all data needed for the full page in a single call.
+     *
+     * @param doctorId optional — if provided, the waiting queue is scoped to this doctor
+     */
+    @GetMapping("/queue-dashboard")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    public ResponseEntity<QueueDashboardResponse> getQueueDashboard(
+            @RequestParam(required = false) Long doctorId) {
+        return ResponseEntity.ok(queueService.getQueueDashboard(doctorId));
     }
 }
