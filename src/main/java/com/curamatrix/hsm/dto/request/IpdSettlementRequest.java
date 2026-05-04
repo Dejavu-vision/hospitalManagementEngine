@@ -14,8 +14,9 @@ public class IpdSettlementRequest {
     @DecimalMin(value = "0.0", message = "Amount cannot be negative")
     private BigDecimal amount;
 
-    @NotBlank(message = "Payment method is required")
-    private String paymentMethod; // CASH, CARD, UPI
+    private String paymentMethod; // CASH, CARD, UPI, NEFT, CHEQUE — optional when balance = 0
+
+    private BigDecimal refundAmount; // positive value when hospital owes patient a refund
 
     private String transactionRef;
 

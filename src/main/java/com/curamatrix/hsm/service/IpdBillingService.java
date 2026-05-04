@@ -247,26 +247,44 @@ public class IpdBillingService {
             throw new InvalidStateTransitionException("Admission", "DISCHARGED", "SETTLE");
         }
 
+        if (!admission.isInvoiceGenerated()) {
+            throw new InvalidStateTransitionException("Admission", "INVOICE_NOT_GENERATED", "SETTLE");
+        }
+
         Billing bill = billingRepository.findByIpdAdmissionId(admissionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Running Bill", "admissionId", admissionId));
 
-        // Calculate balance
-        BigDecimal totalCharges = bill.getTotalAmount();
-        BigDecimal alreadyPaid = bill.getPaidAmount();
-
-        // Collect balance payment if any
-        if (req.getAmount() != null && req.getAmount().compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal newPaid = alreadyPaid.add(req.getAmount());
-            bill.setPaidAmount(newPaid);
+        // Calculate TPA approved amount
+        BigDecimal tpaApprovedAmount = BigDecimal.ZERO;
+        PreAuthRequest preAuth = loadPreAuth(admissionId, tenantId);
+        if (preAuth != null && "APPROVED".equals(preAuth.getStatus().name())) {
+            tpaApprovedAmount = preAuth.getApprovedAmount() != null ? preAuth.getApprovedAmount() : BigDecimal.ZERO;
+            bill.setInsuranceAdjustment(tpaApprovedAmount);
         }
 
-        // Mark bill as paid/closed
+        // Record balance payment (positive = collect from patient) or refund (use refundAmount field)
+        if (req.getAmount() != null && req.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+            bill.setPaidAmount(bill.getPaidAmount().add(req.getAmount()));
+        }
+        // For refunds: paidAmount stays as deposit (hospital already has the money, just returns excess)
+        // refundAmount is tracked in the response for receipt purposes
+
+        // Set payment method from request
+        if (req.getPaymentMethod() != null) {
+            try {
+                bill.setPaymentMethod(PaymentMethod.valueOf(req.getPaymentMethod().toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                bill.setPaymentMethod(PaymentMethod.CASH);
+            }
+        }
+
+        // Mark bill as settled
         bill.setPaymentStatus(PaymentStatus.PAID);
         bill.setPaidAt(LocalDateTime.now());
-        bill.setNetAmount(totalCharges);
+        recalcNet(bill);
         billingRepository.save(bill);
 
-        // Discharge the patient
+        // Release bed
         BedAllocation alloc = allocationRepository
                 .findByAdmissionIdAndIsCurrentTrueAndTenantId(admissionId, tenantId).orElse(null);
         String bedNumber = null;
@@ -274,26 +292,37 @@ public class IpdBillingService {
             alloc.setIsCurrent(false);
             alloc.setEndTime(LocalDateTime.now());
             allocationRepository.save(alloc);
-
             Bed bed = alloc.getBed();
             bedNumber = bed.getBedNumber();
             bed.setStatus(BedStatus.CLEANING);
             bedRepository.save(bed);
         }
 
+        // Discharge patient
         admission.setStatus(AdmissionStatus.DISCHARGED);
         admission.setActualDischargeTime(LocalDateTime.now());
         admissionRepository.save(admission);
 
         log.info("IPD final settlement complete for admission {}. Bed {} released.", admissionId, bedNumber);
 
+        BigDecimal totalCharges = bill.getTotalAmount();
+        BigDecimal depositPaid = admission.getDepositAmount() != null ? admission.getDepositAmount() : BigDecimal.ZERO;
+        BigDecimal balanceCollected = req.getAmount() != null && req.getAmount().compareTo(BigDecimal.ZERO) > 0 ? req.getAmount() : BigDecimal.ZERO;
+        // Refund = deposit + tpa - total (when deposit > charges)
+        BigDecimal refundAmount = req.getRefundAmount() != null ? req.getRefundAmount() : BigDecimal.ZERO;
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("admissionId", admissionId);
         result.put("admissionNumber", admission.getAdmissionNumber());
+        result.put("patientName", admission.getPatient().getFirstName() + " " + admission.getPatient().getLastName());
+        result.put("invoiceNumber", bill.getInvoiceNumber());
         result.put("status", "DISCHARGED");
         result.put("totalCharges", totalCharges);
+        result.put("depositPaid", depositPaid);
+        result.put("tpaApprovedAmount", tpaApprovedAmount);
+        result.put("balanceCollected", balanceCollected.compareTo(BigDecimal.ZERO) > 0 ? balanceCollected : BigDecimal.ZERO);
+        result.put("refundAmount", refundAmount);
         result.put("totalPaid", bill.getPaidAmount());
-        result.put("balance", totalCharges.subtract(bill.getPaidAmount()));
         result.put("bedReleased", bedNumber);
         result.put("dischargeTime", admission.getActualDischargeTime().toString());
         return result;
@@ -354,12 +383,40 @@ public class IpdBillingService {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * Load the most recent pre-auth for this admission (null if none).
+     * Load the pre-auth for this admission.
+     * Strategy:
+     * 1. Use admission.preAuthId (direct FK) — most reliable
+     * 2. Fall back to querying by admissionId on the pre-auth record
+     * 3. Fall back to most recent pre-auth for the patient (covers TPA desk created after admission)
      */
     private PreAuthRequest loadPreAuth(Long admissionId, Long tenantId) {
-        List<PreAuthRequest> preAuths = preAuthRequestRepository
+        // 1. Direct FK on admission
+        IpdAdmission admission = admissionRepository.findById(admissionId).orElse(null);
+        if (admission != null && admission.getPreAuthId() != null) {
+            PreAuthRequest pa = preAuthRequestRepository.findById(admission.getPreAuthId()).orElse(null);
+            if (pa != null) return pa;
+        }
+        // 2. Pre-auth linked to this admissionId
+        List<PreAuthRequest> byAdmission = preAuthRequestRepository
                 .findByAdmissionIdAndTenantId(admissionId, tenantId);
-        return preAuths.isEmpty() ? null : preAuths.get(0);
+        if (!byAdmission.isEmpty()) return byAdmission.get(0);
+        // 3. Most recent pre-auth for the patient (TPA desk may have created it after admission)
+        if (admission != null) {
+            List<PreAuthRequest> byPatient = preAuthRequestRepository
+                    .findByPatientIdAndTenantIdOrderByRequestedAtDesc(admission.getPatient().getId(), tenantId);
+            if (!byPatient.isEmpty()) {
+                // Link it to this admission for future lookups
+                PreAuthRequest pa = byPatient.get(0);
+                if (pa.getAdmissionId() == null) {
+                    pa.setAdmissionId(admissionId);
+                    preAuthRequestRepository.save(pa);
+                    admission.setPreAuthId(pa.getId());
+                    admissionRepository.save(admission);
+                }
+                return pa;
+            }
+        }
+        return null;
     }
 
     /**
@@ -484,6 +541,7 @@ public class IpdBillingService {
         // Existing fields
         result.put("admissionId", admission.getId());
         result.put("admissionNumber", admission.getAdmissionNumber());
+        result.put("invoiceNumber", bill.getInvoiceNumber());
         result.put("patientName", admission.getPatient().getFirstName() + " " + admission.getPatient().getLastName());
         result.put("patientCode", admission.getPatient().getPatientCode());
         result.put("status", admission.getStatus().name());

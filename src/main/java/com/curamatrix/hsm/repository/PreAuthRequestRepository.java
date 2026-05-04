@@ -12,5 +12,6 @@ import java.util.List;
 public interface PreAuthRequestRepository extends JpaRepository<PreAuthRequest, Long> {
     Page<PreAuthRequest> findByTenantId(Long tenantId, Pageable pageable);
     Page<PreAuthRequest> findByPatientIdAndTenantId(Long patientId, Long tenantId, Pageable pageable);
+    List<PreAuthRequest> findByPatientIdAndTenantIdOrderByRequestedAtDesc(Long patientId, Long tenantId);
     List<PreAuthRequest> findByAdmissionIdAndTenantId(Long admissionId, Long tenantId);
 }
