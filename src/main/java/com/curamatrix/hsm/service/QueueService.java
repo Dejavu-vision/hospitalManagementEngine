@@ -51,9 +51,25 @@ public class QueueService {
         LocalDate today = LocalDate.now();
         List<Appointment> queue = appointmentRepository
                 .findTodayQueueByDoctorAndTenant(doctorId, today, tenantId);
+
+        // Build a minimal activeQueues list for counter label lookup
+        List<QueueDashboardResponse.ActiveQueueSummary> activeQueues = List.of(
+                QueueDashboardResponse.ActiveQueueSummary.builder()
+                        .doctorId(doctorId)
+                        .counterLabel("Counter 1")
+                        .build()
+        );
+
         return IntStream.range(0, queue.size())
-                .mapToObj(i -> toQueueEntry(queue.get(i), i + 1,
-                        countCheckedInAhead(queue, i) * AVG_CONSULTATION_MINUTES))
+                .mapToObj(i -> {
+                    Appointment a = queue.get(i);
+                    List<Appointment> activeAhead = queue.subList(0, i).stream()
+                            .filter(x -> x.getStatus() == AppointmentStatus.BOOKED
+                                      || x.getStatus() == AppointmentStatus.CHECKED_IN)
+                            .collect(Collectors.toList());
+                    int estWait = activeAhead.size() * AVG_CONSULTATION_MINUTES;
+                    return toRichQueueEntry(a, i + 1, estWait, activeQueues);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -95,8 +111,21 @@ public class QueueService {
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
 
-        // All today's appointments
-        List<Appointment> allToday = appointmentRepository.findAllByDateAndTenant(today, tenantId);
+        // All today's appointments (all statuses — for stats and recent activity)
+        // Deduplicate by appointment ID in case JOIN FETCH produces duplicates
+        List<Appointment> allToday = appointmentRepository.findAllByDateAndTenant(today, tenantId)
+                .stream()
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toMap(a -> a.getId(), a -> a, (a, b) -> a, java.util.LinkedHashMap::new),
+                        map -> new ArrayList<>(map.values())
+                ));
+
+        // Active only (BOOKED, CHECKED_IN, IN_PROGRESS) — for queue logic
+        List<Appointment> activeToday = allToday.stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.BOOKED
+                          || a.getStatus() == AppointmentStatus.CHECKED_IN
+                          || a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                .collect(Collectors.toList());
 
         // Status counts
         Map<AppointmentStatus, Long> counts = new EnumMap<>(AppointmentStatus.class);
@@ -115,26 +144,36 @@ public class QueueService {
         Map<Long, DoctorAvailability> availMap = availabilities.stream()
                 .collect(Collectors.toMap(da -> da.getDoctor().getId(), da -> da, (a, b) -> a));
 
-        // Group appointments by doctor
-        Map<Long, List<Appointment>> byDoctor = allToday.stream()
-                .collect(Collectors.groupingBy(a -> a.getDoctor().getId()));
+        // Build one entry per doctor — use LinkedHashMap for stable insertion order
+        // Sort by doctorId so counter numbers are consistent across calls
+        Map<Long, Doctor> doctorMap = new java.util.LinkedHashMap<>();
+        allToday.stream()
+                .sorted(Comparator.comparingLong(a -> a.getDoctor().getId()))
+                .forEach(a -> doctorMap.putIfAbsent(a.getDoctor().getId(), a.getDoctor()));
 
-        // Build active queue summaries (left sidebar)
+        // Build active queue summaries (left sidebar) — one entry per unique doctor
         List<QueueDashboardResponse.ActiveQueueSummary> activeQueues = new ArrayList<>();
         int counterIndex = 1;
-        for (Map.Entry<Long, List<Appointment>> entry : byDoctor.entrySet()) {
+        for (Map.Entry<Long, Doctor> entry : doctorMap.entrySet()) {
             Long doctorId = entry.getKey();
-            List<Appointment> appts = entry.getValue();
-            Doctor doc = appts.get(0).getDoctor();
+            Doctor doc = entry.getValue();
+
+            List<Appointment> allForDoc = allToday.stream()
+                    .filter(a -> a.getDoctor().getId().equals(doctorId))
+                    .collect(Collectors.toList());
+            List<Appointment> activeForDoc = activeToday.stream()
+                    .filter(a -> a.getDoctor().getId().equals(doctorId))
+                    .collect(Collectors.toList());
+
             DoctorAvailability avail = availMap.get(doctorId);
             DoctorStatus status = avail != null ? avail.getStatus() : DoctorStatus.OFF_DUTY;
 
-            long waitingForDoc = appts.stream()
+            long waitingForDoc = activeForDoc.stream()
                     .filter(a -> a.getStatus() == AppointmentStatus.BOOKED
                               || a.getStatus() == AppointmentStatus.CHECKED_IN)
                     .count();
 
-            Appointment inProgress = appts.stream()
+            Appointment inProgress = activeForDoc.stream()
                     .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS)
                     .findFirst().orElse(null);
 
@@ -142,11 +181,12 @@ public class QueueService {
                     ? formatToken(inProgress.getTokenNumber(), inProgress.getType())
                     : "—";
 
-            // Avg wait for this doctor
-            int avgWait = computeAvgWaitMinutes(appts);
-
+            int avgWait = computeAvgWaitMinutes(allForDoc);
             String deptName = doc.getDepartment() != null ? doc.getDepartment().getName() : "General";
-            String statusLabel = toStatusLabel(status);
+
+            // Determine counter label — Lab gets special label
+            boolean isLab = deptName.toLowerCase().contains("lab");
+            String counterLabel = isLab ? "Lab Counter" : "Counter " + counterIndex;
 
             activeQueues.add(QueueDashboardResponse.ActiveQueueSummary.builder()
                     .doctorId(doctorId)
@@ -154,9 +194,9 @@ public class QueueService {
                     .qualification(doc.getQualification())
                     .departmentId(doc.getDepartment() != null ? doc.getDepartment().getId() : null)
                     .departmentName(deptName)
-                    .counterLabel("Counter " + counterIndex)
+                    .counterLabel(counterLabel)
                     .doctorStatus(status)
-                    .statusLabel(statusLabel)
+                    .statusLabel(toStatusLabel(status))
                     .waitingCount((int) waitingForDoc)
                     .currentTokenDisplay(currentToken)
                     .avgWaitMinutes(avgWait)
@@ -167,24 +207,27 @@ public class QueueService {
         // Currently serving — pick from selected doctor or first IN_PROGRESS
         Appointment serving = null;
         if (selectedDoctorId != null) {
-            serving = allToday.stream()
+            serving = activeToday.stream()
                     .filter(a -> a.getDoctor().getId().equals(selectedDoctorId)
                               && a.getStatus() == AppointmentStatus.IN_PROGRESS)
                     .findFirst().orElse(null);
         }
         if (serving == null) {
-            serving = allToday.stream()
+            serving = activeToday.stream()
                     .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS)
                     .findFirst().orElse(null);
         }
 
-        QueueEntryResponse currentlyServing = serving != null ? toRichQueueEntry(serving, 0, 0, activeQueues) : null;
+        QueueEntryResponse currentlyServing = serving != null
+                ? toRichQueueEntry(serving, 0, 0, activeQueues) : null;
 
-        // Waiting queue for selected doctor
+        // Determine which doctor's queue to show in the centre panel
         Long queueDoctorId = selectedDoctorId != null ? selectedDoctorId
                 : (serving != null ? serving.getDoctor().getId()
                 : (!activeQueues.isEmpty() ? activeQueues.get(0).getDoctorId() : null));
 
+        // Waiting queue — ALL of today's appointments for the selected doctor
+        // (includes COMPLETED/NO_SHOW so the "Completed" tab works)
         List<QueueEntryResponse> waitingQueue = new ArrayList<>();
         String waitingQueueLabel = "Waiting Queue";
         if (queueDoctorId != null) {
@@ -194,37 +237,44 @@ public class QueueService {
             if (queueDoc != null && queueDoc.getDepartment() != null) {
                 waitingQueueLabel = "Waiting Queue — " + queueDoc.getDepartment().getName();
             }
+            // Only count BOOKED/CHECKED_IN as "ahead" for wait time
+            List<Appointment> activeDocQueue = docQueue.stream()
+                    .filter(a -> a.getStatus() == AppointmentStatus.BOOKED
+                              || a.getStatus() == AppointmentStatus.CHECKED_IN
+                              || a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                    .collect(Collectors.toList());
+
             for (int i = 0; i < docQueue.size(); i++) {
                 Appointment a = docQueue.get(i);
-                int ahead = countCheckedInAhead(docQueue, i);
+                // Estimate wait: count only BOOKED/CHECKED_IN patients ahead (not IN_PROGRESS)
+                int aheadIdx = activeDocQueue.indexOf(a);
+                int ahead = aheadIdx > 0
+                        ? (int) activeDocQueue.subList(0, aheadIdx).stream()
+                            .filter(x -> x.getStatus() == AppointmentStatus.BOOKED
+                                      || x.getStatus() == AppointmentStatus.CHECKED_IN)
+                            .count()
+                        : 0;
                 waitingQueue.add(toRichQueueEntry(a, i + 1, ahead * AVG_CONSULTATION_MINUTES, activeQueues));
             }
         }
 
-        // Counter statuses (right panel) — one per doctor
-        List<QueueDashboardResponse.CounterStatus> counterStatuses = new ArrayList<>();
-        int ci = 1;
-        for (QueueDashboardResponse.ActiveQueueSummary aq : activeQueues) {
-            boolean isLab = aq.getDepartmentName() != null
-                    && aq.getDepartmentName().toLowerCase().contains("lab");
-            counterStatuses.add(QueueDashboardResponse.CounterStatus.builder()
-                    .counterLabel(isLab ? "LAB COUNTER" : "COUNTER " + ci)
-                    .tokenDisplay(aq.getCurrentTokenDisplay())
-                    .doctorName(aq.getDoctorName())
-                    .specialty(aq.getDepartmentName())
-                    .doctorStatus(aq.getDoctorStatus())
-                    .statusLabel(aq.getStatusLabel())
-                    .isLabCounter(isLab)
-                    .build());
-            ci++;
-        }
+        // Counter statuses (right panel) — derived directly from activeQueues (already deduplicated)
+        List<QueueDashboardResponse.CounterStatus> counterStatuses = activeQueues.stream()
+                .map(aq -> QueueDashboardResponse.CounterStatus.builder()
+                        .counterLabel(aq.getCounterLabel().toUpperCase())
+                        .tokenDisplay(aq.getCurrentTokenDisplay())
+                        .doctorName(aq.getDoctorName())
+                        .specialty(aq.getDepartmentName())
+                        .doctorStatus(aq.getDoctorStatus())
+                        .statusLabel(aq.getStatusLabel())
+                        .isLabCounter(aq.getDepartmentName() != null
+                                && aq.getDepartmentName().toLowerCase().contains("lab"))
+                        .build())
+                .collect(Collectors.toList());
 
-        // Avg wait time
         int avgWaitMinutes = computeAvgWaitMinutesAll(allToday);
-        int longestWait = computeLongestWaitMinutes(allToday, now);
+        int longestWait = computeLongestWaitMinutes(activeToday, now);
         String peakHour = computePeakHour(allToday);
-
-        // Recent activity — last 5 status changes
         List<QueueDashboardResponse.RecentActivity> recentActivity = buildRecentActivity(allToday);
 
         return QueueDashboardResponse.builder()
@@ -235,7 +285,7 @@ public class QueueService {
                 .noShows(noShows)
                 .avgConsultMinutes(AVG_CONSULTATION_MINUTES)
                 .targetConsultMinutes(10)
-                .tokensDeltaFromYesterday(12L) // placeholder — would need yesterday's data
+                .tokensDeltaFromYesterday(0L)
                 .activeQueues(activeQueues)
                 .currentlyServing(currentlyServing)
                 .waitingQueue(waitingQueue)
@@ -252,7 +302,7 @@ public class QueueService {
                 .recentActivity(recentActivity)
                 .smsEnabled(true)
                 .smsAlertPosition(3)
-                .smsSentToday((long) Math.min(served, 88))
+                .smsSentToday(served)
                 .build();
     }
 

@@ -50,7 +50,14 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
                                     Pageable pageable);
 
     // All appointments for a tenant on a given date (for queue dashboard)
-    @Query("SELECT a FROM Appointment a WHERE a.appointmentDate = :date AND a.tenantId = :tenantId " +
+    // Uses JOIN FETCH to avoid N+1 lazy loading of patient, doctor, user, department
+    // DISTINCT prevents duplicate rows from JOIN FETCH with multiple associations
+    @Query("SELECT DISTINCT a FROM Appointment a " +
+           "JOIN FETCH a.patient " +
+           "JOIN FETCH a.doctor d " +
+           "JOIN FETCH d.user " +
+           "LEFT JOIN FETCH d.department " +
+           "WHERE a.appointmentDate = :date AND a.tenantId = :tenantId " +
            "ORDER BY a.doctor.id, a.tokenNumber, a.appointmentTime")
     List<Appointment> findAllByDateAndTenant(@Param("date") LocalDate date,
                                               @Param("tenantId") Long tenantId);
@@ -62,7 +69,12 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
                                          @Param("tenantId") Long tenantId);
 
     // Patients in CHECKED_IN status with their check-in time (for wait-time alerts)
-    @Query("SELECT a FROM Appointment a WHERE a.appointmentDate = :date AND a.tenantId = :tenantId " +
+    @Query("SELECT DISTINCT a FROM Appointment a " +
+           "JOIN FETCH a.patient " +
+           "JOIN FETCH a.doctor d " +
+           "JOIN FETCH d.user " +
+           "LEFT JOIN FETCH d.department " +
+           "WHERE a.appointmentDate = :date AND a.tenantId = :tenantId " +
            "AND a.status = 'CHECKED_IN' ORDER BY a.checkedInAt ASC")
     List<Appointment> findCheckedInByDateAndTenant(@Param("date") LocalDate date,
                                                     @Param("tenantId") Long tenantId);
@@ -74,8 +86,13 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Object[]> findVisitSummaryByPatient(@Param("patientId") Long patientId,
                                               @Param("tenantId") Long tenantId);
 
-    // Tenant-scoped today queue per doctor
-    @Query("SELECT a FROM Appointment a WHERE a.doctor.id = :doctorId " +
+    // Tenant-scoped today queue per doctor — all statuses (for full day history in queue table)
+    @Query("SELECT DISTINCT a FROM Appointment a " +
+           "JOIN FETCH a.patient " +
+           "JOIN FETCH a.doctor d " +
+           "JOIN FETCH d.user " +
+           "LEFT JOIN FETCH d.department " +
+           "WHERE a.doctor.id = :doctorId " +
            "AND a.appointmentDate = :date AND a.tenantId = :tenantId " +
            "ORDER BY CASE WHEN a.type = 'WALK_IN' THEN a.tokenNumber ELSE 999999 END, a.appointmentTime")
     List<Appointment> findTodayQueueByDoctorAndTenant(@Param("doctorId") Long doctorId,

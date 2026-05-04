@@ -22,4 +22,11 @@ public class WalkInRequest {
 
     @Pattern(regexp = "^[ABC]$", message = "Counter must be A, B, or C")
     private String counter;
+
+    /**
+     * Optional — when set, assigns this specific blocked (reserved) token number
+     * to the patient instead of auto-incrementing.
+     * The token must exist in blocked_tokens with status BLOCKED.
+     */
+    private Integer blockedTokenNumber;
 }

@@ -53,6 +53,7 @@ public class AppointmentService {
     private final AppointmentStatusLogRepository statusLogRepository;
     private final WalkInTokenSequenceRepository tokenSequenceRepository;
     private final BillingService billingService;
+    private final BlockedTokenService blockedTokenService;
 
     @Transactional
     public AppointmentResponse bookAppointment(AppointmentRequest request) {
@@ -130,19 +131,44 @@ public class AppointmentService {
         // ── Encode counter into notes ─────────────────────────────────────────
         String encodedNotes = encodeCounter(request.getCounter(), request.getNotes());
 
-        // Atomic token increment — one sequence per (date, tenant) across ALL doctors
-        WalkInTokenSequence seq = tokenSequenceRepository
-                .findForUpdate(today, tenantId)
-                .orElseGet(() -> {
-                    WalkInTokenSequence newSeq = WalkInTokenSequence.builder()
-                            .appointmentDate(today).lastToken(0).build();
-                    newSeq.setCounter(0); // Initialize counter field as well
-                    return newSeq;
-                });
-        seq.setLastToken(seq.getLastToken() + 1);
-        seq.setCounter(seq.getLastToken()); // Keep counter in sync with lastToken
-        seq = tokenSequenceRepository.save(seq);
-        int nextToken = seq.getLastToken();
+        // ── Token assignment ──────────────────────────────────────────────────
+        int nextToken;
+
+        if (request.getBlockedTokenNumber() != null) {
+            // Receptionist explicitly chose a blocked (reserved) token
+            boolean isAvailable = blockedTokenService.isTokenBlocked(
+                    request.getBlockedTokenNumber(), tenantId);
+            if (!isAvailable) {
+                throw new IllegalArgumentException(
+                        "Token T-" + String.format("%03d", request.getBlockedTokenNumber()) +
+                        " is not available as a blocked token. It may have already been assigned or released.");
+            }
+            nextToken = request.getBlockedTokenNumber();
+            // The blocked token record will be marked ASSIGNED after appointment is saved (below)
+        } else {
+            // Auto-increment — skip any currently blocked token numbers
+            WalkInTokenSequence seq = tokenSequenceRepository
+                    .findForUpdate(today, tenantId)
+                    .orElseGet(() -> {
+                        WalkInTokenSequence newSeq = WalkInTokenSequence.builder()
+                                .appointmentDate(today).lastToken(0).build();
+                        newSeq.setCounter(0);
+                        return newSeq;
+                    });
+
+            // Increment, skipping blocked numbers (max 100 attempts to avoid infinite loop)
+            int candidate = seq.getLastToken() + 1;
+            int attempts = 0;
+            while (attempts < 100 && blockedTokenService.isTokenBlocked(candidate, tenantId)) {
+                candidate++;
+                attempts++;
+            }
+
+            seq.setLastToken(candidate);
+            seq.setCounter(candidate);
+            tokenSequenceRepository.save(seq);
+            nextToken = candidate;
+        }
 
         Appointment appointment = Appointment.builder()
                 .patient(patient).doctor(doctor).bookedBy(bookedBy)
@@ -150,6 +176,11 @@ public class AppointmentService {
                 .tokenNumber(nextToken).status(AppointmentStatus.BOOKED)
                 .notes(encodedNotes).build();
         appointment = appointmentRepository.save(appointment);
+
+        // If a blocked token was used, mark it as ASSIGNED
+        if (request.getBlockedTokenNumber() != null) {
+            blockedTokenService.assignBlockedToken(request.getBlockedTokenNumber(), appointment.getId(), tenantId);
+        }
 
         // 2. Create billing
         Billing billing = null;
@@ -234,7 +265,8 @@ public class AppointmentService {
 
         LocalDateTime now = LocalDateTime.now();
         switch (newStatus) {
-            case CHECKED_IN  -> appointment.setCheckedInAt(now);
+            // Only set checkedInAt on first check-in — don't overwrite if skipping back
+            case CHECKED_IN  -> { if (appointment.getCheckedInAt() == null) appointment.setCheckedInAt(now); }
             case IN_PROGRESS -> appointment.setConsultationStart(now);
             case COMPLETED   -> appointment.setConsultationEnd(now);
             case NO_SHOW     -> appointment.setNoShowMarkedAt(now);

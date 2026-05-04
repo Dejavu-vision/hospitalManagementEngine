@@ -14,6 +14,12 @@ spring:
     show-sql: true
     database-platform: org.hibernate.dialect.MySQL8Dialect
 
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
 jwt:
   secret: curamatrix-hsm-secret-key-for-jwt-token-generation-minimum-512-bits
   expiration: 86400000  # 24 hours in milliseconds
