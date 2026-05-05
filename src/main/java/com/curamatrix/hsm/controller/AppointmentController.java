@@ -99,6 +99,14 @@ public class AppointmentController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/{id}/recall")
+    @PreAuthorize("hasRole('RECEPTIONIST')")
+    public ResponseEntity<AppointmentResponse> recallToken(@PathVariable Long id) {
+        log.info("Recalling token for appointment: {}", id);
+        AppointmentResponse response = appointmentService.recallToken(id);
+        return ResponseEntity.ok(response);
+    }
+
     @PutMapping("/{id}/reassign")
     @PreAuthorize("hasRole('RECEPTIONIST')")
     public ResponseEntity<AppointmentResponse> reassignDoctor(

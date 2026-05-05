@@ -74,4 +74,8 @@ public class Appointment extends TenantAwareEntity {
 
     @Column(name = "no_show_marked_at")
     private LocalDateTime noShowMarkedAt;
+
+    @Column(name = "recall_count")
+    @Builder.Default
+    private Integer recallCount = 0;
 }

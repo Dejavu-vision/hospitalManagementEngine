@@ -38,4 +38,5 @@ public class AppointmentResponse {
     private Long billingId;
     private String counter;
     private Integer activeQueueLength;
+    private Integer recallCount;
 }

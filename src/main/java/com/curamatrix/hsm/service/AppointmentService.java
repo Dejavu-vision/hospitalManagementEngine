@@ -265,8 +265,14 @@ public class AppointmentService {
 
         LocalDateTime now = LocalDateTime.now();
         switch (newStatus) {
-            // Only set checkedInAt on first check-in — don't overwrite if skipping back
-            case CHECKED_IN  -> { if (appointment.getCheckedInAt() == null) appointment.setCheckedInAt(now); }
+            // When skipping back from IN_PROGRESS or RECALLED, overwrite checkedInAt to move to bottom of queue
+            case CHECKED_IN  -> {
+                if (current == AppointmentStatus.IN_PROGRESS || current == AppointmentStatus.RECALLED) {
+                    appointment.setCheckedInAt(now); // overwrite — moves to bottom
+                } else if (appointment.getCheckedInAt() == null) {
+                    appointment.setCheckedInAt(now); // first check-in
+                }
+            }
             case IN_PROGRESS -> appointment.setConsultationStart(now);
             case COMPLETED   -> appointment.setConsultationEnd(now);
             case NO_SHOW     -> appointment.setNoShowMarkedAt(now);
@@ -276,6 +282,25 @@ public class AppointmentService {
         appointment.setStatus(newStatus);
         appointment = appointmentRepository.save(appointment);
         recordStatusLog(appointment, current, newStatus, getCurrentUser());
+        return mapToResponse(appointment);
+    }
+
+    @Transactional
+    public AppointmentResponse recallToken(Long id) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", id));
+
+        AppointmentStatus current = appointment.getStatus();
+        if (current != AppointmentStatus.IN_PROGRESS && current != AppointmentStatus.RECALLED) {
+            throw new InvalidStateTransitionException("appointment status", current.name(), "RECALLED");
+        }
+
+        int newRecallCount = (appointment.getRecallCount() == null ? 0 : appointment.getRecallCount()) + 1;
+        appointment.setRecallCount(newRecallCount);
+        appointment.setStatus(AppointmentStatus.RECALLED);
+        appointment = appointmentRepository.save(appointment);
+
+        recordStatusLog(appointment, current, AppointmentStatus.RECALLED, getCurrentUser());
         return mapToResponse(appointment);
     }
 
@@ -408,6 +433,7 @@ public class AppointmentService {
                 .consultationEnd(appointment.getConsultationEnd())
                 .noShowMarkedAt(appointment.getNoShowMarkedAt())
                 .createdAt(appointment.getCreatedAt())
+                .recallCount(appointment.getRecallCount())
                 .build();
     }
 }

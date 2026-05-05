@@ -102,7 +102,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     // Doctor queue lengths for auto-assignment
     @Query("SELECT a.doctor.id, COUNT(a) FROM Appointment a " +
            "WHERE a.doctor.department.id = :deptId AND a.appointmentDate = :date " +
-           "AND a.tenantId = :tenantId AND a.status IN ('BOOKED', 'CHECKED_IN', 'IN_PROGRESS') " +
+           "AND a.tenantId = :tenantId AND a.status IN ('BOOKED', 'CHECKED_IN', 'IN_PROGRESS', 'RECALLED') " +
            "GROUP BY a.doctor.id ORDER BY COUNT(a) ASC")
     List<Object[]> findQueueLengthsByDepartment(@Param("deptId") Long deptId,
                                                  @Param("date") LocalDate date,
@@ -111,7 +111,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     // Tenant-wide queue lengths for all doctors (for composite booking context API)
     @Query("SELECT a.doctor.id, COUNT(a) FROM Appointment a " +
            "WHERE a.appointmentDate = :date AND a.tenantId = :tenantId " +
-           "AND a.status IN ('BOOKED', 'CHECKED_IN', 'IN_PROGRESS') " +
+           "AND a.status IN ('BOOKED', 'CHECKED_IN', 'IN_PROGRESS', 'RECALLED') " +
            "GROUP BY a.doctor.id")
     List<Object[]> findQueueLengthsByTenant(@Param("date") LocalDate date,
                                             @Param("tenantId") Long tenantId);
@@ -143,7 +143,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     // Count BOOKED appointments for a doctor today (for queue length in response)
     @Query("SELECT COUNT(a) FROM Appointment a WHERE a.doctor.id = :doctorId " +
            "AND a.appointmentDate = :date AND a.tenantId = :tenantId " +
-           "AND a.status IN ('BOOKED', 'CHECKED_IN', 'IN_PROGRESS')")
+           "AND a.status IN ('BOOKED', 'CHECKED_IN', 'IN_PROGRESS', 'RECALLED')")
     long countActiveByDoctorAndDate(@Param("doctorId") Long doctorId,
                                      @Param("date") LocalDate date,
                                      @Param("tenantId") Long tenantId);

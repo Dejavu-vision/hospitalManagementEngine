@@ -35,4 +35,5 @@ public class QueueEntryResponse {
     private String registeredAt;        // formatted time string e.g. "10:12 AM"
     private String waitDuration;        // formatted e.g. "28 min"
     private String uhid;                // e.g. "UHID-2026-04821"
+    private Integer recallCount;        // number of times this token has been recalled
 }

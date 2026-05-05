@@ -120,11 +120,12 @@ public class QueueService {
                         map -> new ArrayList<>(map.values())
                 ));
 
-        // Active only (BOOKED, CHECKED_IN, IN_PROGRESS) — for queue logic
+        // Active only (BOOKED, CHECKED_IN, IN_PROGRESS, RECALLED) — for queue logic
         List<Appointment> activeToday = allToday.stream()
                 .filter(a -> a.getStatus() == AppointmentStatus.BOOKED
                           || a.getStatus() == AppointmentStatus.CHECKED_IN
-                          || a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                          || a.getStatus() == AppointmentStatus.IN_PROGRESS
+                          || a.getStatus() == AppointmentStatus.RECALLED)
                 .collect(Collectors.toList());
 
         // Status counts
@@ -134,7 +135,8 @@ public class QueueService {
 
         long totalTokens = allToday.size();
         long waiting = counts.getOrDefault(AppointmentStatus.BOOKED, 0L)
-                     + counts.getOrDefault(AppointmentStatus.CHECKED_IN, 0L);
+                     + counts.getOrDefault(AppointmentStatus.CHECKED_IN, 0L)
+                     + counts.getOrDefault(AppointmentStatus.RECALLED, 0L);
         long served = counts.getOrDefault(AppointmentStatus.COMPLETED, 0L);
         long noShows = counts.getOrDefault(AppointmentStatus.NO_SHOW, 0L);
 
@@ -170,11 +172,13 @@ public class QueueService {
 
             long waitingForDoc = activeForDoc.stream()
                     .filter(a -> a.getStatus() == AppointmentStatus.BOOKED
-                              || a.getStatus() == AppointmentStatus.CHECKED_IN)
+                              || a.getStatus() == AppointmentStatus.CHECKED_IN
+                              || a.getStatus() == AppointmentStatus.RECALLED)
                     .count();
 
             Appointment inProgress = activeForDoc.stream()
-                    .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                    .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS
+                              || a.getStatus() == AppointmentStatus.RECALLED)
                     .findFirst().orElse(null);
 
             String currentToken = inProgress != null
@@ -204,17 +208,19 @@ public class QueueService {
             counterIndex++;
         }
 
-        // Currently serving — pick from selected doctor or first IN_PROGRESS
+        // Currently serving — pick from selected doctor or first IN_PROGRESS/RECALLED
         Appointment serving = null;
         if (selectedDoctorId != null) {
             serving = activeToday.stream()
                     .filter(a -> a.getDoctor().getId().equals(selectedDoctorId)
-                              && a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                              && (a.getStatus() == AppointmentStatus.IN_PROGRESS
+                               || a.getStatus() == AppointmentStatus.RECALLED))
                     .findFirst().orElse(null);
         }
         if (serving == null) {
             serving = activeToday.stream()
-                    .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                    .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS
+                              || a.getStatus() == AppointmentStatus.RECALLED)
                     .findFirst().orElse(null);
         }
 
@@ -241,7 +247,8 @@ public class QueueService {
             List<Appointment> activeDocQueue = docQueue.stream()
                     .filter(a -> a.getStatus() == AppointmentStatus.BOOKED
                               || a.getStatus() == AppointmentStatus.CHECKED_IN
-                              || a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                              || a.getStatus() == AppointmentStatus.IN_PROGRESS
+                              || a.getStatus() == AppointmentStatus.RECALLED)
                     .collect(Collectors.toList());
 
             for (int i = 0; i < docQueue.size(); i++) {
@@ -402,6 +409,7 @@ public class QueueService {
                 .registeredAt(registeredAt)
                 .waitDuration(waitMinutes > 0 ? waitMinutes + " min" : "—")
                 .uhid(uhid)
+                .recallCount(a.getRecallCount())
                 .build();
     }
 
