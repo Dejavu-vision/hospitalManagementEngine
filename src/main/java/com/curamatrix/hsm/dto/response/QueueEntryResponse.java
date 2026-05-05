@@ -36,4 +36,6 @@ public class QueueEntryResponse {
     private String waitDuration;        // formatted e.g. "28 min"
     private String uhid;                // e.g. "UHID-2026-04821"
     private Integer recallCount;        // number of times this token has been recalled
+    private LocalDateTime heldAt;       // populated for ON_HOLD entries
+    private Integer holdMinutes;        // minutes elapsed since hold (computed server-side)
 }

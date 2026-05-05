@@ -21,11 +21,11 @@ public class AppointmentStatusLog extends TenantAwareEntity {
     private Appointment appointment;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "previous_status")
+    @Column(name = "previous_status", length = 50)
     private AppointmentStatus previousStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "new_status", nullable = false)
+    @Column(name = "new_status", nullable = false, length = 50)
     private AppointmentStatus newStatus;
 
     @ManyToOne(fetch = FetchType.LAZY)

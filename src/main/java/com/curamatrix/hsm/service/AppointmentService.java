@@ -275,7 +275,20 @@ public class AppointmentService {
             }
             case IN_PROGRESS -> appointment.setConsultationStart(now);
             case COMPLETED   -> appointment.setConsultationEnd(now);
-            case NO_SHOW     -> appointment.setNoShowMarkedAt(now);
+            case NO_SHOW     -> {
+                appointment.setNoShowMarkedAt(now);
+                // Clear heldAt when transitioning away from ON_HOLD
+                if (current == AppointmentStatus.ON_HOLD) {
+                    appointment.setHeldAt(null);
+                }
+            }
+            case BOOKED      -> {
+                // Skip-to-bottom: when transitioning from ON_HOLD to BOOKED, clear heldAt and overwrite checkedInAt
+                if (current == AppointmentStatus.ON_HOLD) {
+                    appointment.setHeldAt(null);
+                    appointment.setCheckedInAt(now); // skip-to-bottom logic
+                }
+            }
             default          -> {}
         }
 
@@ -301,6 +314,45 @@ public class AppointmentService {
         appointment = appointmentRepository.save(appointment);
 
         recordStatusLog(appointment, current, AppointmentStatus.RECALLED, getCurrentUser());
+        return mapToResponse(appointment);
+    }
+
+    @Transactional
+    public AppointmentResponse holdAppointment(Long id) {
+        Long tenantId = TenantContext.getTenantId();
+        Appointment appointment = appointmentRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", id));
+
+        AppointmentStatus current = appointment.getStatus();
+        if (!current.canTransitionTo(AppointmentStatus.ON_HOLD)) {
+            throw new InvalidStateTransitionException("appointment status",
+                    current.name(), AppointmentStatus.ON_HOLD.name());
+        }
+
+        appointment.setStatus(AppointmentStatus.ON_HOLD);
+        appointment.setHeldAt(LocalDateTime.now());
+        appointment = appointmentRepository.save(appointment);
+        recordStatusLog(appointment, current, AppointmentStatus.ON_HOLD, getCurrentUser());
+        return mapToResponse(appointment);
+    }
+
+    @Transactional
+    public AppointmentResponse resumeAppointment(Long id) {
+        Long tenantId = TenantContext.getTenantId();
+        Appointment appointment = appointmentRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", id));
+
+        AppointmentStatus current = appointment.getStatus();
+        if (!current.canTransitionTo(AppointmentStatus.IN_PROGRESS)) {
+            throw new InvalidStateTransitionException("appointment status",
+                    current.name(), AppointmentStatus.IN_PROGRESS.name());
+        }
+
+        appointment.setStatus(AppointmentStatus.IN_PROGRESS);
+        appointment.setHeldAt(null);
+        appointment.setConsultationStart(LocalDateTime.now());
+        appointment = appointmentRepository.save(appointment);
+        recordStatusLog(appointment, current, AppointmentStatus.IN_PROGRESS, getCurrentUser());
         return mapToResponse(appointment);
     }
 
@@ -432,6 +484,7 @@ public class AppointmentService {
                 .consultationStart(appointment.getConsultationStart())
                 .consultationEnd(appointment.getConsultationEnd())
                 .noShowMarkedAt(appointment.getNoShowMarkedAt())
+                .heldAt(appointment.getHeldAt())
                 .createdAt(appointment.getCreatedAt())
                 .recallCount(appointment.getRecallCount())
                 .build();

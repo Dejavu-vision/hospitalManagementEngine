@@ -35,6 +35,7 @@ public class AppointmentResponse {
     private LocalDateTime consultationStart;
     private LocalDateTime consultationEnd;
     private LocalDateTime noShowMarkedAt;
+    private LocalDateTime heldAt;
     private Long billingId;
     private String counter;
     private Integer activeQueueLength;

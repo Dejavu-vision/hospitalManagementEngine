@@ -42,14 +42,14 @@ public class Appointment extends TenantAwareEntity {
     private LocalTime appointmentTime;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private AppointmentType type;
 
     @Column(name = "token_number")
     private Integer tokenNumber;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     @Builder.Default
     private AppointmentStatus status = AppointmentStatus.BOOKED;
 
@@ -78,4 +78,7 @@ public class Appointment extends TenantAwareEntity {
     @Column(name = "recall_count")
     @Builder.Default
     private Integer recallCount = 0;
+
+    @Column(name = "held_at")
+    private LocalDateTime heldAt;
 }

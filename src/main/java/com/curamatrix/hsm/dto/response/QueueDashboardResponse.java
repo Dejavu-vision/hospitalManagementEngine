@@ -35,6 +35,10 @@ public class QueueDashboardResponse {
     private String waitingQueueLabel;   // e.g. "Waiting Queue — Cardiology"
     private Integer waitingQueueTotal;
 
+    // ── On-hold patients for selected doctor ──────────────────────────────────
+    private List<QueueEntryResponse> heldPatients;  // ON_HOLD entries for selected doctor
+    private Long onHoldCount;                        // total ON_HOLD for stat card
+
     // ── Counter status (right panel) ──────────────────────────────────────────
     private List<CounterStatus> counterStatuses;
 

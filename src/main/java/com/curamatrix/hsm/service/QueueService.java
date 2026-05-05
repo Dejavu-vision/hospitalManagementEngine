@@ -120,11 +120,12 @@ public class QueueService {
                         map -> new ArrayList<>(map.values())
                 ));
 
-        // Active only (BOOKED, CHECKED_IN, IN_PROGRESS, RECALLED) — for queue logic
+        // Active only (BOOKED, CHECKED_IN, IN_PROGRESS, ON_HOLD, RECALLED) — for queue logic
         List<Appointment> activeToday = allToday.stream()
                 .filter(a -> a.getStatus() == AppointmentStatus.BOOKED
                           || a.getStatus() == AppointmentStatus.CHECKED_IN
                           || a.getStatus() == AppointmentStatus.IN_PROGRESS
+                          || a.getStatus() == AppointmentStatus.ON_HOLD
                           || a.getStatus() == AppointmentStatus.RECALLED)
                 .collect(Collectors.toList());
 
@@ -234,7 +235,9 @@ public class QueueService {
 
         // Waiting queue — ALL of today's appointments for the selected doctor
         // (includes COMPLETED/NO_SHOW so the "Completed" tab works)
+        // docQueue is fetched once and reused for both waitingQueue and heldPatients
         List<QueueEntryResponse> waitingQueue = new ArrayList<>();
+        List<QueueEntryResponse> heldPatients = new ArrayList<>();
         String waitingQueueLabel = "Waiting Queue";
         if (queueDoctorId != null) {
             List<Appointment> docQueue = appointmentRepository
@@ -263,7 +266,11 @@ public class QueueService {
                         : 0;
                 waitingQueue.add(toRichQueueEntry(a, i + 1, ahead * AVG_CONSULTATION_MINUTES, activeQueues));
             }
+
+            // Build held patients list from the same docQueue (no extra DB fetch)
+            heldPatients = buildHeldPatients(docQueue, activeQueues, now);
         }
+        long onHoldCount = heldPatients.size();
 
         // Counter statuses (right panel) — derived directly from activeQueues (already deduplicated)
         List<QueueDashboardResponse.CounterStatus> counterStatuses = activeQueues.stream()
@@ -298,6 +305,8 @@ public class QueueService {
                 .waitingQueue(waitingQueue)
                 .waitingQueueLabel(waitingQueueLabel)
                 .waitingQueueTotal(waitingQueue.size())
+                .heldPatients(heldPatients)
+                .onHoldCount(onHoldCount)
                 .counterStatuses(counterStatuses)
                 .tokensIssued(totalTokens)
                 .served(served)
@@ -410,6 +419,10 @@ public class QueueService {
                 .waitDuration(waitMinutes > 0 ? waitMinutes + " min" : "—")
                 .uhid(uhid)
                 .recallCount(a.getRecallCount())
+                .heldAt(a.getHeldAt())
+                .holdMinutes(a.getHeldAt() != null
+                        ? Math.max(0, (int) ChronoUnit.MINUTES.between(a.getHeldAt(), LocalDateTime.now()))
+                        : null)
                 .build();
     }
 
@@ -518,8 +531,40 @@ public class QueueService {
                         .timeAgo(a.getNoShowMarkedAt().format(TIME_FMT))
                         .build()));
 
+        // ON_HOLD → "Held"
+        appts.stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.ON_HOLD && a.getHeldAt() != null)
+                .sorted(Comparator.comparing(Appointment::getHeldAt).reversed())
+                .limit(1)
+                .forEach(a -> activities.add(QueueDashboardResponse.RecentActivity.builder()
+                        .type("HELD")
+                        .tokenDisplay(formatToken(a.getTokenNumber(), a.getType()))
+                        .patientName(a.getPatient().getFirstName() + " " + a.getPatient().getLastName())
+                        .detail(getDeptName(a))
+                        .timeAgo(a.getHeldAt().format(TIME_FMT))
+                        .build()));
+
         // Sort by time descending and limit to 5
         return activities.stream().limit(5).collect(Collectors.toList());
+    }
+
+    private List<QueueEntryResponse> buildHeldPatients(List<Appointment> docQueue,
+            List<QueueDashboardResponse.ActiveQueueSummary> activeQueues, LocalDateTime now) {
+        return docQueue.stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.ON_HOLD)
+                .sorted(Comparator.comparing(Appointment::getHeldAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(a -> {
+                    QueueEntryResponse entry = toRichQueueEntry(a, 0, 0, activeQueues);
+                    int holdMins = 0;
+                    if (a.getHeldAt() != null) {
+                        holdMins = (int) ChronoUnit.MINUTES.between(a.getHeldAt(), now);
+                        if (holdMins < 0) holdMins = 0;
+                    }
+                    entry.setHeldAt(a.getHeldAt());
+                    entry.setHoldMinutes(holdMins);
+                    return entry;
+                })
+                .collect(Collectors.toList());
     }
 
     private String getDeptName(Appointment a) {
