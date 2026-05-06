@@ -265,7 +265,7 @@ public class ConsultationService {
     }
 
     /**
-     * Returns all distinct patients who have ever been assigned to this doctor (tenant-scoped).
+     * Returns all distinct patients who have ever had an appointment with this doctor (tenant-scoped).
      */
     public List<PatientResponse> getDoctorPatients(Long doctorId) {
         Long tenantId = TenantContext.getTenantId();
