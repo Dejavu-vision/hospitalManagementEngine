@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "blocked_tokens",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"token_number", "appointment_date", "tenant_id"}))
+       uniqueConstraints = @UniqueConstraint(columnNames = {"token_number", "appointment_date", "tenant_id", "doctor_id"}))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class BlockedToken extends TenantAwareEntity {
 
@@ -30,6 +30,13 @@ public class BlockedToken extends TenantAwareEntity {
 
     @Column(name = "appointment_date", nullable = false)
     private LocalDate appointmentDate;
+
+    /**
+     * The doctor whose queue this block applies to.
+     * Nullable for backward compatibility with legacy rows that predate per-doctor scoping.
+     */
+    @Column(name = "doctor_id")
+    private Long doctorId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)

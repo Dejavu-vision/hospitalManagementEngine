@@ -10,8 +10,11 @@ import java.util.Optional;
 
 public interface WalkInTokenSequenceRepository extends JpaRepository<WalkInTokenSequence, Long> {
 
-    @Query(value = "SELECT * FROM walk_in_token_sequence WHERE appointment_date = :date AND tenant_id = :tenantId LIMIT 1",
+    @Query(value = "SELECT * FROM walk_in_token_sequence " +
+                   "WHERE appointment_date = :date AND tenant_id = :tenantId AND doctor_id = :doctorId " +
+                   "LIMIT 1 FOR UPDATE",
            nativeQuery = true)
     Optional<WalkInTokenSequence> findForUpdate(@Param("date") LocalDate date,
-                                                @Param("tenantId") Long tenantId);
+                                                @Param("tenantId") Long tenantId,
+                                                @Param("doctorId") Long doctorId);
 }

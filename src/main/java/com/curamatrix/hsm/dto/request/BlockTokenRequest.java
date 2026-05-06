@@ -11,6 +11,9 @@ public class BlockTokenRequest {
     @Min(value = 1, message = "Token number must be at least 1")
     private Integer tokenNumber;
 
+    @NotNull(message = "Doctor ID is required")
+    private Long doctorId;
+
     /** Optional reason — e.g. "VIP Reserve", "Emergency slot" */
     private String reason;
 }

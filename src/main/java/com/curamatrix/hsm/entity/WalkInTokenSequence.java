@@ -6,14 +6,13 @@ import lombok.*;
 import java.time.LocalDate;
 
 /**
- * Tracks the daily walk-in token sequence per tenant.
- * One sequence per (appointment_date, tenant_id) — tokens are unique across
- * ALL doctors and departments for the day, so patients get a single queue number
- * regardless of which doctor they are seeing.
+ * Tracks the daily walk-in token sequence per doctor per tenant.
+ * One sequence per (appointment_date, tenant_id, doctor_id) — each doctor
+ * gets an independent counter starting at T-001 for the day.
  */
 @Entity
 @Table(name = "walk_in_token_sequence",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"appointment_date", "tenant_id"}))
+       uniqueConstraints = @UniqueConstraint(columnNames = {"appointment_date", "tenant_id", "doctor_id"}))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class WalkInTokenSequence extends TenantAwareEntity {
 
@@ -23,6 +22,10 @@ public class WalkInTokenSequence extends TenantAwareEntity {
 
     @Column(name = "appointment_date", nullable = false)
     private LocalDate appointmentDate;
+
+    /** The doctor whose token sequence this row tracks. */
+    @Column(name = "doctor_id", nullable = false)
+    private Long doctorId;
 
     // Database has both 'counter' and 'last_token' columns - keep them in sync
     @Column(name = "last_token", nullable = false)

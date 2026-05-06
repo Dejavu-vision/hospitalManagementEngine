@@ -35,19 +35,20 @@ public class BlockedTokenService {
     // ── List today's blocked tokens ───────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public List<BlockedTokenResponse> getTodayBlockedTokens() {
+    public List<BlockedTokenResponse> getTodayBlockedTokens(Long doctorId) {
         Long tenantId = TenantContext.getTenantId();
         return blockedTokenRepository
-                .findByAppointmentDateAndTenantIdOrderByTokenNumberAsc(LocalDate.now(), tenantId)
+                .findByAppointmentDateAndTenantIdAndDoctorIdOrderByTokenNumberAsc(
+                        LocalDate.now(), tenantId, doctorId)
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public List<BlockedTokenResponse> getAvailableBlockedTokens() {
+    public List<BlockedTokenResponse> getAvailableBlockedTokens(Long doctorId) {
         Long tenantId = TenantContext.getTenantId();
         return blockedTokenRepository
-                .findByAppointmentDateAndTenantIdAndStatusOrderByTokenNumberAsc(
-                        LocalDate.now(), tenantId, BlockedTokenStatus.BLOCKED)
+                .findByAppointmentDateAndTenantIdAndDoctorIdAndStatusOrderByTokenNumberAsc(
+                        LocalDate.now(), tenantId, doctorId, BlockedTokenStatus.BLOCKED)
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
@@ -57,15 +58,16 @@ public class BlockedTokenService {
     public BlockedTokenResponse blockToken(BlockTokenRequest request) {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
+        Long doctorId = request.getDoctorId();
 
-        // Check if already blocked
-        blockedTokenRepository.findByTokenNumberAndAppointmentDateAndTenantId(
-                request.getTokenNumber(), today, tenantId)
+        // Check if already blocked for this doctor today
+        blockedTokenRepository.findByTokenNumberAndAppointmentDateAndTenantIdAndDoctorId(
+                request.getTokenNumber(), today, tenantId, doctorId)
                 .ifPresent(bt -> {
                     if (bt.getStatus() == BlockedTokenStatus.BLOCKED) {
                         throw new DuplicateResourceException(
                                 "Token T-" + String.format("%03d", request.getTokenNumber()) +
-                                " is already blocked for today");
+                                " is already blocked for this doctor today");
                     }
                 });
 
@@ -74,6 +76,7 @@ public class BlockedTokenService {
         BlockedToken bt = BlockedToken.builder()
                 .tokenNumber(request.getTokenNumber())
                 .appointmentDate(today)
+                .doctorId(doctorId)
                 .status(BlockedTokenStatus.BLOCKED)
                 .reason(request.getReason())
                 .blockedBy(currentUser)
@@ -81,24 +84,25 @@ public class BlockedTokenService {
         bt.setTenantId(tenantId);
 
         bt = blockedTokenRepository.save(bt);
-        log.info("Token {} blocked by {} for {}", request.getTokenNumber(), currentUser.getFullName(), today);
+        log.info("Token {} blocked by {} for doctor {} on {}", request.getTokenNumber(),
+                currentUser.getFullName(), doctorId, today);
         return toResponse(bt);
     }
 
     // ── Release a blocked token ───────────────────────────────────────────────
 
     @Transactional
-    public BlockedTokenResponse releaseToken(Integer tokenNumber) {
+    public BlockedTokenResponse releaseToken(Integer tokenNumber, Long doctorId) {
         Long tenantId = TenantContext.getTenantId();
         BlockedToken bt = blockedTokenRepository
-                .findByTokenNumberAndAppointmentDateAndTenantIdAndStatus(
-                        tokenNumber, LocalDate.now(), tenantId, BlockedTokenStatus.BLOCKED)
+                .findByTokenNumberAndAppointmentDateAndTenantIdAndDoctorIdAndStatus(
+                        tokenNumber, LocalDate.now(), tenantId, doctorId, BlockedTokenStatus.BLOCKED)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "BlockedToken", "tokenNumber", tokenNumber));
 
         bt.setStatus(BlockedTokenStatus.RELEASED);
         bt = blockedTokenRepository.save(bt);
-        log.info("Token {} released", tokenNumber);
+        log.info("Token {} released for doctor {}", tokenNumber, doctorId);
         return toResponse(bt);
     }
 
@@ -107,26 +111,27 @@ public class BlockedTokenService {
     // Uses REQUIRES_NEW so this commits independently — the blocked token record
     // is updated even if the outer createWalkIn transaction has issues.
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
-    public void assignBlockedToken(Integer tokenNumber, Long appointmentId, Long tenantId) {
+    public void assignBlockedToken(Integer tokenNumber, Long appointmentId, Long tenantId, Long doctorId) {
         blockedTokenRepository
-                .findByTokenNumberAndAppointmentDateAndTenantIdAndStatus(
-                        tokenNumber, LocalDate.now(), tenantId, BlockedTokenStatus.BLOCKED)
+                .findByTokenNumberAndAppointmentDateAndTenantIdAndDoctorIdAndStatus(
+                        tokenNumber, LocalDate.now(), tenantId, doctorId, BlockedTokenStatus.BLOCKED)
                 .ifPresent(bt -> {
                     bt.setStatus(BlockedTokenStatus.ASSIGNED);
                     bt.setAssignedToAppointmentId(appointmentId);
                     bt.setAssignedAt(LocalDateTime.now());
                     blockedTokenRepository.save(bt);
-                    log.info("Blocked token {} assigned to appointment {}", tokenNumber, appointmentId);
+                    log.info("Blocked token {} assigned to appointment {} for doctor {}",
+                            tokenNumber, appointmentId, doctorId);
                 });
     }
 
-    // ── Check if a token number is blocked (used during auto-increment) ───────
+    // ── Check if a token number is blocked for a specific doctor ─────────────
 
     // Note: No @Transactional here — this is a simple read called from within
     // createWalkIn's @Transactional. Adding readOnly=true would mark the outer
     // write transaction as read-only, causing a rollback-only error.
-    public boolean isTokenBlocked(Integer tokenNumber, Long tenantId) {
-        return blockedTokenRepository.isTokenBlocked(tokenNumber, LocalDate.now(), tenantId);
+    public boolean isTokenBlocked(Integer tokenNumber, Long tenantId, Long doctorId) {
+        return blockedTokenRepository.isTokenBlocked(tokenNumber, LocalDate.now(), tenantId, doctorId);
     }
 
     // ── Mapping ───────────────────────────────────────────────────────────────
@@ -137,6 +142,7 @@ public class BlockedTokenService {
                 .tokenNumber(bt.getTokenNumber())
                 .tokenDisplay("T-" + String.format("%03d", bt.getTokenNumber()))
                 .appointmentDate(bt.getAppointmentDate())
+                .doctorId(bt.getDoctorId())
                 .status(bt.getStatus().name())
                 .reason(bt.getReason())
                 .blockedByName(bt.getBlockedBy() != null ? bt.getBlockedBy().getFullName() : null)

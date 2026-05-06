@@ -137,7 +137,7 @@ public class AppointmentService {
         if (request.getBlockedTokenNumber() != null) {
             // Receptionist explicitly chose a blocked (reserved) token
             boolean isAvailable = blockedTokenService.isTokenBlocked(
-                    request.getBlockedTokenNumber(), tenantId);
+                    request.getBlockedTokenNumber(), tenantId, doctor.getId());
             if (!isAvailable) {
                 throw new IllegalArgumentException(
                         "Token T-" + String.format("%03d", request.getBlockedTokenNumber()) +
@@ -146,20 +146,21 @@ public class AppointmentService {
             nextToken = request.getBlockedTokenNumber();
             // The blocked token record will be marked ASSIGNED after appointment is saved (below)
         } else {
-            // Auto-increment — skip any currently blocked token numbers
+            // Auto-increment — skip any currently blocked token numbers for this doctor
             WalkInTokenSequence seq = tokenSequenceRepository
-                    .findForUpdate(today, tenantId)
+                    .findForUpdate(today, tenantId, doctor.getId())
                     .orElseGet(() -> {
                         WalkInTokenSequence newSeq = WalkInTokenSequence.builder()
                                 .appointmentDate(today).lastToken(0).build();
                         newSeq.setCounter(0);
+                        newSeq.setDoctorId(doctor.getId());
                         return newSeq;
                     });
 
-            // Increment, skipping blocked numbers (max 100 attempts to avoid infinite loop)
+            // Increment, skipping blocked numbers for this doctor (max 100 attempts to avoid infinite loop)
             int candidate = seq.getLastToken() + 1;
             int attempts = 0;
-            while (attempts < 100 && blockedTokenService.isTokenBlocked(candidate, tenantId)) {
+            while (attempts < 100 && blockedTokenService.isTokenBlocked(candidate, tenantId, doctor.getId())) {
                 candidate++;
                 attempts++;
             }
@@ -179,7 +180,7 @@ public class AppointmentService {
 
         // If a blocked token was used, mark it as ASSIGNED
         if (request.getBlockedTokenNumber() != null) {
-            blockedTokenService.assignBlockedToken(request.getBlockedTokenNumber(), appointment.getId(), tenantId);
+            blockedTokenService.assignBlockedToken(request.getBlockedTokenNumber(), appointment.getId(), tenantId, doctor.getId());
         }
 
         // 2. Create billing

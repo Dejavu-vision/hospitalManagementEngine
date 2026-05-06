@@ -21,21 +21,23 @@ public class BlockedTokenController {
 
     private final BlockedTokenService blockedTokenService;
 
-    /** List all blocked tokens for today (all statuses) */
+    /** List all blocked tokens for today (all statuses) scoped to a specific doctor */
     @GetMapping("/blocked")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
-    public ResponseEntity<List<BlockedTokenResponse>> getTodayBlockedTokens() {
-        return ResponseEntity.ok(blockedTokenService.getTodayBlockedTokens());
+    public ResponseEntity<List<BlockedTokenResponse>> getTodayBlockedTokens(
+            @RequestParam Long doctorId) {
+        return ResponseEntity.ok(blockedTokenService.getTodayBlockedTokens(doctorId));
     }
 
     /** List only BLOCKED (available) tokens for today — used by walk-in form */
     @GetMapping("/blocked/available")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
-    public ResponseEntity<List<BlockedTokenResponse>> getAvailableBlockedTokens() {
-        return ResponseEntity.ok(blockedTokenService.getAvailableBlockedTokens());
+    public ResponseEntity<List<BlockedTokenResponse>> getAvailableBlockedTokens(
+            @RequestParam Long doctorId) {
+        return ResponseEntity.ok(blockedTokenService.getAvailableBlockedTokens(doctorId));
     }
 
-    /** Block a token number for today */
+    /** Block a token number for today (doctorId comes in the request body) */
     @PostMapping("/block")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<BlockedTokenResponse> blockToken(
@@ -48,7 +50,8 @@ public class BlockedTokenController {
     @DeleteMapping("/blocked/{tokenNumber}")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<BlockedTokenResponse> releaseToken(
-            @PathVariable Integer tokenNumber) {
-        return ResponseEntity.ok(blockedTokenService.releaseToken(tokenNumber));
+            @PathVariable Integer tokenNumber,
+            @RequestParam Long doctorId) {
+        return ResponseEntity.ok(blockedTokenService.releaseToken(tokenNumber, doctorId));
     }
 }
