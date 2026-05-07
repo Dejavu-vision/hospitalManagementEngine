@@ -266,13 +266,15 @@ public class AppointmentService {
 
         LocalDateTime now = LocalDateTime.now();
         switch (newStatus) {
-            // When skipping back from IN_PROGRESS or RECALLED, overwrite checkedInAt to move to bottom of queue
+            // When moving back from IN_PROGRESS or RECALLED to CHECKED_IN,
+            // preserve the original checkedInAt so the patient keeps their queue position.
+            // Only set checkedInAt if it was never set (first check-in).
             case CHECKED_IN  -> {
-                if (current == AppointmentStatus.IN_PROGRESS || current == AppointmentStatus.RECALLED) {
-                    appointment.setCheckedInAt(now); // overwrite — moves to bottom
-                } else if (appointment.getCheckedInAt() == null) {
-                    appointment.setCheckedInAt(now); // first check-in
+                if (appointment.getCheckedInAt() == null) {
+                    appointment.setCheckedInAt(now); // first check-in only
                 }
+                // Do NOT overwrite checkedInAt when coming from IN_PROGRESS/RECALLED —
+                // this preserves the patient's original queue position.
             }
             case IN_PROGRESS -> appointment.setConsultationStart(now);
             case COMPLETED   -> appointment.setConsultationEnd(now);
