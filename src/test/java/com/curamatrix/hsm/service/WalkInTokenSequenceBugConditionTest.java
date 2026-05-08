@@ -154,7 +154,7 @@ class WalkInTokenSequenceBugConditionTest {
         // CRITICAL: Ensure NO existing token sequence for today and this tenant
         // This ensures we trigger the INSERT path (not UPDATE path)
         LocalDate today = LocalDate.now();
-        tokenSequenceRepository.findForUpdate(today, TEST_TENANT_ID)
+        tokenSequenceRepository.findForUpdate(today, TEST_TENANT_ID, testDoctor.getId())
                 .ifPresent(seq -> tokenSequenceRepository.delete(seq));
     }
 
@@ -194,7 +194,7 @@ class WalkInTokenSequenceBugConditionTest {
         LocalDate today = LocalDate.now();
 
         // Verify no existing token sequence (precondition)
-        assertTrue(tokenSequenceRepository.findForUpdate(today, TEST_TENANT_ID).isEmpty(),
+        assertTrue(tokenSequenceRepository.findForUpdate(today, TEST_TENANT_ID, testDoctor.getId()).isEmpty(),
                 "Precondition failed: Token sequence should not exist for today and test tenant");
 
         // Act - This should trigger the bug on unfixed code
@@ -206,7 +206,7 @@ class WalkInTokenSequenceBugConditionTest {
         assertEquals(1, response.getTokenNumber(), "First token of the day should be 1");
 
         // Verify token sequence record was created in database
-        WalkInTokenSequence sequence = tokenSequenceRepository.findForUpdate(today, TEST_TENANT_ID)
+        WalkInTokenSequence sequence = tokenSequenceRepository.findForUpdate(today, TEST_TENANT_ID, testDoctor.getId())
                 .orElseThrow(() -> new AssertionError("Token sequence record should exist after walk-in creation"));
 
         assertEquals(today, sequence.getAppointmentDate(), "Sequence should be for today's date");
@@ -257,7 +257,7 @@ class WalkInTokenSequenceBugConditionTest {
 
         // Verify sequence counter in database
         LocalDate today = LocalDate.now();
-        WalkInTokenSequence sequence = tokenSequenceRepository.findForUpdate(today, TEST_TENANT_ID)
+        WalkInTokenSequence sequence = tokenSequenceRepository.findForUpdate(today, TEST_TENANT_ID, testDoctor.getId())
                 .orElseThrow(() -> new AssertionError("Token sequence should exist"));
 
         assertEquals(2, sequence.getLastToken(), "Counter should be 2 after second walk-in");

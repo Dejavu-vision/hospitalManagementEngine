@@ -243,10 +243,11 @@ class WalkInTokenSequencePreservationTest {
      */
     private void insertTokenSequenceDirectly(LocalDate date, Long tenantId, int counter) {
         entityManager.createNativeQuery(
-                "INSERT INTO walk_in_token_sequence (appointment_date, tenant_id, counter, last_token, created_at, updated_at) " +
-                "VALUES (:date, :tenantId, :counter, :counter, NOW(), NOW())")
+                "INSERT INTO walk_in_token_sequence (appointment_date, tenant_id, doctor_id, counter, last_token, created_at, updated_at) " +
+                "VALUES (:date, :tenantId, :doctorId, :counter, :counter, NOW(), NOW())")
                 .setParameter("date", date)
                 .setParameter("tenantId", tenantId)
+                .setParameter("doctorId", tenantId.equals(TENANT_A_ID) ? testDoctorA.getId() : testDoctorB.getId())
                 .setParameter("counter", counter)
                 .executeUpdate();
         entityManager.flush();
@@ -279,7 +280,7 @@ class WalkInTokenSequencePreservationTest {
             insertTokenSequenceDirectly(testDate, TENANT_A_ID, counterValue);
 
             // Now read the sequence and verify counter value
-            Optional<WalkInTokenSequence> sequenceOpt = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID);
+            Optional<WalkInTokenSequence> sequenceOpt = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID, testDoctorA.getId());
             assertTrue(sequenceOpt.isPresent(), 
                     "Sequence should exist for date " + testDate + " and tenant " + TENANT_A_ID);
 
@@ -325,7 +326,7 @@ class WalkInTokenSequencePreservationTest {
             tokenSequenceRepository.save(existingSequence);
 
             // Verify initial counter
-            WalkInTokenSequence beforeUpdate = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID)
+            WalkInTokenSequence beforeUpdate = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID, testDoctorA.getId())
                     .orElseThrow(() -> new AssertionError("Sequence should exist before update"));
             assertEquals(initialCounter, beforeUpdate.getLastToken(),
                     "Initial counter should be " + initialCounter);
@@ -354,7 +355,7 @@ class WalkInTokenSequencePreservationTest {
                     "New token should be " + (initialCounter + 1));
 
             // Verify final counter
-            WalkInTokenSequence afterUpdate = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID)
+            WalkInTokenSequence afterUpdate = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID, testDoctorA.getId())
                     .orElseThrow(() -> new AssertionError("Sequence should exist after update"));
             assertEquals(initialCounter + 1, afterUpdate.getLastToken(),
                     "Final counter should be " + (initialCounter + 1));
@@ -393,7 +394,7 @@ class WalkInTokenSequencePreservationTest {
         tokenSequenceRepository.save(initialSequence);
 
         // Verify initial state
-        WalkInTokenSequence savedSequence = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID)
+        WalkInTokenSequence savedSequence = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID, testDoctorA.getId())
                 .orElseThrow(() -> new AssertionError("Initial sequence should exist"));
         assertEquals(1, savedSequence.getLastToken(), "Initial counter should be 1");
 
@@ -457,7 +458,7 @@ class WalkInTokenSequencePreservationTest {
 
         // Verify final counter value
         TenantContext.setTenantId(TENANT_A_ID);
-        WalkInTokenSequence finalSequence = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID)
+        WalkInTokenSequence finalSequence = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID, testDoctorA.getId())
                 .orElseThrow(() -> new AssertionError("Final sequence should exist"));
         assertEquals(concurrentRequests + 1, finalSequence.getLastToken(),
                 "Final counter should be " + (concurrentRequests + 1));
@@ -516,7 +517,7 @@ class WalkInTokenSequencePreservationTest {
         }
 
         // Verify Tenant A sequence
-        WalkInTokenSequence sequenceAAfterUpdates = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID)
+        WalkInTokenSequence sequenceAAfterUpdates = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID, testDoctorA.getId())
                 .orElseThrow(() -> new AssertionError("Tenant A sequence should exist"));
         assertEquals(5, sequenceAAfterUpdates.getLastToken(), "Tenant A counter should be 5");
         assertEquals(TENANT_A_ID, sequenceAAfterUpdates.getTenantId(), "Sequence should belong to Tenant A");
@@ -555,7 +556,7 @@ class WalkInTokenSequencePreservationTest {
         }
 
         // Verify Tenant B sequence
-        WalkInTokenSequence sequenceBAfterUpdates = tokenSequenceRepository.findForUpdate(testDate, TENANT_B_ID)
+        WalkInTokenSequence sequenceBAfterUpdates = tokenSequenceRepository.findForUpdate(testDate, TENANT_B_ID, testDoctorB.getId())
                 .orElseThrow(() -> new AssertionError("Tenant B sequence should exist"));
         assertEquals(3, sequenceBAfterUpdates.getLastToken(), "Tenant B counter should be 3");
         assertEquals(TENANT_B_ID, sequenceBAfterUpdates.getTenantId(), "Sequence should belong to Tenant B");
@@ -565,13 +566,13 @@ class WalkInTokenSequencePreservationTest {
 
         // Verify isolation: Tenant A cannot see Tenant B's sequence
         TenantContext.setTenantId(TENANT_A_ID);
-        Optional<WalkInTokenSequence> tenantAViewOfB = tokenSequenceRepository.findForUpdate(testDate, TENANT_B_ID);
+        Optional<WalkInTokenSequence> tenantAViewOfB = tokenSequenceRepository.findForUpdate(testDate, TENANT_B_ID, testDoctorB.getId());
         // Note: findForUpdate takes tenantId as parameter, so it CAN query other tenants
         // But in production, the service layer enforces tenant isolation via TenantContext
         // The key isolation test is that Tenant A's counter is independent of Tenant B's counter
 
         // Re-verify Tenant A sequence is unchanged
-        WalkInTokenSequence sequenceAFinal = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID)
+        WalkInTokenSequence sequenceAFinal = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID, testDoctorA.getId())
                 .orElseThrow(() -> new AssertionError("Tenant A sequence should still exist"));
         assertEquals(5, sequenceAFinal.getLastToken(), 
                 "Tenant A counter should still be 5 (unaffected by Tenant B operations)");
@@ -580,7 +581,7 @@ class WalkInTokenSequencePreservationTest {
 
         // Verify Tenant B sequence is unchanged
         TenantContext.setTenantId(TENANT_B_ID);
-        WalkInTokenSequence sequenceBFinal = tokenSequenceRepository.findForUpdate(testDate, TENANT_B_ID)
+        WalkInTokenSequence sequenceBFinal = tokenSequenceRepository.findForUpdate(testDate, TENANT_B_ID, testDoctorB.getId())
                 .orElseThrow(() -> new AssertionError("Tenant B sequence should still exist"));
         assertEquals(3, sequenceBFinal.getLastToken(),
                 "Tenant B counter should still be 3 (unaffected by Tenant A operations)");

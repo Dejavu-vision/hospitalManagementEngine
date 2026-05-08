@@ -45,6 +45,7 @@ public class DoctorAvailabilityService {
     }
 
     /** Get today's availability for a single doctor */
+    @Transactional(readOnly = true)
     public DoctorAvailabilityResponse getAvailability(Long doctorId, LocalDate date) {
         Long tenantId = TenantContext.getTenantId();
         Optional<DoctorAvailability> record = availabilityRepository
@@ -65,24 +66,27 @@ public class DoctorAvailabilityService {
     }
 
     /** Get today's availability for all doctors in a tenant */
+    @Transactional(readOnly = true)
     public List<DoctorAvailabilityResponse> getTodayAvailability() {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
         List<Doctor> allDoctors = doctorRepository.findByTenantId(tenantId);
-        return allDoctors.stream().map(doctor -> {
-            Optional<DoctorAvailability> record = availabilityRepository
-                    .findByDoctorIdAndAvailabilityDateAndTenantId(doctor.getId(), today, tenantId);
-            return record.map(r -> toResponse(r, doctor))
-                    .orElseGet(() -> DoctorAvailabilityResponse.builder()
-                            .userId(doctor.getUser().getId())
-                            .doctorId(doctor.getId())
-                            .doctorName(doctor.getUser().getFullName())
-                            .departmentName(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
-                            .date(today)
-                            .isPresent(false)
-                            .status(DoctorStatus.OFF_DUTY)
-                            .build());
-        }).collect(Collectors.toList());
+        return allDoctors.stream()
+                .filter(doctor -> doctor.getUser() != null)  // skip doctors with broken user association
+                .map(doctor -> {
+                    Optional<DoctorAvailability> record = availabilityRepository
+                            .findByDoctorIdAndAvailabilityDateAndTenantId(doctor.getId(), today, tenantId);
+                    return record.map(r -> toResponse(r, doctor))
+                            .orElseGet(() -> DoctorAvailabilityResponse.builder()
+                                    .userId(doctor.getUser().getId())
+                                    .doctorId(doctor.getId())
+                                    .doctorName(doctor.getUser().getFullName())
+                                    .departmentName(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
+                                    .date(today)
+                                    .isPresent(false)
+                                    .status(DoctorStatus.OFF_DUTY)
+                                    .build());
+                }).collect(Collectors.toList());
     }
 
     /** Upsert presence + duty hours (used by admin for scheduling) */
@@ -130,10 +134,11 @@ public class DoctorAvailabilityService {
     }
 
     private DoctorAvailabilityResponse toResponse(DoctorAvailability r, Doctor doctor) {
+        User user = doctor.getUser();
         return DoctorAvailabilityResponse.builder()
-                .userId(doctor.getUser().getId())
+                .userId(user != null ? user.getId() : null)
                 .doctorId(r.getDoctor().getId())
-                .doctorName(doctor.getUser().getFullName())
+                .doctorName(user != null ? user.getFullName() : "Unknown Doctor")
                 .departmentName(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
                 .date(r.getAvailabilityDate())
                 .isPresent(r.getIsPresent())
