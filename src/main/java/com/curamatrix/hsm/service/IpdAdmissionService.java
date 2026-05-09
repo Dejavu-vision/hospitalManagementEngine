@@ -239,16 +239,22 @@ public class IpdAdmissionService {
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getActiveAdmissions() {
         Long tenantId = TenantContext.getTenantId();
+        List<Map<String, Object>> resultList = new ArrayList<>();
+        Set<Long> processedPatientIds = new HashSet<>();
+
+        // 1. IPD Admitted Patients
         List<IpdAdmission> active = admissionRepository.findByStatusAndTenantId(AdmissionStatus.ADMITTED, tenantId);
 
-        return active.stream().map(adm -> {
+        for (IpdAdmission adm : active) {
+            processedPatientIds.add(adm.getPatient().getId());
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("id", adm.getId());
-            row.put("admissionNumber", adm.getAdmissionNumber());
+            row.put("id", adm.getId()); // admissionId
             row.put("patientId", adm.getPatient().getId());
+            row.put("admissionNumber", adm.getAdmissionNumber());
             row.put("patientName", adm.getPatient().getFirstName() + " " + adm.getPatient().getLastName());
+            row.put("patientCode", adm.getPatient().getPatientCode());
             row.put("primaryDoctorName", adm.getPrimaryDoctor().getUser().getFullName());
-            row.put("admissionType", adm.getAdmissionType() != null ? adm.getAdmissionType().name() : null);
+            row.put("admissionType", adm.getAdmissionType() != null ? adm.getAdmissionType().name() : "IPD");
             row.put("admissionTime", adm.getAdmissionTime() != null ? adm.getAdmissionTime().toString() : null);
             row.put("expectedDischargeTime", adm.getExpectedDischargeTime() != null ? adm.getExpectedDischargeTime().toString() : null);
 
@@ -275,8 +281,59 @@ public class IpdAdmissionService {
             row.put("runningBillTotal", bill != null ? bill.getNetAmount() : BigDecimal.ZERO);
             row.put("paidAmount", bill != null ? bill.getPaidAmount() : BigDecimal.ZERO);
 
-            return row;
-        }).collect(Collectors.toList());
+            resultList.add(row);
+        }
+
+        // 2. OPD Patients with Pending Bills + ALL Patients who visited today
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        List<PaymentStatus> statuses = List.of(PaymentStatus.PENDING, PaymentStatus.PARTIAL);
+        List<Billing> allUnpaid = billingRepository.findActiveOpdBills(tenantId, statuses, startOfDay);
+
+        Map<Long, List<Billing>> billsByPatient = allUnpaid.stream()
+            .filter(b -> b.getPatient() != null && !processedPatientIds.contains(b.getPatient().getId()))
+            .collect(Collectors.groupingBy(b -> b.getPatient().getId()));
+
+        for (Map.Entry<Long, List<Billing>> entry : billsByPatient.entrySet()) {
+            Patient p = entry.getValue().get(0).getPatient();
+            
+            BigDecimal totalNet = entry.getValue().stream()
+                .map(b -> b.getNetAmount() != null ? b.getNetAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                
+            BigDecimal totalPaid = entry.getValue().stream()
+                .map(b -> b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", null); // No admissionId for OPD
+            row.put("patientId", p.getId());
+            row.put("admissionNumber", "OPD");
+            row.put("patientName", p.getFirstName() + " " + p.getLastName());
+            row.put("patientCode", p.getPatientCode());
+            
+            // Try to find a doctor from their bills, otherwise default
+            String docName = "OPD Consultant";
+            for (Billing b : entry.getValue()) {
+                if (b.getAppointment() != null && b.getAppointment().getDoctor() != null) {
+                    docName = b.getAppointment().getDoctor().getUser().getFullName();
+                    break;
+                }
+            }
+            row.put("primaryDoctorName", docName);
+            row.put("admissionType", "OPD");
+            
+            row.put("bedNumber", "OPD");
+            row.put("wardName", "Outpatient");
+            row.put("roomType", "");
+            row.put("daysAdmitted", 0);
+
+            row.put("runningBillTotal", totalNet);
+            row.put("paidAmount", totalPaid);
+
+            resultList.add(row);
+        }
+
+        return resultList;
     }
 
     @Transactional(readOnly = true)

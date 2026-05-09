@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * IPD-specific billing operations:
+ * Unified patient billing operations:
  * - Add / remove manual charges to the running bill
  * - Freeze bill (lock before discharge)
  * - Final settlement and discharge
@@ -38,25 +38,77 @@ public class IpdBillingService {
     private final BedRepository bedRepository;
     private final PaymentRepository paymentRepository;
     private final PreAuthRequestRepository preAuthRequestRepository;
+    private final PatientRepository patientRepository;
+
+    // ── Unified Lookup Helpers ────────────────────────────────────────────────
+
+    private IpdAdmission getActiveAdmission(Long patientId, Long tenantId) {
+        return admissionRepository.findByStatusAndTenantId(AdmissionStatus.ADMITTED, tenantId).stream()
+                .filter(a -> a.getPatient().getId().equals(patientId))
+                .findFirst().orElse(null);
+    }
+
+    private List<Billing> getAllPendingBills(Long patientId, Long tenantId) {
+        return billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId).stream()
+                .filter(b -> b.getPaymentStatus() == PaymentStatus.PENDING || b.getPaymentStatus() == PaymentStatus.PARTIAL)
+                .collect(Collectors.toList());
+    }
+
+    private List<Billing> getRelevantBillsForSummary(Long patientId, Long tenantId, IpdAdmission admission) {
+        List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
+        if (admission == null) {
+            // Include today's paid bills for OPD so they show up in the running bill UI
+            LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+            List<Billing> todaysPaid = billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId).stream()
+                    .filter(b -> b.getPaymentStatus() == PaymentStatus.PAID && b.getCreatedAt() != null && !b.getCreatedAt().isBefore(startOfDay))
+                    .collect(Collectors.toList());
+            List<Billing> result = new ArrayList<>(pendingBills);
+            for (Billing b : todaysPaid) {
+                if (!result.contains(b)) result.add(b);
+            }
+            // Sort by createdAt so chronological
+            result.sort(Comparator.comparing(Billing::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
+            return result;
+        }
+        return pendingBills;
+    }
+
+    private Billing getPrimaryBill(Long patientId, Long tenantId, IpdAdmission admission) {
+        if (admission != null) {
+            return billingRepository.findByIpdAdmissionId(admission.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Running Bill", "admissionId", admission.getId()));
+        } else {
+            List<Billing> bills = getAllPendingBills(patientId, tenantId);
+            if (bills.isEmpty()) {
+                Patient patient = patientRepository.findById(patientId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", patientId));
+                Billing b = Billing.builder()
+                        .patient(patient)
+                        .invoiceNumber("OPD-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                        .totalAmount(BigDecimal.ZERO)
+                        .netAmount(BigDecimal.ZERO)
+                        .paidAmount(BigDecimal.ZERO)
+                        .paymentStatus(PaymentStatus.PENDING)
+                        .items(new ArrayList<>())
+                        .build();
+                b.setTenantId(tenantId);
+                return billingRepository.save(b);
+            }
+            return bills.get(0); // Use the most recent pending bill as primary
+        }
+    }
 
     // ── Add a manual charge to the running bill ───────────────────────────────
 
     @Transactional
-    public Map<String, Object> addCharge(Long admissionId, IpdChargeRequest req) {
+    public Map<String, Object> addCharge(Long patientId, IpdChargeRequest req) {
         Long tenantId = TenantContext.getTenantId();
 
-        IpdAdmission admission = admissionRepository.findById(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", admissionId));
-
-        if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
-            throw new InvalidStateTransitionException("IPD Billing", "DISCHARGED", "ADD_CHARGE");
-        }
-
-        Billing bill = billingRepository.findByIpdAdmissionId(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Running Bill", "admissionId", admissionId));
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        Billing bill = getPrimaryBill(patientId, tenantId, admission);
 
         if (bill.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new InvalidStateTransitionException("IPD Billing", "PAID", "ADD_CHARGE");
+            throw new InvalidStateTransitionException("Billing", "PAID", "ADD_CHARGE");
         }
 
         BillingItemType itemType = mapChargeCategory(req.getChargeCategory());
@@ -76,28 +128,31 @@ public class IpdBillingService {
         recalcNet(bill);
         billingRepository.save(bill);
 
-        log.info("IPD charge added to admission {}: {} x{} = ₹{}", admissionId, req.getDescription(), qty, total);
+        log.info("Charge added for patient {}: {} x{} = ₹{}", patientId, req.getDescription(), qty, total);
 
-        PreAuthRequest preAuth = loadPreAuth(admissionId, tenantId);
-        BedAllocation currentAllocation = allocationRepository
-                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admissionId, tenantId).orElse(null);
-        return buildEnrichedRunningBillSummary(admission, bill, preAuth, currentAllocation);
+        PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
+        BedAllocation currentAllocation = admission != null ? allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
+        return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
     }
 
     // ── Remove a manual charge (only before freeze) ───────────────────────────
 
     @Transactional
-    public Map<String, Object> removeCharge(Long admissionId, Long itemId) {
+    public Map<String, Object> removeCharge(Long patientId, Long itemId) {
         Long tenantId = TenantContext.getTenantId();
 
-        IpdAdmission admission = admissionRepository.findById(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", admissionId));
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
 
-        Billing bill = billingRepository.findByIpdAdmissionId(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Running Bill", "admissionId", admissionId));
+        // Find the bill containing this item
+        Billing bill = pendingBills.stream()
+                .filter(b -> b.getItems().stream().anyMatch(i -> i.getId().equals(itemId)))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
 
         if (bill.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new InvalidStateTransitionException("IPD Billing", "PAID", "REMOVE_CHARGE");
+            throw new InvalidStateTransitionException("Billing", "PAID", "REMOVE_CHARGE");
         }
 
         BillingItem toRemove = bill.getItems().stream()
@@ -105,7 +160,6 @@ public class IpdBillingService {
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
 
-        // Prevent removing auto-generated bed charges
         if (toRemove.getItemType() == BillingItemType.BED_CHARGE ||
             toRemove.getItemType() == BillingItemType.NURSING_CHARGE) {
             throw new IllegalArgumentException("Auto-generated bed/nursing charges cannot be removed manually.");
@@ -117,41 +171,47 @@ public class IpdBillingService {
         recalcNet(bill);
         billingRepository.save(bill);
 
-        log.info("IPD charge {} removed from admission {}", itemId, admissionId);
+        log.info("Charge {} removed for patient {}", itemId, patientId);
 
-        PreAuthRequest preAuth = loadPreAuth(admissionId, tenantId);
-        BedAllocation currentAllocation = allocationRepository
-                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admissionId, tenantId).orElse(null);
-        return buildEnrichedRunningBillSummary(admission, bill, preAuth, currentAllocation);
+        PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
+        BedAllocation currentAllocation = admission != null ? allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
+        return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
     }
 
     // ── Get running bill summary (enriched) ──────────────────────────────────
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getRunningBill(Long admissionId) {
+    public Map<String, Object> getRunningBill(Long patientId) {
         Long tenantId = TenantContext.getTenantId();
 
-        IpdAdmission admission = admissionRepository.findById(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", admissionId));
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        List<Billing> summaryBills = getRelevantBillsForSummary(patientId, tenantId, admission);
 
-        Billing bill = billingRepository.findByIpdAdmissionId(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Running Bill", "admissionId", admissionId));
+        if (admission == null && summaryBills.isEmpty()) {
+            // Patient has no active bills and is not admitted. We'll return an empty structure.
+            Patient p = patientRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", patientId));
+            return buildUnifiedRunningBillSummary(patientId, null, Collections.emptyList(), null, null);
+        }
 
-        PreAuthRequest preAuth = loadPreAuth(admissionId, tenantId);
-        BedAllocation currentAllocation = allocationRepository
-                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admissionId, tenantId).orElse(null);
+        PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
+        BedAllocation currentAllocation = admission != null ? allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
 
-        return buildEnrichedRunningBillSummary(admission, bill, preAuth, currentAllocation);
+        return buildUnifiedRunningBillSummary(patientId, admission, summaryBills, preAuth, currentAllocation);
     }
 
-    // ── Clear discharge (doctor marks clinical work done) ─────────────────────
+    // ── Clear discharge (Doctor marks clinical work done) ─────────────────────
 
     @Transactional
-    public Map<String, Object> clearDischarge(Long admissionId) {
+    public Map<String, Object> clearDischarge(Long patientId) {
         Long tenantId = TenantContext.getTenantId();
 
-        IpdAdmission admission = admissionRepository.findById(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", admissionId));
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        if (admission == null) {
+            throw new IllegalArgumentException("Patient is not admitted. Cannot clear discharge.");
+        }
 
         if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
             throw new InvalidStateTransitionException("Admission", "DISCHARGED", "CLEAR_DISCHARGE");
@@ -159,194 +219,218 @@ public class IpdBillingService {
 
         admission.setDischargeCleared(true);
         admissionRepository.save(admission);
-        log.info("Discharge cleared for admission {}", admissionId);
+        log.info("Discharge cleared for patient {}", patientId);
 
-        Billing bill = billingRepository.findByIpdAdmissionId(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Running Bill", "admissionId", admissionId));
-        PreAuthRequest preAuth = loadPreAuth(admissionId, tenantId);
+        PreAuthRequest preAuth = loadPreAuth(admission.getId(), tenantId);
         BedAllocation currentAllocation = allocationRepository
-                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admissionId, tenantId).orElse(null);
-        return buildEnrichedRunningBillSummary(admission, bill, preAuth, currentAllocation);
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null);
+        return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
     }
 
     // ── Generate Invoice (freeze + mark invoice generated) ───────────────────
 
     @Transactional
-    public Map<String, Object> generateInvoice(Long admissionId) {
+    public Map<String, Object> generateInvoice(Long patientId) {
         Long tenantId = TenantContext.getTenantId();
 
-        IpdAdmission admission = admissionRepository.findById(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", admissionId));
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
 
-        if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
-            throw new InvalidStateTransitionException("Admission", "DISCHARGED", "GENERATE_INVOICE");
+        if (admission != null) {
+            if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
+                throw new InvalidStateTransitionException("Admission", "DISCHARGED", "GENERATE_INVOICE");
+            }
+            if (!admission.isDischargeCleared()) {
+                throw new InvalidStateTransitionException("Admission", "DISCHARGE_NOT_CLEARED", "GENERATE_INVOICE");
+            }
+            admission.setInvoiceGenerated(true);
+            admissionRepository.save(admission);
         }
 
-        if (!admission.isDischargeCleared()) {
-            throw new InvalidStateTransitionException("Admission", "DISCHARGE_NOT_CLEARED", "GENERATE_INVOICE");
+        for (Billing bill : pendingBills) {
+            if (bill.getRemarks() == null || !bill.getRemarks().startsWith("FROZEN")) {
+                bill.setRemarks("FROZEN - " + LocalDateTime.now());
+                billingRepository.save(bill);
+            }
         }
 
-        Billing bill = billingRepository.findByIpdAdmissionId(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Running Bill", "admissionId", admissionId));
+        log.info("Invoice generated for patient {}", patientId);
 
-        // Freeze the bill if not already frozen
-        if (bill.getRemarks() == null || !bill.getRemarks().startsWith("FROZEN")) {
-            bill.setRemarks("FROZEN - " + LocalDateTime.now());
-        }
-        billingRepository.save(bill);
-
-        // Mark invoice as generated
-        admission.setInvoiceGenerated(true);
-        admissionRepository.save(admission);
-        log.info("Invoice generated for admission {}", admissionId);
-
-        PreAuthRequest preAuth = loadPreAuth(admissionId, tenantId);
-        BedAllocation currentAllocation = allocationRepository
-                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admissionId, tenantId).orElse(null);
-        return buildEnrichedRunningBillSummary(admission, bill, preAuth, currentAllocation);
+        PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
+        BedAllocation currentAllocation = admission != null ? allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
+        return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
     }
 
     // ── Freeze bill (lock before discharge) ──────────────────────────────────
 
     @Transactional
-    public Map<String, Object> freezeBill(Long admissionId) {
+    public Map<String, Object> freezeBill(Long patientId) {
         Long tenantId = TenantContext.getTenantId();
 
-        IpdAdmission admission = admissionRepository.findById(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", admissionId));
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
 
-        if (admission.getStatus() != AdmissionStatus.ADMITTED) {
+        if (admission != null && admission.getStatus() != AdmissionStatus.ADMITTED) {
             throw new InvalidStateTransitionException("Admission", admission.getStatus().name(), "FREEZE");
         }
 
-        Billing bill = billingRepository.findByIpdAdmissionId(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Running Bill", "admissionId", admissionId));
+        for (Billing bill : pendingBills) {
+            bill.setRemarks("FROZEN - " + LocalDateTime.now());
+            billingRepository.save(bill);
+        }
 
-        // Mark all items as final by setting remarks
-        bill.setRemarks("FROZEN - " + LocalDateTime.now());
-        billingRepository.save(bill);
+        log.info("Bill frozen for patient {}", patientId);
 
-        log.info("IPD bill frozen for admission {}", admissionId);
-
-        PreAuthRequest preAuth = loadPreAuth(admissionId, tenantId);
-        BedAllocation currentAllocation = allocationRepository
-                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admissionId, tenantId).orElse(null);
-        return buildEnrichedRunningBillSummary(admission, bill, preAuth, currentAllocation);
+        PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
+        BedAllocation currentAllocation = admission != null ? allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
+        return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
     }
 
     // ── Final settlement and discharge ────────────────────────────────────────
 
     @Transactional
-    public Map<String, Object> finalSettlement(Long admissionId, IpdSettlementRequest req) {
+    public Map<String, Object> finalSettlement(Long patientId, IpdSettlementRequest req) {
         Long tenantId = TenantContext.getTenantId();
 
-        IpdAdmission admission = admissionRepository.findById(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", admissionId));
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
 
-        if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
-            throw new InvalidStateTransitionException("Admission", "DISCHARGED", "SETTLE");
-        }
-
-        if (!admission.isInvoiceGenerated()) {
-            throw new InvalidStateTransitionException("Admission", "INVOICE_NOT_GENERATED", "SETTLE");
-        }
-
-        Billing bill = billingRepository.findByIpdAdmissionId(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Running Bill", "admissionId", admissionId));
-
-        // Calculate TPA approved amount
-        BigDecimal tpaApprovedAmount = BigDecimal.ZERO;
-        PreAuthRequest preAuth = loadPreAuth(admissionId, tenantId);
-        if (preAuth != null && "APPROVED".equals(preAuth.getStatus().name())) {
-            tpaApprovedAmount = preAuth.getApprovedAmount() != null ? preAuth.getApprovedAmount() : BigDecimal.ZERO;
-            bill.setInsuranceAdjustment(tpaApprovedAmount);
-        }
-
-        // Record balance payment (positive = collect from patient) or refund (use refundAmount field)
-        if (req.getAmount() != null && req.getAmount().compareTo(BigDecimal.ZERO) > 0) {
-            bill.setPaidAmount(bill.getPaidAmount().add(req.getAmount()));
-        }
-        // For refunds: paidAmount stays as deposit (hospital already has the money, just returns excess)
-        // refundAmount is tracked in the response for receipt purposes
-
-        // Set payment method from request
-        if (req.getPaymentMethod() != null) {
-            try {
-                bill.setPaymentMethod(PaymentMethod.valueOf(req.getPaymentMethod().toUpperCase()));
-            } catch (IllegalArgumentException e) {
-                bill.setPaymentMethod(PaymentMethod.CASH);
+        if (admission != null) {
+            if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
+                throw new InvalidStateTransitionException("Admission", "DISCHARGED", "SETTLE");
+            }
+            if (!admission.isInvoiceGenerated()) {
+                throw new InvalidStateTransitionException("Admission", "INVOICE_NOT_GENERATED", "SETTLE");
             }
         }
 
-        // Mark bill as settled
-        bill.setPaymentStatus(PaymentStatus.PAID);
-        bill.setPaidAt(LocalDateTime.now());
-        recalcNet(bill);
-        billingRepository.save(bill);
-
-        // Release bed
-        BedAllocation alloc = allocationRepository
-                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admissionId, tenantId).orElse(null);
-        String bedNumber = null;
-        if (alloc != null) {
-            alloc.setIsCurrent(false);
-            alloc.setEndTime(LocalDateTime.now());
-            allocationRepository.save(alloc);
-            Bed bed = alloc.getBed();
-            bedNumber = bed.getBedNumber();
-            bed.setStatus(BedStatus.CLEANING);
-            bedRepository.save(bed);
+        BigDecimal tpaApprovedAmount = BigDecimal.ZERO;
+        PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
+        if (preAuth != null && "APPROVED".equals(preAuth.getStatus().name())) {
+            tpaApprovedAmount = preAuth.getApprovedAmount() != null ? preAuth.getApprovedAmount() : BigDecimal.ZERO;
         }
 
-        // Discharge patient
-        admission.setStatus(AdmissionStatus.DISCHARGED);
-        admission.setActualDischargeTime(LocalDateTime.now());
-        admissionRepository.save(admission);
+        BigDecimal remainingTpa = tpaApprovedAmount;
 
-        log.info("IPD final settlement complete for admission {}. Bed {} released.", admissionId, bedNumber);
+        // Apply TPA to bills
+        for (Billing bill : pendingBills) {
+            if (remainingTpa.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal billDue = bill.getNetAmount().subtract(bill.getPaidAmount());
+                BigDecimal tpaToApply = remainingTpa.min(billDue);
+                bill.setInsuranceAdjustment(tpaToApply);
+                remainingTpa = remainingTpa.subtract(tpaToApply);
+                recalcNet(bill);
+            }
+        }
 
-        BigDecimal totalCharges = bill.getTotalAmount();
-        BigDecimal depositPaid = admission.getDepositAmount() != null ? admission.getDepositAmount() : BigDecimal.ZERO;
+        // Apply payment to the primary bill
+        Billing primaryBill = getPrimaryBill(patientId, tenantId, admission);
+        if (req.getAmount() != null && req.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+            primaryBill.setPaidAmount(primaryBill.getPaidAmount().add(req.getAmount()));
+        }
+
+        BigDecimal totalCharges = BigDecimal.ZERO;
+        BigDecimal totalPaid = BigDecimal.ZERO;
+        
+        // Finalize all bills
+        for (Billing bill : pendingBills) {
+            bill.setPaymentStatus(PaymentStatus.PAID);
+            bill.setPaidAt(LocalDateTime.now());
+            if (req.getPaymentMethod() != null) {
+                try {
+                    bill.setPaymentMethod(PaymentMethod.valueOf(req.getPaymentMethod().toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    bill.setPaymentMethod(PaymentMethod.CASH);
+                }
+            }
+            billingRepository.save(bill);
+            totalCharges = totalCharges.add(bill.getTotalAmount());
+            totalPaid = totalPaid.add(bill.getPaidAmount());
+        }
+
+        String bedNumber = null;
+        if (admission != null) {
+            BedAllocation alloc = allocationRepository
+                    .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null);
+            if (alloc != null) {
+                alloc.setIsCurrent(false);
+                alloc.setEndTime(LocalDateTime.now());
+                allocationRepository.save(alloc);
+                Bed bed = alloc.getBed();
+                bedNumber = bed.getBedNumber();
+                bed.setStatus(BedStatus.CLEANING);
+                bedRepository.save(bed);
+            }
+
+            admission.setStatus(AdmissionStatus.DISCHARGED);
+            admission.setActualDischargeTime(LocalDateTime.now());
+            admissionRepository.save(admission);
+            log.info("IPD final settlement complete for patient {}. Bed {} released.", patientId, bedNumber);
+        } else {
+            log.info("OPD final settlement complete for patient {}.", patientId);
+        }
+
+        BigDecimal depositPaid = admission != null && admission.getDepositAmount() != null ? admission.getDepositAmount() : BigDecimal.ZERO;
         BigDecimal balanceCollected = req.getAmount() != null && req.getAmount().compareTo(BigDecimal.ZERO) > 0 ? req.getAmount() : BigDecimal.ZERO;
-        // Refund = deposit + tpa - total (when deposit > charges)
         BigDecimal refundAmount = req.getRefundAmount() != null ? req.getRefundAmount() : BigDecimal.ZERO;
 
+        Patient patient = patientRepository.findById(patientId).orElseThrow();
+
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("admissionId", admissionId);
-        result.put("admissionNumber", admission.getAdmissionNumber());
-        result.put("patientName", admission.getPatient().getFirstName() + " " + admission.getPatient().getLastName());
-        result.put("invoiceNumber", bill.getInvoiceNumber());
-        result.put("status", "DISCHARGED");
+        result.put("patientId", patientId);
+        result.put("admissionId", admission != null ? admission.getId() : null);
+        result.put("admissionNumber", admission != null ? admission.getAdmissionNumber() : "OPD");
+        result.put("patientName", patient.getFirstName() + " " + patient.getLastName());
+        result.put("invoiceNumber", primaryBill.getInvoiceNumber());
+        result.put("status", admission != null ? "DISCHARGED" : "SETTLED");
         result.put("totalCharges", totalCharges);
         result.put("depositPaid", depositPaid);
         result.put("tpaApprovedAmount", tpaApprovedAmount);
-        result.put("balanceCollected", balanceCollected.compareTo(BigDecimal.ZERO) > 0 ? balanceCollected : BigDecimal.ZERO);
+        result.put("balanceCollected", balanceCollected);
         result.put("refundAmount", refundAmount);
-        result.put("totalPaid", bill.getPaidAmount());
+        result.put("totalPaid", totalPaid);
         result.put("bedReleased", bedNumber);
-        result.put("dischargeTime", admission.getActualDischargeTime().toString());
+        result.put("dischargeTime", admission != null && admission.getActualDischargeTime() != null ? admission.getActualDischargeTime().toString() : LocalDateTime.now().toString());
         return result;
     }
 
     // ── Final bill breakdown ──────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getFinalBill(Long admissionId) {
-        IpdAdmission admission = admissionRepository.findById(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", admissionId));
-
-        Billing bill = billingRepository.findByIpdAdmissionId(admissionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Running Bill", "admissionId", admissionId));
-
-        // Get pre-auth approved amount if any
-        BigDecimal tpaApprovedAmount = BigDecimal.ZERO;
-        if (admission.getPreAuthId() != null) {
-            tpaApprovedAmount = bill.getInsuranceAdjustment() != null ? bill.getInsuranceAdjustment() : BigDecimal.ZERO;
+    public Map<String, Object> getFinalBill(Long patientId) {
+        Long tenantId = TenantContext.getTenantId();
+        
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        List<Billing> bills = getRelevantBillsForSummary(patientId, tenantId, admission);
+        if (bills.isEmpty() && admission != null) {
+            billingRepository.findByIpdAdmissionId(admission.getId()).ifPresent(bills::add);
         }
 
-        BigDecimal totalCharges = bill.getTotalAmount();
-        BigDecimal depositPaid = admission.getDepositAmount() != null ? admission.getDepositAmount() : BigDecimal.ZERO;
-        BigDecimal copayCollected = bill.getPaidAmount().subtract(depositPaid);
+        BigDecimal tpaApprovedAmount = BigDecimal.ZERO;
+        if (admission != null && admission.getPreAuthId() != null) {
+            tpaApprovedAmount = bills.stream()
+                .map(b -> b.getInsuranceAdjustment() != null ? b.getInsuranceAdjustment() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+
+        BigDecimal totalCharges = BigDecimal.ZERO;
+        BigDecimal totalPaid = BigDecimal.ZERO;
+        Map<String, BigDecimal> byCategory = new LinkedHashMap<>();
+        
+        for (Billing bill : bills) {
+            totalCharges = totalCharges.add(bill.getTotalAmount());
+            totalPaid = totalPaid.add(bill.getPaidAmount());
+            for (BillingItem item : bill.getItems()) {
+                String cat = item.getItemType().name();
+                BigDecimal subtotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+                byCategory.merge(cat, subtotal, BigDecimal::add);
+            }
+        }
+
+        BigDecimal depositPaid = admission != null && admission.getDepositAmount() != null ? admission.getDepositAmount() : BigDecimal.ZERO;
+        BigDecimal copayCollected = totalPaid.subtract(depositPaid);
         if (copayCollected.compareTo(BigDecimal.ZERO) < 0) copayCollected = BigDecimal.ZERO;
 
         BigDecimal balanceDue = totalCharges
@@ -354,58 +438,47 @@ public class IpdBillingService {
                 .subtract(tpaApprovedAmount)
                 .subtract(copayCollected);
 
-        // Group items by category
-        Map<String, BigDecimal> byCategory = new LinkedHashMap<>();
-        for (BillingItem item : bill.getItems()) {
-            String cat = item.getItemType().name();
-            BigDecimal subtotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
-            byCategory.merge(cat, subtotal, BigDecimal::add);
-        }
+        Patient patient = patientRepository.findById(patientId).orElseThrow();
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("admissionId", admissionId);
-        result.put("admissionNumber", admission.getAdmissionNumber());
-        result.put("patientName", admission.getPatient().getFirstName() + " " + admission.getPatient().getLastName());
-        result.put("patientCode", admission.getPatient().getPatientCode());
-        result.put("admissionTime", admission.getAdmissionTime() != null ? admission.getAdmissionTime().toString() : null);
-        result.put("dischargeTime", admission.getActualDischargeTime() != null ? admission.getActualDischargeTime().toString() : null);
+        result.put("patientId", patientId);
+        result.put("admissionId", admission != null ? admission.getId() : null);
+        result.put("admissionNumber", admission != null ? admission.getAdmissionNumber() : "OPD");
+        result.put("patientName", patient.getFirstName() + " " + patient.getLastName());
+        result.put("patientCode", patient.getPatientCode());
+        result.put("admissionTime", admission != null && admission.getAdmissionTime() != null ? admission.getAdmissionTime().toString() : null);
+        result.put("dischargeTime", admission != null && admission.getActualDischargeTime() != null ? admission.getActualDischargeTime().toString() : null);
         result.put("chargesByCategory", byCategory);
         result.put("totalCharges", totalCharges);
         result.put("depositPaid", depositPaid);
         result.put("tpaApprovedAmount", tpaApprovedAmount);
         result.put("copayCollected", copayCollected);
         result.put("balanceDue", balanceDue);
-        result.put("isFrozen", bill.getRemarks() != null && bill.getRemarks().startsWith("FROZEN"));
-        result.put("paymentStatus", bill.getPaymentStatus().name());
+        
+        boolean isFrozen = bills.stream().anyMatch(b -> b.getRemarks() != null && b.getRemarks().startsWith("FROZEN"));
+        result.put("isFrozen", isFrozen);
+        
+        boolean allPaid = bills.stream().allMatch(b -> b.getPaymentStatus() == PaymentStatus.PAID);
+        result.put("paymentStatus", allPaid ? "PAID" : "PENDING");
         return result;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /**
-     * Load the pre-auth for this admission.
-     * Strategy:
-     * 1. Use admission.preAuthId (direct FK) — most reliable
-     * 2. Fall back to querying by admissionId on the pre-auth record
-     * 3. Fall back to most recent pre-auth for the patient (covers TPA desk created after admission)
-     */
     private PreAuthRequest loadPreAuth(Long admissionId, Long tenantId) {
-        // 1. Direct FK on admission
         IpdAdmission admission = admissionRepository.findById(admissionId).orElse(null);
         if (admission != null && admission.getPreAuthId() != null) {
             PreAuthRequest pa = preAuthRequestRepository.findById(admission.getPreAuthId()).orElse(null);
             if (pa != null) return pa;
         }
-        // 2. Pre-auth linked to this admissionId
         List<PreAuthRequest> byAdmission = preAuthRequestRepository
                 .findByAdmissionIdAndTenantId(admissionId, tenantId);
         if (!byAdmission.isEmpty()) return byAdmission.get(0);
-        // 3. Most recent pre-auth for the patient (TPA desk may have created it after admission)
+        
         if (admission != null) {
             List<PreAuthRequest> byPatient = preAuthRequestRepository
                     .findByPatientIdAndTenantIdOrderByRequestedAtDesc(admission.getPatient().getId(), tenantId);
             if (!byPatient.isEmpty()) {
-                // Link it to this admission for future lookups
                 PreAuthRequest pa = byPatient.get(0);
                 if (pa.getAdmissionId() == null) {
                     pa.setAdmissionId(admissionId);
@@ -419,95 +492,89 @@ public class IpdBillingService {
         return null;
     }
 
-    /**
-     * Build the enriched running bill summary including TPA/insurance, doctor,
-     * ward/bed, and stay-duration data.
-     *
-     * NEVER put raw LocalDateTime into a Map — always call .toString() explicitly.
-     * NEVER use Map.of() — values may be null (use HashMap / LinkedHashMap).
-     */
-    private Map<String, Object> buildEnrichedRunningBillSummary(
+    private Map<String, Object> buildUnifiedRunningBillSummary(
+            Long patientId,
             IpdAdmission admission,
-            Billing bill,
-            PreAuthRequest preAuth,          // nullable
-            BedAllocation currentAllocation  // nullable
+            List<Billing> pendingBills,
+            PreAuthRequest preAuth,
+            BedAllocation currentAllocation
     ) {
-        // ── Items ──────────────────────────────────────────────────────────────
-        List<Map<String, Object>> items = bill.getItems().stream().map(item -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", item.getId());
-            m.put("description", item.getDescription());
-            m.put("chargeCategory", item.getItemType().name());
-            m.put("unitPrice", item.getAmount());
-            m.put("quantity", item.getQuantity());
-            m.put("totalAmount", item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity())));
-            m.put("isAutoCharge", item.getItemType() == BillingItemType.BED_CHARGE ||
-                                   item.getItemType() == BillingItemType.NURSING_CHARGE);
-            return m;
-        }).collect(Collectors.toList());
-
-        // ── Financial totals ───────────────────────────────────────────────────
-        BigDecimal depositPaid = admission.getDepositAmount() != null ? admission.getDepositAmount() : BigDecimal.ZERO;
-        BigDecimal provisionalBalance = bill.getTotalAmount().subtract(depositPaid);
-
-        // ── Stay duration (always ≥ 1) ─────────────────────────────────────────
-        int stayDays = (int) ChronoUnit.DAYS.between(
-                admission.getAdmissionTime().toLocalDate(), LocalDate.now()) + 1;
-        if (stayDays < 1) stayDays = 1;
-
-        // ── Doctor info ────────────────────────────────────────────────────────
-        String primaryDoctorName = null;
-        String primaryDoctorSpecialty = null;
-        try {
-            Doctor doctor = admission.getPrimaryDoctor();
-            if (doctor != null) {
-                primaryDoctorName = doctor.getUser().getFullName();
-                if (doctor.getDepartment() != null) {
-                    primaryDoctorSpecialty = doctor.getDepartment().getName();
-                }
+        Patient patient = patientRepository.findById(patientId).orElseThrow();
+        
+        List<Map<String, Object>> items = new ArrayList<>();
+        BigDecimal totalCharges = BigDecimal.ZERO;
+        BigDecimal totalPaid = BigDecimal.ZERO;
+        boolean isFrozen = false;
+        
+        for (Billing bill : pendingBills) {
+            totalCharges = totalCharges.add(bill.getTotalAmount());
+            totalPaid = totalPaid.add(bill.getPaidAmount());
+            if (bill.getRemarks() != null && bill.getRemarks().startsWith("FROZEN")) {
+                isFrozen = true;
             }
-        } catch (Exception e) {
-            log.warn("Could not load doctor info for admission {}: {}", admission.getId(), e.getMessage());
+            
+            for (BillingItem item : bill.getItems()) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", item.getId());
+                m.put("description", item.getDescription());
+                m.put("chargeCategory", item.getItemType().name());
+                m.put("unitPrice", item.getAmount());
+                m.put("quantity", item.getQuantity());
+                m.put("totalAmount", item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity())));
+                m.put("isAutoCharge", item.getItemType() == BillingItemType.BED_CHARGE ||
+                                       item.getItemType() == BillingItemType.NURSING_CHARGE);
+                items.add(m);
+            }
         }
 
-        // ── Ward / Bed info ────────────────────────────────────────────────────
+        BigDecimal depositPaid = admission != null && admission.getDepositAmount() != null ? admission.getDepositAmount() : BigDecimal.ZERO;
+        
+        BigDecimal tpaApprovedAmount = BigDecimal.ZERO;
+        if (preAuth != null && "APPROVED".equals(preAuth.getStatus().name())) {
+            tpaApprovedAmount = preAuth.getApprovedAmount() != null ? preAuth.getApprovedAmount() : BigDecimal.ZERO;
+        }
+        
+        BigDecimal provisionalBalance = totalCharges
+                .subtract(depositPaid)
+                .subtract(totalPaid)
+                .subtract(tpaApprovedAmount);
+                
+        if (provisionalBalance.compareTo(BigDecimal.ZERO) < 0) {
+            provisionalBalance = BigDecimal.ZERO;
+        }
+
+        int stayDays = 0;
+        if (admission != null && admission.getAdmissionTime() != null) {
+            stayDays = (int) ChronoUnit.DAYS.between(admission.getAdmissionTime().toLocalDate(), LocalDate.now()) + 1;
+            if (stayDays < 1) stayDays = 1;
+        }
+
+        String primaryDoctorName = null;
+        String primaryDoctorSpecialty = null;
+        if (admission != null && admission.getPrimaryDoctor() != null) {
+            primaryDoctorName = admission.getPrimaryDoctor().getUser().getFullName();
+            if (admission.getPrimaryDoctor().getDepartment() != null) {
+                primaryDoctorSpecialty = admission.getPrimaryDoctor().getDepartment().getName();
+            }
+        } else {
+            // OPD Doctor fallback
+            primaryDoctorName = "OPD Consultant";
+        }
+
         String currentWardName = null;
         String currentBedNumber = null;
         if (currentAllocation != null) {
-            try {
-                Bed bed = currentAllocation.getBed();
-                currentBedNumber = bed.getBedNumber();
-                if (bed.getRoom() != null && bed.getRoom().getWard() != null) {
-                    currentWardName = bed.getRoom().getWard().getName();
-                }
-            } catch (Exception e) {
-                log.warn("Could not load ward/bed info for admission {}: {}", admission.getId(), e.getMessage());
+            Bed bed = currentAllocation.getBed();
+            currentBedNumber = bed.getBedNumber();
+            if (bed.getRoom() != null && bed.getRoom().getWard() != null) {
+                currentWardName = bed.getRoom().getWard().getName();
             }
+        } else if (admission == null) {
+            currentWardName = "Outpatient";
+            currentBedNumber = "OPD";
         }
 
-        // ── Deposit receipt number ─────────────────────────────────────────────
-        String depositReceiptNumber = null;
-        try {
-            Long tenantId = TenantContext.getTenantId();
-            List<Payment> payments = paymentRepository
-                    .findAllByPatientIdAndTenantId(admission.getPatient().getId(), tenantId);
-            if (!payments.isEmpty()) {
-                // Prefer receiptNumber, fall back to referenceNumber
-                depositReceiptNumber = payments.stream()
-                        .filter(p -> p.getReceiptNumber() != null)
-                        .map(Payment::getReceiptNumber)
-                        .findFirst()
-                        .orElseGet(() -> payments.stream()
-                                .filter(p -> p.getReferenceNumber() != null)
-                                .map(Payment::getReferenceNumber)
-                                .findFirst()
-                                .orElse(null));
-            }
-        } catch (Exception e) {
-            log.warn("Could not load deposit receipt for admission {}: {}", admission.getId(), e.getMessage());
-        }
-
-        // ── Pre-auth sub-map (use HashMap — values may be null) ────────────────
+        // Pre-auth Map
         Map<String, Object> preAuthMap = null;
         if (preAuth != null) {
             preAuthMap = new HashMap<>();
@@ -515,11 +582,8 @@ public class IpdBillingService {
             preAuthMap.put("status", preAuth.getStatus().name());
             preAuthMap.put("tpaReferenceNumber", preAuth.getTpaReferenceNumber());
             preAuthMap.put("approvedAmount", preAuth.getApprovedAmount());
-            // Explicitly call .toString() on LocalDateTime — never put raw LocalDateTime in Map
-            preAuthMap.put("requestedAt", preAuth.getRequestedAt() != null
-                    ? preAuth.getRequestedAt().toString() : null);
+            preAuthMap.put("requestedAt", preAuth.getRequestedAt() != null ? preAuth.getRequestedAt().toString() : null);
 
-            // Insurance policy sub-map
             Map<String, Object> policyMap = null;
             InsurancePolicy policy = preAuth.getInsurancePolicy();
             if (policy != null) {
@@ -528,42 +592,38 @@ public class IpdBillingService {
                 policyMap.put("memberId", policy.getMemberId());
                 policyMap.put("sumInsured", policy.getSumInsured());
                 policyMap.put("copayPct", policy.getCopayPct());
-                // Payer info
-                PayerMaster payer = policy.getPayer();
-                policyMap.put("insurerName", payer != null ? payer.getInsurerName() : null);
-                policyMap.put("tpaName", payer != null ? payer.getTpaName() : null);
             }
             preAuthMap.put("insurancePolicy", policyMap);
         }
 
-        // ── Assemble result ────────────────────────────────────────────────────
         Map<String, Object> result = new LinkedHashMap<>();
-        // Existing fields
-        result.put("admissionId", admission.getId());
-        result.put("admissionNumber", admission.getAdmissionNumber());
-        result.put("invoiceNumber", bill.getInvoiceNumber());
-        result.put("patientName", admission.getPatient().getFirstName() + " " + admission.getPatient().getLastName());
-        result.put("patientCode", admission.getPatient().getPatientCode());
-        result.put("status", admission.getStatus().name());
-        result.put("isFrozen", bill.getRemarks() != null && bill.getRemarks().startsWith("FROZEN"));
+        result.put("patientId", patientId);
+        result.put("admissionId", admission != null ? admission.getId() : null);
+        result.put("admissionNumber", admission != null ? admission.getAdmissionNumber() : "OPD");
+        result.put("invoiceNumber", !pendingBills.isEmpty() ? pendingBills.get(0).getInvoiceNumber() : null);
+        result.put("patientName", patient.getFirstName() + " " + patient.getLastName());
+        result.put("patientCode", patient.getPatientCode());
+        result.put("status", admission != null ? admission.getStatus().name() : "OPD");
+        result.put("isFrozen", isFrozen);
         result.put("items", items);
-        result.put("totalCharges", bill.getTotalAmount());
+        result.put("totalCharges", totalCharges);
         result.put("depositPaid", depositPaid);
         result.put("provisionalBalance", provisionalBalance);
-        result.put("paymentStatus", bill.getPaymentStatus().name());
-        // New enriched fields — explicitly call .toString() on LocalDateTime
-        result.put("admissionTime", admission.getAdmissionTime() != null
-                ? admission.getAdmissionTime().toString() : null);
+        
+        boolean allPaid = !pendingBills.isEmpty() && pendingBills.stream().allMatch(b -> b.getPaymentStatus() == PaymentStatus.PAID);
+        result.put("paymentStatus", allPaid ? "PAID" : "PENDING");
+        
+        result.put("admissionTime", admission != null && admission.getAdmissionTime() != null ? admission.getAdmissionTime().toString() : null);
         result.put("primaryDoctorName", primaryDoctorName);
         result.put("primaryDoctorSpecialty", primaryDoctorSpecialty);
         result.put("currentWardName", currentWardName);
         result.put("currentBedNumber", currentBedNumber);
         result.put("stayDays", stayDays);
-        result.put("depositReceiptNumber", depositReceiptNumber);
+        result.put("depositReceiptNumber", null);
         result.put("preAuth", preAuthMap);
-        // Unlock gate fields for frontend button logic
-        result.put("dischargeCleared", admission.isDischargeCleared());
-        result.put("invoiceGenerated", admission.isInvoiceGenerated());
+        
+        result.put("dischargeCleared", admission == null || admission.isDischargeCleared());
+        result.put("invoiceGenerated", admission == null || admission.isInvoiceGenerated());
         return result;
     }
 

@@ -23,77 +23,77 @@ public class IpdBillingController {
 
     // ── Running Bill ──────────────────────────────────────────────────────────
 
-    @GetMapping("/{admissionId}/running-bill")
+    @GetMapping("/patient/{patientId}/running-bill")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR', 'ADMIN')")
-    @Operation(summary = "Get running bill for an IPD admission")
-    public ResponseEntity<Map<String, Object>> getRunningBill(@PathVariable Long admissionId) {
-        return ResponseEntity.ok(ipdBillingService.getRunningBill(admissionId));
+    @Operation(summary = "Get running bill for a patient (unified OPD/IPD)")
+    public ResponseEntity<Map<String, Object>> getRunningBill(@PathVariable Long patientId) {
+        return ResponseEntity.ok(ipdBillingService.getRunningBill(patientId));
     }
 
     // ── Charges ───────────────────────────────────────────────────────────────
 
-    @PostMapping("/{admissionId}/charges")
+    @PostMapping("/patient/{patientId}/charges")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     @Operation(summary = "Add a manual charge to the running bill")
     public ResponseEntity<Map<String, Object>> addCharge(
-            @PathVariable Long admissionId,
+            @PathVariable Long patientId,
             @Valid @RequestBody IpdChargeRequest request) {
-        return ResponseEntity.ok(ipdBillingService.addCharge(admissionId, request));
+        return ResponseEntity.ok(ipdBillingService.addCharge(patientId, request));
     }
 
-    @DeleteMapping("/{admissionId}/charges/{itemId}")
+    @DeleteMapping("/patient/{patientId}/charges/{itemId}")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     @Operation(summary = "Remove a manual charge from the running bill (before freeze)")
     public ResponseEntity<Map<String, Object>> removeCharge(
-            @PathVariable Long admissionId,
+            @PathVariable Long patientId,
             @PathVariable Long itemId) {
-        return ResponseEntity.ok(ipdBillingService.removeCharge(admissionId, itemId));
+        return ResponseEntity.ok(ipdBillingService.removeCharge(patientId, itemId));
     }
 
     // ── Freeze ────────────────────────────────────────────────────────────────
 
-    @PostMapping("/{admissionId}/freeze")
+    @PostMapping("/patient/{patientId}/freeze")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     @Operation(summary = "Freeze the bill — no more charges can be added after this")
-    public ResponseEntity<Map<String, Object>> freezeBill(@PathVariable Long admissionId) {
-        return ResponseEntity.ok(ipdBillingService.freezeBill(admissionId));
+    public ResponseEntity<Map<String, Object>> freezeBill(@PathVariable Long patientId) {
+        return ResponseEntity.ok(ipdBillingService.freezeBill(patientId));
     }
 
     // ── Clear Discharge (Doctor action) ──────────────────────────────────────
 
-    @PatchMapping("/{admissionId}/clear-discharge")
+    @PatchMapping("/patient/{patientId}/clear-discharge")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR', 'ADMIN')")
     @Operation(summary = "Doctor clears discharge — marks clinical work as done, unlocks Generate Invoice")
-    public ResponseEntity<Map<String, Object>> clearDischarge(@PathVariable Long admissionId) {
-        return ResponseEntity.ok(ipdBillingService.clearDischarge(admissionId));
+    public ResponseEntity<Map<String, Object>> clearDischarge(@PathVariable Long patientId) {
+        return ResponseEntity.ok(ipdBillingService.clearDischarge(patientId));
     }
 
     // ── Generate Invoice ──────────────────────────────────────────────────────
 
-    @PostMapping("/{admissionId}/generate-invoice")
+    @PostMapping("/patient/{patientId}/generate-invoice")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     @Operation(summary = "Generate final invoice — freezes bill and marks invoiceGenerated=true, unlocks Discharge & Settle")
-    public ResponseEntity<Map<String, Object>> generateInvoice(@PathVariable Long admissionId) {
-        return ResponseEntity.ok(ipdBillingService.generateInvoice(admissionId));
+    public ResponseEntity<Map<String, Object>> generateInvoice(@PathVariable Long patientId) {
+        return ResponseEntity.ok(ipdBillingService.generateInvoice(patientId));
     }
 
     // ── Final Bill ────────────────────────────────────────────────────────────
 
-    @GetMapping("/{admissionId}/final-bill")
+    @GetMapping("/patient/{patientId}/final-bill")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR', 'ADMIN')")
     @Operation(summary = "Get final bill breakdown for discharge")
-    public ResponseEntity<Map<String, Object>> getFinalBill(@PathVariable Long admissionId) {
-        return ResponseEntity.ok(ipdBillingService.getFinalBill(admissionId));
+    public ResponseEntity<Map<String, Object>> getFinalBill(@PathVariable Long patientId) {
+        return ResponseEntity.ok(ipdBillingService.getFinalBill(patientId));
     }
 
     // ── Settlement & Discharge ────────────────────────────────────────────────
 
-    @PostMapping("/{admissionId}/final-settlement")
+    @PostMapping("/patient/{patientId}/final-settlement")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     @Operation(summary = "Collect final balance, close bill, release bed, and discharge patient")
     public ResponseEntity<Map<String, Object>> finalSettlement(
-            @PathVariable Long admissionId,
+            @PathVariable Long patientId,
             @Valid @RequestBody IpdSettlementRequest request) {
-        return ResponseEntity.ok(ipdBillingService.finalSettlement(admissionId, request));
+        return ResponseEntity.ok(ipdBillingService.finalSettlement(patientId, request));
     }
 }
