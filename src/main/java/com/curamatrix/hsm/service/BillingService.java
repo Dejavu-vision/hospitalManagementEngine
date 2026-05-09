@@ -64,10 +64,18 @@ public class BillingService {
         // 1. Check for Case Paper (Registration)
         if (!isRegistrationValid(patient.getId(), tenantId)) {
             Optional<HospitalService> regService = hospitalServiceRepository.findByServiceCodeAndTenantId("REG_FEE", tenantId);
+            
+            // If REG_FEE not found, look for any REGISTRATION service
+            if (regService.isEmpty()) {
+                regService = hospitalServiceRepository.findAllByTenantIdAndActiveTrue(tenantId).stream()
+                        .filter(s -> s.getItemType() == BillingItemType.REGISTRATION)
+                        .findFirst();
+            }
+
             if (regService.isPresent()) {
                 // Registration fee is ALWAYS patient-pay regardless of insurance
                 BillingItem regItem = BillingItem.builder()
-                        .description("Patient Registration / Case Paper")
+                        .description(regService.get().getServiceName())
                         .amount(regService.get().getPrice())
                         .itemType(BillingItemType.REGISTRATION)
                         .quantity(1)
@@ -79,19 +87,32 @@ public class BillingService {
         }
 
         // 2. Add Consultation Fee
-        Optional<HospitalService> consultService = hospitalServiceRepository.findByServiceCodeAndTenantId("CONSULT", tenantId);
-        if (consultService.isPresent()) {
-            // Consultation is NOT_COVERED for now — insurance billing engine (Phase 3) will handle splits
-            BillingItem consultItem = BillingItem.builder()
-                    .description("Consultation - " + appointment.getDoctor().getUser().getFullName())
-                    .amount(consultService.get().getPrice())
-                    .itemType(BillingItemType.CONSULTATION)
-                    .quantity(1)
-                    .insuranceCoverage(com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED)
-                    .build();
-            items.add(consultItem);
-            totalAmount = totalAmount.add(consultItem.getAmount());
+        Optional<HospitalService> consultService = Optional.empty();
+        
+        // 1st Priority: Look for CONSULTATION service specifically for this doctor's department
+        if (appointment.getDoctor().getDepartment() != null) {
+            consultService = hospitalServiceRepository.findAllByTenantIdAndDepartmentId(tenantId, appointment.getDoctor().getDepartment().getId()).stream()
+                    .filter(s -> s.getItemType() == BillingItemType.CONSULTATION && s.isActive())
+                    .findFirst();
         }
+        
+        // 2nd Priority: Look for generic 'CONSULT' code if no department service found
+        if (consultService.isEmpty()) {
+            consultService = hospitalServiceRepository.findByServiceCodeAndTenantId("CONSULT", tenantId);
+        }
+
+        BigDecimal fee = consultService.isPresent() ? consultService.get().getPrice() : appointment.getDoctor().getConsultationFee();
+        String desc = consultService.isPresent() ? consultService.get().getServiceName() : "Consultation - " + appointment.getDoctor().getUser().getFullName();
+
+        BillingItem consultItem = BillingItem.builder()
+                .description(desc)
+                .amount(fee)
+                .itemType(BillingItemType.CONSULTATION)
+                .quantity(1)
+                .insuranceCoverage(com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED)
+                .build();
+        items.add(consultItem);
+        totalAmount = totalAmount.add(consultItem.getAmount());
 
         BigDecimal insuranceAdjustment = BigDecimal.ZERO;
         for (BillingItem item : items) {
@@ -140,7 +161,16 @@ public class BillingService {
     public Billing createRegistrationBilling(Patient patient, Long tenantId, String paymentMethodStr) {
         // Validation removed as per request to allow re-registration even if valid paper exists
         
-        Optional<HospitalService> regService = hospitalServiceRepository.findByServiceCodeAndTenantId("REG_FEE", tenantId);
+        // Try to find any user-defined REGISTRATION service first
+        Optional<HospitalService> regService = hospitalServiceRepository.findAllByTenantIdAndActiveTrue(tenantId).stream()
+                .filter(s -> s.getItemType() == BillingItemType.REGISTRATION)
+                .findFirst();
+
+        // Fallback to generic REG_FEE
+        if (regService.isEmpty()) {
+            regService = hospitalServiceRepository.findByServiceCodeAndTenantId("REG_FEE", tenantId);
+        }
+        
         if (regService.isEmpty()) {
             throw new RuntimeException("Registration fee service not configured");
         }

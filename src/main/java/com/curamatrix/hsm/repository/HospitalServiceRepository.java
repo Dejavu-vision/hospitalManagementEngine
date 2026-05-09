@@ -12,4 +12,6 @@ public interface HospitalServiceRepository extends JpaRepository<HospitalService
     List<HospitalService> findAllByTenantIdAndActiveTrue(Long tenantId);
     Optional<HospitalService> findByServiceCodeAndTenantId(String serviceCode, Long tenantId);
     Optional<HospitalService> findByIdAndTenantId(Long id, Long tenantId);
+    List<HospitalService> findAllByTenantIdAndDepartmentId(Long tenantId, Long departmentId);
+    List<HospitalService> findAllByTenantId(Long tenantId);
 }

@@ -1,5 +1,7 @@
 package com.curamatrix.hsm.entity;
 
+import com.curamatrix.hsm.entity.Department;
+
 import com.curamatrix.hsm.enums.BillingItemType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -48,4 +50,16 @@ public class HospitalService extends TenantAwareEntity {
     @Builder.Default
     @Column(name = "is_insurance_payable")
     private Boolean isInsurancePayable = true;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;
+
+    @Column(name = "insurance_rate")
+    private BigDecimal insuranceRate;
+
+    @Builder.Default
+    @Column(name = "gst_percentage")
+    @org.hibernate.annotations.ColumnDefault("0")
+    private BigDecimal gstPercentage = BigDecimal.ZERO;
 }
