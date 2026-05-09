@@ -29,10 +29,12 @@ public class WalkInTokenSequence extends TenantAwareEntity {
 
     // Database has both 'counter' and 'last_token' columns - keep them in sync
     @Column(name = "last_token", nullable = false)
+    @org.hibernate.annotations.ColumnDefault("0")
     @Builder.Default
     private Integer lastToken = 0;
 
     @Column(name = "counter", nullable = false)
+    @org.hibernate.annotations.ColumnDefault("0")
     @Builder.Default
     private Integer counter = 0;
 }

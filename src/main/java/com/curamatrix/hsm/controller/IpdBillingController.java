@@ -59,6 +59,13 @@ public class IpdBillingController {
         return ResponseEntity.ok(ipdBillingService.freezeBill(patientId));
     }
 
+    @PostMapping("/patient/{patientId}/unfreeze")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @Operation(summary = "Unfreeze the bill — allows adding charges again")
+    public ResponseEntity<Map<String, Object>> unfreezeBill(@PathVariable Long patientId) {
+        return ResponseEntity.ok(ipdBillingService.unfreezeBill(patientId));
+    }
+
     // ── Clear Discharge (Doctor action) ──────────────────────────────────────
 
     @PatchMapping("/patient/{patientId}/clear-discharge")

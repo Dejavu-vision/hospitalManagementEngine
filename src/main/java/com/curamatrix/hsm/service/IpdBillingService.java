@@ -288,6 +288,39 @@ public class IpdBillingService {
         return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
     }
 
+    // ── Unfreeze bill (unlock) ────────────────────────────────────────────────
+    @Transactional
+    public Map<String, Object> unfreezeBill(Long patientId) {
+        Long tenantId = TenantContext.getTenantId();
+
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        List<Billing> relevantBills = getRelevantBillsForSummary(patientId, tenantId, admission);
+
+        if (admission != null && admission.getStatus() != AdmissionStatus.ADMITTED) {
+            throw new InvalidStateTransitionException("Admission", admission.getStatus().name(), "UNFREEZE");
+        }
+
+        for (Billing bill : relevantBills) {
+            if (bill.getRemarks() != null && bill.getRemarks().startsWith("FROZEN")) {
+                // Remove the FROZEN prefix. If it's just FROZEN - date, set to null
+                bill.setRemarks(null);
+                billingRepository.save(bill);
+            }
+        }
+        
+        if (admission != null && admission.isInvoiceGenerated()) {
+            admission.setInvoiceGenerated(false);
+            admissionRepository.save(admission);
+        }
+
+        log.info("Bill unfrozen for patient {}", patientId);
+
+        PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
+        BedAllocation currentAllocation = admission != null ? allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
+        return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
+    }
+
     // ── Final settlement and discharge ────────────────────────────────────────
 
     @Transactional

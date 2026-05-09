@@ -140,7 +140,7 @@ public class GlobalExceptionHandler {
                                                                       HttpServletRequest request) {
         log.error("Unexpected error on {}: {}", request.getRequestURI(), ex.getMessage(), ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR,
-                "An unexpected error occurred. Please try again later.",
+                "Unexpected error: " + ex.getClass().getName() + " - " + ex.getMessage(),
                 request.getRequestURI());
     }
 
