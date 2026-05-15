@@ -1,8 +1,10 @@
 package com.curamatrix.hsm.controller;
 
 import com.curamatrix.hsm.context.TenantContext;
+import com.curamatrix.hsm.dto.request.UnifiedRegistrationRequest;
 import com.curamatrix.hsm.dto.response.BookingContextResponse;
 import com.curamatrix.hsm.dto.response.CasePaperResponse;
+import com.curamatrix.hsm.dto.response.UnifiedRegistrationResponse;
 import com.curamatrix.hsm.service.ReceptionDeskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,9 +21,10 @@ public class ReceptionDeskController {
 
     private final ReceptionDeskService receptionDeskService;
 
-    @GetMapping("/booking-context/{patientId}")
+    @GetMapping({"/booking-context", "/booking-context/{patientId}"})
     @PreAuthorize("hasRole('RECEPTIONIST')")
-    public ResponseEntity<BookingContextResponse> getBookingContext(@PathVariable Long patientId) {
+    public ResponseEntity<BookingContextResponse> getBookingContext(
+            @PathVariable(required = false) Long patientId) {
         log.info("Fetching booking context for patient: {}", patientId);
         BookingContextResponse response = receptionDeskService.getBookingContext(patientId);
         return ResponseEntity.ok(response);
@@ -48,5 +51,14 @@ public class ReceptionDeskController {
         log.info("Deactivating case paper for patient: {}", patientId);
         receptionDeskService.deleteCasePaper(patientId, TenantContext.getTenantId());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/unified-registration")
+    @PreAuthorize("hasRole('RECEPTIONIST')")
+    public ResponseEntity<UnifiedRegistrationResponse> unifiedRegistration(
+            @RequestBody UnifiedRegistrationRequest request) {
+        log.info("Executing unified registration/billing flow");
+        UnifiedRegistrationResponse response = receptionDeskService.unifiedRegistration(request);
+        return ResponseEntity.ok(response);
     }
 }

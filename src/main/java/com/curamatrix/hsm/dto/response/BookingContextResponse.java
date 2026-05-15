@@ -11,6 +11,7 @@ import java.util.List;
 public class BookingContextResponse {
     private Long patientId;
     private CasePaperStatus casePaper;
+    private BigDecimal registrationFee;
     private List<DepartmentWithDoctors> departments;
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor

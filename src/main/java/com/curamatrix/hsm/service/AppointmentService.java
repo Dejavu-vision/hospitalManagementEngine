@@ -472,6 +472,7 @@ public class AppointmentService {
                 .patientCode(appointment.getPatient().getPatientCode())
                 .doctorId(appointment.getDoctor().getId())
                 .doctorName(appointment.getDoctor().getUser().getFullName())
+                .doctorQualification(appointment.getDoctor().getQualification())
                 .department(appointment.getDoctor().getDepartment() != null ?
                         appointment.getDoctor().getDepartment().getName() : null)
                 .appointmentDate(appointment.getAppointmentDate())
