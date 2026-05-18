@@ -188,6 +188,7 @@ public class AuthService {
                 .hospitalName(tenant.getHospitalName())
                 .subscriptionPlan(tenant.getSubscriptionPlan())
                 .subscriptionExpiry(tenant.getSubscriptionEnd().toString())
+                .wakeWord(tenant.getWakeWord())
                 .pageKeys(pageKeys)
                 .build();
     }

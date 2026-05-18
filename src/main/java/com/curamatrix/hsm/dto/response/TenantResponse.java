@@ -26,6 +26,7 @@ public class TenantResponse {
     private String contactPhone;
     private String address;
     private String logo;
+    private String wakeWord;
     private LocalDateTime createdAt;
     
     // Usage stats

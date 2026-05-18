@@ -26,6 +26,7 @@ public class LoginResponse {
     private String hospitalName;
     private String subscriptionPlan;
     private String subscriptionExpiry;
+    private String wakeWord;
 
     // Simplified: only page keys (no permissions)
     private List<String> pageKeys;

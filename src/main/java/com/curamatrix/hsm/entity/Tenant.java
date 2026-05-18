@@ -67,6 +67,10 @@ public class Tenant {
     @Column(columnDefinition = "JSON")
     private Map<String, Object> settings; // Custom configuration per tenant
 
+    @Column(name = "wake_word", length = 50)
+    @Builder.Default
+    private String wakeWord = "hey matrix";
+
     @Column(name = "created_at", updatable = false)
     @CreationTimestamp
     private LocalDateTime createdAt;

@@ -101,10 +101,10 @@ public class ConsultationService {
         }
 
         // Status validation
-        if (appointment.getStatus() != AppointmentStatus.IN_PROGRESS) {
+        if (appointment.getStatus() != AppointmentStatus.IN_PROGRESS && appointment.getStatus() != AppointmentStatus.COMPLETED) {
             throw new InvalidStateTransitionException(
                     "Cannot submit consultation. Appointment status is " + appointment.getStatus().name() +
-                    ", expected IN_PROGRESS.");
+                    ", expected IN_PROGRESS or COMPLETED.");
         }
 
         // Create or update Diagnosis (upsert — exactly one per appointment)
