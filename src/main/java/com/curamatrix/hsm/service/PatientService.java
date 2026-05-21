@@ -22,8 +22,7 @@ import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.entity.Appointment;
 import com.curamatrix.hsm.repository.*;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
+import lombok.extern.slf4j.Slf4j;import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -52,6 +51,7 @@ public class PatientService {
     private final DoctorAvailabilityService doctorAvailabilityService;
     private final PayerMasterRepository payerMasterRepository;
     private final PatientFinancialAccountRepository patientFinancialAccountRepository;
+    private final QueueEventService queueEventService;
 
     @Transactional
     public PatientResponse registerPatient(PatientRequest request) {
@@ -287,6 +287,12 @@ public class PatientService {
 
         PatientResponse resp = mapToResponse(patient);
         resp.setActiveAppointmentId(activeAppointmentId);
+        // Best-effort SSE broadcast — must not roll back the clinical operation
+        try {
+            queueEventService.broadcastQueueUpdate(TenantContext.getTenantId(), doctor.getId());
+        } catch (Exception e) {
+            log.warn("SSE broadcast failed after check-in for patient {}: {}", id, e.getMessage());
+        }
         return resp;
     }
 
@@ -327,6 +333,19 @@ public class PatientService {
         }
 
         log.info("Patient checked out and {} active appointments completed: {}", inProgressAppts.size(), id);
+
+        // Best-effort SSE broadcast for each affected doctor — must not roll back the clinical operation
+        inProgressAppts.stream()
+                .map(a -> a.getDoctor().getId())
+                .distinct()
+                .forEach(doctorId -> {
+                    try {
+                        queueEventService.broadcastQueueUpdate(TenantContext.getTenantId(), doctorId);
+                    } catch (Exception e) {
+                        log.warn("SSE broadcast failed after check-out for patient {}: {}", id, e.getMessage());
+                    }
+                });
+
         return mapToResponse(patient);
     }
 
