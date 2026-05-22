@@ -256,6 +256,8 @@ public class QueueService {
 
             for (int i = 0; i < docQueue.size(); i++) {
                 Appointment a = docQueue.get(i);
+                // Skip CANCELLED appointments — they should not appear in the queue table
+                if (a.getStatus() == AppointmentStatus.CANCELLED) continue;
                 // Estimate wait: count only BOOKED/CHECKED_IN patients ahead (not IN_PROGRESS)
                 int aheadIdx = activeDocQueue.indexOf(a);
                 int ahead = aheadIdx > 0

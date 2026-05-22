@@ -277,6 +277,10 @@ public class PatientService {
             }
         }
 
+        // Assign the next walk-in token number for this doctor today
+        Integer maxToken = appointmentRepository.findMaxTokenNumber(doctor.getId(), java.time.LocalDate.now());
+        int nextToken = (maxToken == null ? 0 : maxToken) + 1;
+
         Appointment appt = Appointment.builder()
                 .patient(patient)
                 .doctor(doctor)
@@ -285,13 +289,12 @@ public class PatientService {
                 .appointmentTime(java.time.LocalTime.now())
                 .type(com.curamatrix.hsm.enums.AppointmentType.WALK_IN)
                 .status(com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS)
+                .tokenNumber(nextToken)
                 .consultationStart(java.time.LocalDateTime.now())
                 .build();
         
         appt = appointmentRepository.save(appt);
         Long activeAppointmentId = appt.getId();
-
-        // Update the doctor's global status to IN_CONSULTATION
         try {
             com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest statusReq = 
                     new com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest();
