@@ -261,6 +261,22 @@ public class PatientService {
                         "Only full Doctors can execute direct check-ins."
                 ));
 
+        // Cancel any existing BOOKED/CHECKED_IN appointments for this patient today
+        // to avoid duplicate rows in the queue (one waiting + one in consult)
+        List<Appointment> existingToday = appointmentRepository.findByFilters(
+                java.time.LocalDate.now(), null, id, null, null,
+                org.springframework.data.domain.PageRequest.of(0, 20)
+        ).getContent();
+        for (Appointment existing : existingToday) {
+            if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.BOOKED
+                    || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.CHECKED_IN) {
+                existing.setStatus(com.curamatrix.hsm.enums.AppointmentStatus.CANCELLED);
+                appointmentRepository.save(existing);
+                log.info("Cancelled pre-existing BOOKED/CHECKED_IN appointment {} for patient {} on direct check-in",
+                        existing.getId(), id);
+            }
+        }
+
         Appointment appt = Appointment.builder()
                 .patient(patient)
                 .doctor(doctor)
