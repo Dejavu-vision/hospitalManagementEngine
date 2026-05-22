@@ -21,4 +21,11 @@ public interface DiagnosisRepository extends JpaRepository<Diagnosis, Long> {
            "AND d.tenantId = :tenantId ORDER BY d.createdAt DESC")
     List<Diagnosis> findByPatientIdAndTenantId(@Param("patientId") Long patientId,
                                                 @Param("tenantId") Long tenantId);
+
+    // Doctor-scoped patient history — only diagnoses written by this doctor
+    @Query("SELECT d FROM Diagnosis d WHERE d.appointment.patient.id = :patientId " +
+           "AND d.doctor.id = :doctorId AND d.tenantId = :tenantId ORDER BY d.createdAt DESC")
+    List<Diagnosis> findByPatientIdAndDoctorIdAndTenantId(@Param("patientId") Long patientId,
+                                                           @Param("doctorId") Long doctorId,
+                                                           @Param("tenantId") Long tenantId);
 }

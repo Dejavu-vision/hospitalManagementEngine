@@ -60,4 +60,17 @@ public class DiagnosisController {
         List<DiagnosisResponse> responses = diagnosisService.getDiagnosesByPatientId(patientId);
         return ResponseEntity.ok(responses);
     }
+
+    /**
+     * Doctor-scoped patient history — only visits handled by the authenticated doctor,
+     * including today's appointments even without a submitted diagnosis.
+     * Used by the "History" drawer on the My Patients page.
+     */
+    @GetMapping("/patient/{patientId}/my-history")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<List<DiagnosisResponse>> getMyPatientHistory(@PathVariable Long patientId) {
+        log.info("Fetching doctor-scoped history for patient: {}", patientId);
+        List<DiagnosisResponse> responses = diagnosisService.getDoctorScopedPatientHistory(patientId);
+        return ResponseEntity.ok(responses);
+    }
 }

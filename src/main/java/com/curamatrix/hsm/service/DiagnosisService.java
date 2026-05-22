@@ -21,7 +21,6 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -132,6 +131,74 @@ public class DiagnosisService {
         return diagnosisRepository.findByAppointmentPatientIdOrderByCreatedAtDesc(patientId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns visit history for a patient scoped to the authenticated doctor.
+     * Includes:
+     *  - All diagnoses written by this doctor for this patient (any date)
+     *  - Today's appointments for this patient with this doctor that have no diagnosis yet
+     *    (IN_PROGRESS or COMPLETED without a submitted diagnosis)
+     * This ensures today's checked-out patients appear even before a diagnosis is submitted.
+     */
+    public List<DiagnosisResponse> getDoctorScopedPatientHistory(Long patientId) {
+        Long tenantId = com.curamatrix.hsm.context.TenantContext.getTenantId();
+
+        // Resolve the authenticated doctor
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        com.curamatrix.hsm.entity.Doctor doctor = doctorRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor profile not found for current user"));
+        Long doctorId = doctor.getId();
+
+        // All diagnoses by this doctor for this patient
+        List<DiagnosisResponse> diagnosisHistory = diagnosisRepository
+                .findByPatientIdAndDoctorIdAndTenantId(patientId, doctorId, tenantId)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
+        // Collect appointment IDs already covered by a diagnosis
+        java.util.Set<Long> coveredAppointmentIds = diagnosisHistory.stream()
+                .map(DiagnosisResponse::getAppointmentId)
+                .collect(java.util.stream.Collectors.toSet());
+
+        // Today's appointments for this patient+doctor without a diagnosis entry
+        LocalDate today = LocalDate.now();
+        List<Appointment> todayAppts = appointmentRepository
+                .findTodayQueueByDoctorAndTenant(doctorId, today, tenantId)
+                .stream()
+                .filter(a -> a.getPatient().getId().equals(patientId))
+                .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS
+                          || a.getStatus() == AppointmentStatus.COMPLETED)
+                .filter(a -> !coveredAppointmentIds.contains(a.getId()))
+                .collect(Collectors.toList());
+
+        // Build stub DiagnosisResponse entries for today's uncovered appointments
+        List<DiagnosisResponse> todayStubs = todayAppts.stream()
+                .map(a -> DiagnosisResponse.builder()
+                        .id(null)
+                        .appointmentId(a.getId())
+                        .doctorId(doctorId)
+                        .doctorName(doctor.getUser().getFullName())
+                        .patientId(patientId)
+                        .patientName(a.getPatient().getFirstName() + " " + a.getPatient().getLastName())
+                        .symptoms(null)
+                        .diagnosis(null)
+                        .clinicalNotes(null)
+                        .createdAt(a.getConsultationStart() != null
+                                ? a.getConsultationStart()
+                                : a.getAppointmentDate().atTime(a.getAppointmentTime() != null
+                                        ? a.getAppointmentTime() : LocalTime.now()))
+                        .build())
+                .collect(Collectors.toList());
+
+        // Merge: today's stubs first (most recent), then historical diagnoses
+        List<DiagnosisResponse> merged = new java.util.ArrayList<>();
+        merged.addAll(todayStubs);
+        merged.addAll(diagnosisHistory);
+        return merged;
     }
 
     @Transactional
