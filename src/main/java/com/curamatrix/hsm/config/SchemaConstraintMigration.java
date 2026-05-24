@@ -31,6 +31,33 @@ public class SchemaConstraintMigration implements CommandLineRunner {
         // then let Hibernate recreate the correct (date, tenant_id, doctor_id) one
         dropAllUniqueConstraints("walk_in_token_sequence");
         dropAllUniqueConstraints("blocked_tokens");
+
+        // Clean up legacy PENDING_ACCEPTANCE appointments to CHECKED_IN
+        cleanupPendingAcceptanceAppointments();
+    }
+
+    private void cleanupPendingAcceptanceAppointments() {
+        try {
+            int updatedAppts = jdbc.update(
+                "UPDATE appointments SET status = 'CHECKED_IN' WHERE status = 'PENDING_ACCEPTANCE'"
+            );
+            log.info("SchemaConstraintMigration: successfully cleaned up {} legacy appointments from PENDING_ACCEPTANCE to CHECKED_IN", updatedAppts);
+        } catch (Exception e) {
+            log.warn("SchemaConstraintMigration: could not clean up PENDING_ACCEPTANCE appointments: {}", e.getMessage());
+        }
+
+        try {
+            int updatedNewLogs = jdbc.update(
+                "UPDATE appointment_status_log SET new_status = 'CHECKED_IN' WHERE new_status = 'PENDING_ACCEPTANCE'"
+            );
+            int updatedPrevLogs = jdbc.update(
+                "UPDATE appointment_status_log SET previous_status = 'CHECKED_IN' WHERE previous_status = 'PENDING_ACCEPTANCE'"
+            );
+            log.info("SchemaConstraintMigration: successfully cleaned up {}/{} legacy appointment status logs from PENDING_ACCEPTANCE to CHECKED_IN", 
+                updatedNewLogs, updatedPrevLogs);
+        } catch (Exception e) {
+            log.warn("SchemaConstraintMigration: could not clean up PENDING_ACCEPTANCE logs: {}", e.getMessage());
+        }
     }
 
     private void logConstraints(String table) {

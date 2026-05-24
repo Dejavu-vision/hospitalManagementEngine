@@ -388,7 +388,7 @@ public class ConsultationService {
     }
 
     private PatientResponse mapToPatientResponse(Patient p) {
-        return PatientResponse.builder()
+        PatientResponse resp = PatientResponse.builder()
                 .id(p.getId())
                 .patientCode(p.getPatientCode())
                 .firstName(p.getFirstName())
@@ -402,6 +402,32 @@ public class ConsultationService {
                 .allergies(p.getAllergies())
                 .medicalHistory(p.getMedicalHistory())
                 .registeredAt(p.getRegisteredAt())
+                .checkedIn(p.getCheckedIn())
+                .checkedOut(p.getCheckedOut())
                 .build();
+
+        try {
+            LocalDate today = LocalDate.now();
+            appointmentRepository.findByFilters(
+                today, null, p.getId(), null, null, org.springframework.data.domain.PageRequest.of(0, 10))
+            .getContent().stream()
+            .filter(a -> a.getStatus() == AppointmentStatus.BOOKED || 
+                         a.getStatus() == AppointmentStatus.CHECKED_IN || 
+                         a.getStatus() == AppointmentStatus.IN_PROGRESS)
+            .findFirst()
+            .ifPresent(appt -> {
+                resp.setActiveAppointmentId(appt.getId());
+                resp.setActiveAppointmentStatus(appt.getStatus().name());
+                resp.setActiveTokenNumber(appt.getTokenNumber());
+                if (appt.getDoctor() != null) {
+                    resp.setActiveAppointmentDoctorId(appt.getDoctor().getId());
+                    resp.setActiveAppointmentDoctorName(appt.getDoctor().getUser().getFullName());
+                }
+            });
+        } catch (Exception e) {
+            log.warn("Could not fetch active appointment for patient in ConsultationService: {}", e.getMessage());
+        }
+
+        return resp;
     }
 }
