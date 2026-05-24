@@ -13,6 +13,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       SPRING_PROFILES_ACTIVE: prod
     restart: always
+    networks:
+      - hsm-network
 
   nginx:
     image: nginx:alpine
@@ -23,8 +25,14 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
+      # Mount the frontend build directory
+      - ../HospitalManagment/hospital-management/dist:/usr/share/nginx/html:ro
     depends_on:
       - app
     restart: always
     networks:
       - hsm-network
+
+networks:
+  hsm-network:
+    driver: bridge
