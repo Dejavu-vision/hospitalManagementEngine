@@ -15,9 +15,8 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * Property 1: Status Transition Invariants
  *   1a. No self-transitions
- *   1b. Terminal states have no outgoing edges
- *   1c. No reverse transitions
- *   1d. Only the 7 defined edges return true
+ *   1b. Terminal states (COMPLETED, CANCELLED) have no outgoing edges
+ *   1c. Only the defined edges in the state machine return true
  */
 class AppointmentStatusTransitionTest {
 
@@ -30,10 +29,10 @@ class AppointmentStatusTransitionTest {
         }
     }
 
-    /** Property 1b — Terminal states (COMPLETED, CANCELLED, NO_SHOW) have no outgoing edges. */
+    /** Property 1b — Terminal states (COMPLETED, CANCELLED) have no outgoing edges. */
     @Test
     void terminalStatesHaveNoOutgoingEdges() {
-        List<AppointmentStatus> terminals = List.of(COMPLETED, CANCELLED, NO_SHOW);
+        List<AppointmentStatus> terminals = List.of(COMPLETED, CANCELLED);
         for (AppointmentStatus terminal : terminals) {
             for (AppointmentStatus target : AppointmentStatus.values()) {
                 assertFalse(terminal.canTransitionTo(target),
@@ -43,41 +42,45 @@ class AppointmentStatusTransitionTest {
     }
 
     /**
-     * Property 1c — No reverse transitions:
-     * if s.canTransitionTo(t) is true, then t.canTransitionTo(s) must be false.
-     */
-    @Test
-    void noReverseTransitions() {
-        for (AppointmentStatus s : AppointmentStatus.values()) {
-            for (AppointmentStatus t : AppointmentStatus.values()) {
-                if (s.canTransitionTo(t)) {
-                    assertFalse(t.canTransitionTo(s),
-                            "Reverse transition should not be allowed: " + t + " -> " + s
-                            + " (forward " + s + " -> " + t + " is valid)");
-                }
-            }
-        }
-    }
-
-    /**
-     * Property 1d — Only the 7 defined edges return true; every other (source, target) pair
+     * Property 1c — Only the defined edges return true; every other (source, target) pair
      * must return false.
-     *
-     * Defined edges:
-     *   BOOKED->CHECKED_IN, BOOKED->CANCELLED, BOOKED->NO_SHOW,
-     *   CHECKED_IN->IN_PROGRESS, CHECKED_IN->CANCELLED, CHECKED_IN->NO_SHOW,
-     *   IN_PROGRESS->COMPLETED
      */
     @Test
     void onlyDefinedEdgesReturnTrue() {
         Set<String> allowed = Set.of(
+                // BOOKED ->
                 "BOOKED->CHECKED_IN",
+                "BOOKED->IN_PROGRESS",
                 "BOOKED->CANCELLED",
                 "BOOKED->NO_SHOW",
+
+                // CHECKED_IN ->
                 "CHECKED_IN->IN_PROGRESS",
                 "CHECKED_IN->CANCELLED",
                 "CHECKED_IN->NO_SHOW",
-                "IN_PROGRESS->COMPLETED"
+                "CHECKED_IN->BOOKED",
+
+                // IN_PROGRESS ->
+                "IN_PROGRESS->COMPLETED",
+                "IN_PROGRESS->CHECKED_IN",
+                "IN_PROGRESS->BOOKED",
+                "IN_PROGRESS->NO_SHOW",
+                "IN_PROGRESS->RECALLED",
+                "IN_PROGRESS->ON_HOLD",
+
+                // ON_HOLD ->
+                "ON_HOLD->IN_PROGRESS",
+                "ON_HOLD->NO_SHOW",
+                "ON_HOLD->BOOKED",
+
+                // RECALLED ->
+                "RECALLED->IN_PROGRESS",
+                "RECALLED->COMPLETED",
+                "RECALLED->CHECKED_IN",
+                "RECALLED->NO_SHOW",
+
+                // NO_SHOW ->
+                "NO_SHOW->BOOKED"
         );
 
         for (AppointmentStatus s : AppointmentStatus.values()) {
