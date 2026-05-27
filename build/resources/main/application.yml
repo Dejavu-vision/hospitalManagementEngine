@@ -12,7 +12,6 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
-    database-platform: org.hibernate.dialect.MySQL8Dialect
 
   jackson:
     serialization:
@@ -36,7 +35,7 @@ logging:
     path: /app/logs
   logback:
     rollingpolicy:
-      file-name-pattern: /app/logs/hsm-%d{yyyy-MM-dd}.log
+      file-name-pattern: /app/logs/hsm-%d{yyyy-MM-dd}.%i.log
       max-history: 30
       clean-history-on-start: false
 
@@ -77,17 +76,3 @@ management:
       show-details: always
       show-components: always
 
----
-spring:
-  config:
-    activate:
-      on-profile: prod
-  datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-  jpa:
-    show-sql: false
-
-jwt:
-  secret: ${JWT_SECRET}

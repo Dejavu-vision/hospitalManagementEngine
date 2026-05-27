@@ -21,10 +21,9 @@ $LogFile       = Join-Path $Root 'deploy_full_prod.log'
 # -------------------------------------------------
 # 1️⃣ Ensure .env has a real Deepgram key
 Write-Host "`n=== Ensuring .env contains DEEPGRAM_API_KEY ===`n"
-if (-Not (Test-Path $EnvFile)) {
-    Write-Host ".env not found – creating a new one."
-    $newKey = Read-Host -Prompt 'Enter your REAL Deepgram API key (input hidden)' -AsSecureString |
-              ConvertFrom-SecureString -AsPlainText
+if (-not (Test-Path $EnvFile)) {
+    $secure = Read-Host -Prompt 'Enter your REAL Deepgram API key (input hidden)' -AsSecureString
+$newKey = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
     $envContent = @"
 DEEPGRAM_API_KEY=$newKey
 DB_URL=jdbc:mysql://db:3306/hospitalsystems?useSSL=false&allowPublicKeyRetrieval=true
@@ -33,11 +32,12 @@ DB_PASSWORD=root
 JWT_SECRET=curamatrix-hsm-secret-key-for-jwt-token-generation-minimum-512-bits
 "@
     Set-Content -Path $EnvFile -Value $envContent -Encoding UTF8
+    Write-Host ".env created with Deepgram key."
 } else {
     $content = Get-Content $EnvFile -Raw
     if ($content -notmatch '^DEEPGRAM_API_KEY=') {
-        $newKey = Read-Host -Prompt 'Enter your REAL Deepgram API key (input hidden)' -AsSecureString |
-                  ConvertFrom-SecureString -AsPlainText
+        $secure = Read-Host -Prompt 'Enter your REAL Deepgram API key (input hidden)' -AsSecureString
+        $newKey = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
         $content += "`r`nDEEPGRAM_API_KEY=$newKey"
         Set-Content -Path $EnvFile -Value $content -Encoding UTF8
         Write-Host ".env updated with Deepgram key."
@@ -51,14 +51,8 @@ JWT_SECRET=curamatrix-hsm-secret-key-for-jwt-token-generation-minimum-512-bits
 #    If it does not, we simply comment‑out the volume line so MySQL can start.
 $initSql = Join-Path $Root 'docs\COMPLETE_SAAS_SCHEMA.sql'
 if (-Not (Test-Path $initSql)) {
-    Write-Host "MySQL init script not found – disabling that mount in docker‑compose.yml"
-    # Replace the line that contains the mount with a commented version
-    (Get-Content $ComposeFile) |
-        ForEach-Object {
-            if ($_ -match 'COMPLETE_SAAS_SCHEMA.sql') {
-                "#$_   # disabled – file not present"
-            } else { $_ }
-        } | Set-Content $ComposeFile -Encoding UTF8
+    Write-Host "MySQL init script not found – disabling that mount in docker-compose.yml"
+    (Get-Content $ComposeFile) | ForEach-Object { if ($_ -match 'COMPLETE_SAAS_SCHEMA.sql') { "#$_   # disabled - file not present" } else { $_ } } | Set-Content $ComposeFile -Encoding UTF8
 }
 
 # -------------------------------------------------
@@ -94,7 +88,7 @@ Write-Host "✅ MySQL is healthy."
 # -------------------------------------------------
 # 6️⃣ Start the Spring back‑end (hsm-app)
 Write-Host "`n=== Starting Spring back‑end (hsm-app) ===`n"
-docker compose -f $ComposeFile up -d app
+docker compose -f $ComposeFile up -d hsm-app
 
 # -------------------------------------------------
 # 7️⃣ Verify Deepgram key was loaded (wait a few seconds)
@@ -125,14 +119,14 @@ Pop-Location
 # 9️⃣ Verify the back‑end endpoint works (simple health check)
 Write-Host "`n=== Verifying back‑end health endpoint ===`n"
 $healthUrl = "http://localhost:8080/actuator/health"
-try {
-    $health = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 10
-    if ($health.StatusCode -eq 200) {
-        Write-Host "✅ Back‑end health endpoint OK (200)." -ForegroundColor Green
-    }
-} catch {
-    Write-Host "⚠️ Health endpoint failed – check container logs." -ForegroundColor Red
+
+$health = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 10
+if ($health.StatusCode -eq 200) {
+    Write-Host "✅ Back‑end health endpoint OK (200)." -ForegroundColor Green
+} else {
+    Write-Host "⚠️ Health endpoint returned $($health.StatusCode)." -ForegroundColor Red
 }
+
 
 # -------------------------------------------------
 # 10️⃣ Final user info
@@ -140,5 +134,5 @@ Write-Host "`n=== Deployment finished ===`n"
 Write-Host " • Back‑end URL:      http://localhost:8080"
 Write-Host " • Front‑end (React) URL: http://localhost:3000"
 Write-Host "All logs are in $LogFile"
-Write-Host "Use `docker compose -f $ComposeFile logs -f` to tail live logs."
-Write-Host "Use `Get-Job -Name react-dev | Receive-Job -Keep` to see React dev server output."
+Write-Host "Use docker compose -f $ComposeFile logs -f to tail live logs."
+Write-Host "Use Get-Job -Name react-dev | Receive-Job -Keep to see React dev server output."
