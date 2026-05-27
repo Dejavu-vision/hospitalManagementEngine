@@ -24,6 +24,7 @@ import java.util.UUID;
 @RequestMapping("/api/queue")
 @RequiredArgsConstructor
 @Tag(name = "5. Queue", description = "Real-time queue management for receptionist and doctor")
+@CrossOrigin(origins = "*")
 public class QueueController {
 
     private final QueueService queueService;
