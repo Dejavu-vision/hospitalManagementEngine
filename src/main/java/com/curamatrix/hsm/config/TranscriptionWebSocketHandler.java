@@ -1,7 +1,8 @@
 package com.curamatrix.hsm.config;
 
+import com.curamatrix.hsm.service.DeepgramKeyService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
@@ -18,10 +19,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class TranscriptionWebSocketHandler extends BinaryWebSocketHandler {
 
-    @Value("${deepgram.api.key:}")
-    private String deepgramApiKey;
+    private final DeepgramKeyService deepgramKeyService;
 
     // Active client session -> Deepgram websocket connection
     private final ConcurrentHashMap<String, WebSocket> deepgramSessions = new ConcurrentHashMap<>();
@@ -31,17 +32,14 @@ public class TranscriptionWebSocketHandler extends BinaryWebSocketHandler {
         String username = (String) session.getAttributes().get("username");
         log.info("WebSocket connection established with client: {} (session ID: {})", username, session.getId());
 
-        if (deepgramApiKey == null || deepgramApiKey.trim().isEmpty()) {
-            log.error("DEEPGRAM_API_KEY is not configured! Closing connection.");
+        if (!deepgramKeyService.isKeyConfigured()) {
+            log.error("DEEPGRAM_API_KEY is not configured! Closing connection. " +
+                    "Set via DEEPGRAM_API_KEY env var or PUT /api/admin/deepgram-key");
             session.close(new CloseStatus(1008, "Deepgram API key not configured"));
             return;
         }
 
-        String keyToUse = deepgramApiKey.trim();
-        String keyPreview = keyToUse.length() > 6 
-            ? keyToUse.substring(0, 4) + "..." + keyToUse.substring(keyToUse.length() - 2)
-            : "TOO_SHORT";
-        log.info("Connecting to Deepgram with Key: {} (length: {})", keyPreview, keyToUse.length());
+        String keyToUse = deepgramKeyService.getApiKey();
 
         // Connect to Deepgram's streaming WebSocket
         // Let Deepgram auto-detect WebM/Opus container headers natively
@@ -86,10 +84,21 @@ public class TranscriptionWebSocketHandler extends BinaryWebSocketHandler {
 
                         @Override
                         public void onError(WebSocket webSocket, Throwable error) {
-                            log.error("Deepgram WebSocket error for session {}: {}", session.getId(), error.getMessage());
+                            String errorMsg = error.getMessage();
+                            log.error("Deepgram WebSocket error for session {}: {}", session.getId(), errorMsg);
+
+                            // Detect auth failures (expired/invalid key)
+                            if (errorMsg != null && (errorMsg.contains("401") || errorMsg.contains("403") ||
+                                    errorMsg.toLowerCase().contains("unauthorized") ||
+                                    errorMsg.toLowerCase().contains("forbidden"))) {
+                                deepgramKeyService.recordFailure("Authentication error: " + errorMsg);
+                            } else {
+                                deepgramKeyService.recordFailure("Connection error: " + errorMsg);
+                            }
+
                             try {
                                 if (session.isOpen()) {
-                                    session.sendMessage(new TextMessage("{\"error\": \"Deepgram connection error\", \"message\": \"" + error.getMessage() + "\"}"));
+                                    session.sendMessage(new TextMessage("{\"error\": \"Deepgram connection error\", \"message\": \"" + errorMsg + "\"}"));
                                     session.close(CloseStatus.SERVER_ERROR);
                                 }
                             } catch (Exception e) {
@@ -100,11 +109,22 @@ public class TranscriptionWebSocketHandler extends BinaryWebSocketHandler {
                     }).join();
 
             deepgramSessions.put(session.getId(), deepgramWs);
+            deepgramKeyService.recordSuccess();
             log.info("Successfully tunneled session {} to Deepgram streaming API.", session.getId());
 
         } catch (Exception e) {
-            log.error("Failed to establish connection to Deepgram: {}", e.getMessage(), e);
-            session.close(new CloseStatus(1011, "Failed to connect to speech engine: " + e.getMessage()));
+            String errorMsg = e.getMessage();
+            log.error("Failed to establish connection to Deepgram: {}", errorMsg, e);
+
+            // Detect handshake failures (often means expired or invalid key)
+            if (errorMsg != null && (errorMsg.contains("WebSocketHandshakeException") ||
+                    errorMsg.contains("401") || errorMsg.contains("403"))) {
+                deepgramKeyService.recordFailure("Handshake failed (key may be expired/invalid): " + errorMsg);
+            } else {
+                deepgramKeyService.recordFailure("Connection failed: " + errorMsg);
+            }
+
+            session.close(new CloseStatus(1011, "Failed to connect to speech engine: " + errorMsg));
         }
     }
 

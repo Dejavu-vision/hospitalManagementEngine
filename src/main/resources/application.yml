@@ -26,7 +26,7 @@ jwt:
 
 deepgram:
   api:
-    key: ${DEEPGRAM_API_KEY:cbbef991666af67ac13f501bc54bae0d20b58ac1}
+    key: ${DEEPGRAM_API_KEY:}
 
 server:
   port: 8080
