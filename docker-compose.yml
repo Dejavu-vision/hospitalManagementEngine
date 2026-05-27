@@ -10,8 +10,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/hospitalsystems?useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      SPRING_PROFILES_ACTIVE: dev
+      SPRING_PROFILES_ACTIVE: prod
       JWT_SECRET: curamatrix-hsm-secret-key-for-jwt-token-generation-minimum-512-bits
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY}
     depends_on:
       db:
         condition: service_healthy
