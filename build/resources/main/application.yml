@@ -24,6 +24,10 @@ jwt:
   secret: curamatrix-hsm-secret-key-for-jwt-token-generation-minimum-512-bits
   expiration: 86400000  # 24 hours in milliseconds
 
+deepgram:
+  api:
+    key: ${DEEPGRAM_API_KEY:cbbef991666af67ac13f501bc54bae0d20b58ac1}
+
 server:
   port: 8080
 
