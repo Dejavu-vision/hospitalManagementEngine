@@ -105,6 +105,48 @@ public class QueueEventService {
     }
 
     /**
+     * Broadcasts a DOCTOR_CALL_REQUEST event to all connected clients of the given tenant.
+     * The frontend filters this by doctorId to show the notification only to the correct doctor.
+     *
+     * @param tenantId the tenant whose receptionists/doctors should be notified
+     * @param doctorId the doctor being called
+     * @param appointmentId the appointment ID to call
+     * @param patientName the name of the patient
+     */
+    public void broadcastDoctorCallRequest(Long tenantId, Long doctorId, Long appointmentId, String patientName) {
+        Map<String, SseEmitter> tenantEmitters = emittersByTenant.get(tenantId);
+        if (tenantEmitters == null || tenantEmitters.isEmpty()) {
+            log.debug("No SSE clients connected for tenant={}, skipping doctor call request", tenantId);
+            return;
+        }
+
+        String timestamp = LocalDateTime.now().toString();
+        // Construct JSON payload
+        String payload = "{\"type\":\"DOCTOR_CALL_REQUEST\",\"doctorId\":" + doctorId
+                + ",\"appointmentId\":" + appointmentId
+                + ",\"patientName\":\"" + patientName + "\""
+                + ",\"tenantId\":" + tenantId
+                + ",\"timestamp\":\"" + timestamp + "\"}";
+
+        log.debug("Broadcasting DOCTOR_CALL_REQUEST: tenant={}, doctorId={}, appointmentId={}",
+                tenantId, doctorId, appointmentId);
+
+        List<String> staleClients = new ArrayList<>();
+
+        tenantEmitters.forEach((clientId, emitter) -> {
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("queue-update") // Use the same stream name
+                        .data(payload));
+            } catch (IOException e) {
+                staleClients.add(clientId);
+            }
+        });
+
+        staleClients.forEach(clientId -> tenantEmitters.remove(clientId));
+    }
+
+    /**
      * Sends a heartbeat to all connected clients across all tenants every 25 seconds.
      * Prevents intermediate proxies (nginx, AWS ALB) from closing idle connections.
      */

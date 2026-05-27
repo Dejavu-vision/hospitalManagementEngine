@@ -22,7 +22,8 @@ public enum AppointmentStatus {
             // Recalled: can be called back in, completed, skipped back, or marked no-show
             case RECALLED    -> target == IN_PROGRESS || target == COMPLETED
                                 || target == CHECKED_IN || target == NO_SHOW;
-            case COMPLETED, CANCELLED -> false; // terminal
+            case COMPLETED   -> target == CHECKED_IN || target == BOOKED;
+            case CANCELLED   -> false;
             case NO_SHOW     -> target == BOOKED; // restorable
         };
     }

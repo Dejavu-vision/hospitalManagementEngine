@@ -29,10 +29,10 @@ class AppointmentStatusTransitionTest {
         }
     }
 
-    /** Property 1b — Terminal states (COMPLETED, CANCELLED) have no outgoing edges. */
+    /** Property 1b — Terminal states (CANCELLED) have no outgoing edges. */
     @Test
     void terminalStatesHaveNoOutgoingEdges() {
-        List<AppointmentStatus> terminals = List.of(COMPLETED, CANCELLED);
+        List<AppointmentStatus> terminals = List.of(CANCELLED);
         for (AppointmentStatus terminal : terminals) {
             for (AppointmentStatus target : AppointmentStatus.values()) {
                 assertFalse(terminal.canTransitionTo(target),
@@ -78,6 +78,10 @@ class AppointmentStatusTransitionTest {
                 "RECALLED->COMPLETED",
                 "RECALLED->CHECKED_IN",
                 "RECALLED->NO_SHOW",
+
+                // COMPLETED ->
+                "COMPLETED->CHECKED_IN",
+                "COMPLETED->BOOKED",
 
                 // NO_SHOW ->
                 "NO_SHOW->BOOKED"

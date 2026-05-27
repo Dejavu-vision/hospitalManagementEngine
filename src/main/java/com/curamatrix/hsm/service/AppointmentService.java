@@ -25,6 +25,7 @@ import com.curamatrix.hsm.repository.DoctorRepository;
 import com.curamatrix.hsm.repository.PatientRepository;
 import com.curamatrix.hsm.repository.UserRepository;
 import com.curamatrix.hsm.repository.WalkInTokenSequenceRepository;
+import com.curamatrix.hsm.service.QueueEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -54,6 +55,7 @@ public class AppointmentService {
     private final WalkInTokenSequenceRepository tokenSequenceRepository;
     private final BillingService billingService;
     private final BlockedTokenService blockedTokenService;
+    private final QueueEventService queueEventService;
 
     @Transactional
     public AppointmentResponse bookAppointment(AppointmentRequest request) {
@@ -273,8 +275,11 @@ public class AppointmentService {
                 if (appointment.getCheckedInAt() == null) {
                     appointment.setCheckedInAt(now); // first check-in only
                 }
-                // Do NOT overwrite checkedInAt when coming from IN_PROGRESS/RECALLED —
-                // this preserves the patient's original queue position.
+                if (current == AppointmentStatus.COMPLETED) {
+                    appointment.setConsultationStart(null);
+                    appointment.setConsultationEnd(null);
+                    appointment.setRecallCount(0);
+                }
             }
             case IN_PROGRESS -> appointment.setConsultationStart(now);
             case COMPLETED   -> appointment.setConsultationEnd(now);
@@ -291,6 +296,12 @@ public class AppointmentService {
                     appointment.setHeldAt(null);
                     appointment.setCheckedInAt(now); // skip-to-bottom logic
                 }
+                if (current == AppointmentStatus.COMPLETED) {
+                    appointment.setCheckedInAt(null);
+                    appointment.setConsultationStart(null);
+                    appointment.setConsultationEnd(null);
+                    appointment.setRecallCount(0);
+                }
             }
             default          -> {}
         }
@@ -298,6 +309,17 @@ public class AppointmentService {
         appointment.setStatus(newStatus);
         appointment = appointmentRepository.save(appointment);
         recordStatusLog(appointment, current, newStatus, getCurrentUser());
+        
+        // Broadcast the real-time update to receptionists/doctors
+        try {
+            Long tenantId = TenantContext.getTenantId();
+            if (tenantId != null && appointment.getDoctor() != null) {
+                queueEventService.broadcastQueueUpdate(tenantId, appointment.getDoctor().getId());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to broadcast queue update for appointment {}: {}", id, e.getMessage());
+        }
+        
         return mapToResponse(appointment);
     }
 
@@ -317,6 +339,14 @@ public class AppointmentService {
         appointment = appointmentRepository.save(appointment);
 
         recordStatusLog(appointment, current, AppointmentStatus.RECALLED, getCurrentUser());
+        
+        try {
+            Long tenantId = TenantContext.getTenantId();
+            if (tenantId != null && appointment.getDoctor() != null) {
+                queueEventService.broadcastQueueUpdate(tenantId, appointment.getDoctor().getId());
+            }
+        } catch (Exception e) {}
+
         return mapToResponse(appointment);
     }
 
@@ -336,6 +366,13 @@ public class AppointmentService {
         appointment.setHeldAt(LocalDateTime.now());
         appointment = appointmentRepository.save(appointment);
         recordStatusLog(appointment, current, AppointmentStatus.ON_HOLD, getCurrentUser());
+        
+        try {
+            if (tenantId != null && appointment.getDoctor() != null) {
+                queueEventService.broadcastQueueUpdate(tenantId, appointment.getDoctor().getId());
+            }
+        } catch (Exception e) {}
+
         return mapToResponse(appointment);
     }
 
@@ -356,6 +393,13 @@ public class AppointmentService {
         appointment.setConsultationStart(LocalDateTime.now());
         appointment = appointmentRepository.save(appointment);
         recordStatusLog(appointment, current, AppointmentStatus.IN_PROGRESS, getCurrentUser());
+        
+        try {
+            if (tenantId != null && appointment.getDoctor() != null) {
+                queueEventService.broadcastQueueUpdate(tenantId, appointment.getDoctor().getId());
+            }
+        } catch (Exception e) {}
+
         return mapToResponse(appointment);
     }
 

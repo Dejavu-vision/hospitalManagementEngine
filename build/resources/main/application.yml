@@ -26,7 +26,6 @@ jwt:
 
 deepgram:
   api:
-
     key: ${DEEPGRAM_API_KEY:}
 
 server:
