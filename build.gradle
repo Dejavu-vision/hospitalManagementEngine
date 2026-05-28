@@ -47,6 +47,9 @@ dependencies {
 	
 	// MySQL
 	runtimeOnly 'com.mysql:mysql-connector-j'
+
+	// .env file support — auto-loads .env into Spring properties
+	implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 	
 	// Test
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'

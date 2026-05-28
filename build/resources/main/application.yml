@@ -3,9 +3,9 @@ spring:
     name: hsm
 
   datasource:
-    url: jdbc:mysql://43.204.168.146:3306/hospitalsystems
-    username: backenduser
-    password: backenduser
+    url: ${DB_URL:jdbc:mysql://43.204.168.146:3306/hospitalsystems}
+    username: ${DB_USERNAME:backenduser}
+    password: ${DB_PASSWORD:backenduser}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -20,7 +20,7 @@ spring:
       fail-on-unknown-properties: false
 
 jwt:
-  secret: curamatrix-hsm-secret-key-for-jwt-token-generation-minimum-512-bits
+  secret: ${JWT_SECRET:curamatrix-hsm-secret-key-for-jwt-token-generation-minimum-512-bits}
   expiration: 86400000  # 24 hours in milliseconds
 
 deepgram:
