@@ -85,8 +85,9 @@ public class BedChargeEngine {
 
         // 2. Add New Billing Item representing today's Bed Charge
         BigDecimal dailyPrice = allocation.getDailyPriceAtTime();
-        if (dailyPrice == null) {
-            dailyPrice = allocation.getBed().getDailyPrice();
+        if (dailyPrice == null || dailyPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("No bed charge snapshot for Allocation {}, skipping.", allocation.getId());
+            return;
         }
 
         BillingItem chargeItem = BillingItem.builder()
@@ -101,6 +102,35 @@ public class BedChargeEngine {
 
         // 3. Update the Running Bill Totals
         BigDecimal newTotal = runningBill.getTotalAmount().add(dailyPrice);
+
+        // 3a. Post Nursing Charge if snapshotted
+        BigDecimal nursingCharge = allocation.getNursingChargeAtTime();
+        if (nursingCharge != null && nursingCharge.compareTo(BigDecimal.ZERO) > 0) {
+            BillingItem nursingItem = BillingItem.builder()
+                    .description("Daily Nursing Charge on " + LocalDate.now())
+                    .amount(nursingCharge)
+                    .quantity(1)
+                    .itemType(BillingItemType.NURSING_CHARGE)
+                    .billing(runningBill)
+                    .build();
+            runningBill.getItems().add(nursingItem);
+            newTotal = newTotal.add(nursingCharge);
+        }
+
+        // 3b. Post Diet Charge if snapshotted
+        BigDecimal dietCharge = allocation.getDietChargeAtTime();
+        if (dietCharge != null && dietCharge.compareTo(BigDecimal.ZERO) > 0) {
+            BillingItem dietItem = BillingItem.builder()
+                    .description("Daily Diet Charge on " + LocalDate.now())
+                    .amount(dietCharge)
+                    .quantity(1)
+                    .itemType(BillingItemType.DIET_CHARGE)
+                    .billing(runningBill)
+                    .build();
+            runningBill.getItems().add(dietItem);
+            newTotal = newTotal.add(dietCharge);
+        }
+
         runningBill.setTotalAmount(newTotal);
         
         BigDecimal netAmount = newTotal.subtract(runningBill.getDiscount()).add(runningBill.getTax());

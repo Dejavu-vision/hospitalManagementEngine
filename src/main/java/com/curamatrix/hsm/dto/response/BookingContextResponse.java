@@ -27,6 +27,7 @@ public class BookingContextResponse {
     public static class DepartmentWithDoctors {
         private Long departmentId;
         private String departmentName;
+        private BigDecimal registrationFee; // department-specific override; null means use global
         private List<DoctorInfo> doctors;
     }
 

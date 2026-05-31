@@ -156,6 +156,34 @@ public class UserManagementService {
         }
 
         user = userRepository.save(user);
+
+        // Update doctor profile if this user is a doctor and doctor fields are provided
+        String primaryRole = user.getRoles().stream().findFirst().map(r -> r.getName().name()).orElse("");
+        final User savedUser = user;
+        if ("ROLE_DOCTOR".equals(primaryRole)) {
+            doctorRepository.findByUserId(savedUser.getId()).ifPresent(doctor -> {
+                boolean changed = false;
+                if (request.getQualification() != null) { doctor.setQualification(request.getQualification()); changed = true; }
+                if (request.getLicenseNumber() != null) { doctor.setLicenseNumber(request.getLicenseNumber()); changed = true; }
+                if (request.getExperience() != null) { doctor.setExperienceYears(request.getExperience()); changed = true; }
+                if (request.isConsultationFeeProvided()) {
+                    // Explicitly set — could be a number or null (to clear override)
+                    doctor.setConsultationFee(request.getConsultationFee() != null ? BigDecimal.valueOf(request.getConsultationFee()) : null);
+                    changed = true;
+                }
+                if (request.getDepartmentId() != null) {
+                    Department dept = departmentRepository.findById(request.getDepartmentId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Department", "id", request.getDepartmentId()));
+                    doctor.setDepartment(dept);
+                    changed = true;
+                }
+                if (changed) {
+                    doctorRepository.save(doctor);
+                    log.info("Doctor profile updated for user: {}", savedUser.getEmail());
+                }
+            });
+        }
+
         log.info("User updated: {}", user.getEmail());
         return mapToResponse(user);
     }
@@ -289,10 +317,9 @@ public class UserManagementService {
     }
 
     private void createOrUpdateDoctorProfile(User user, CreateUserRequest request) {
-        if (request.getDepartmentId() == null ||
-                request.getLicenseNumber() == null || request.getConsultationFee() == null) {
+        if (request.getDepartmentId() == null || request.getLicenseNumber() == null) {
             throw new IllegalArgumentException(
-                    "Doctor profile requires: departmentId, licenseNumber, consultationFee");
+                    "Doctor profile requires: departmentId, licenseNumber");
         }
 
         Department department = departmentRepository.findById(request.getDepartmentId())
@@ -303,7 +330,10 @@ public class UserManagementService {
         doctor.setLicenseNumber(request.getLicenseNumber());
         doctor.setQualification(request.getQualification());
         doctor.setExperienceYears(request.getExperienceYears());
-        doctor.setConsultationFee(BigDecimal.valueOf(request.getConsultationFee()));
+        // consultationFee is optional — null means use department rate from Service Catalog
+        doctor.setConsultationFee(request.getConsultationFee() != null
+                ? BigDecimal.valueOf(request.getConsultationFee())
+                : null);
 
         doctorRepository.save(doctor);
         log.info("Doctor profile created for user: {}", user.getEmail());
@@ -336,7 +366,7 @@ public class UserManagementService {
         // Compute effective page keys
         Set<String> effectivePageKeys = accessControlService.computeEffectivePageKeys(user);
 
-        return UserResponse.builder()
+        UserResponse.UserResponseBuilder builder = UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
@@ -347,7 +377,25 @@ public class UserManagementService {
                 .roles(roleNames)
                 .pageKeys(new ArrayList<>(effectivePageKeys))
                 .tenantId(user.getTenantId())
-                .createdAt(user.getCreatedAt())
-                .build();
+                .createdAt(user.getCreatedAt());
+
+        // Populate doctor-specific fields if this user is a doctor
+        if ("ROLE_DOCTOR".equals(primaryRole)) {
+            doctorRepository.findByUserId(user.getId()).ifPresent(doctor -> {
+                builder.qualification(doctor.getQualification())
+                       .licenseNumber(doctor.getLicenseNumber())
+                       .experienceYears(doctor.getExperienceYears())
+                       .consultationFee(doctor.getConsultationFee())
+                       .departmentId(doctor.getDepartment() != null ? doctor.getDepartment().getId() : null)
+                       .departmentName(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null);
+            });
+        }
+
+        // Populate shift for shift-based roles
+        if (List.of("ROLE_RECEPTIONIST", "ROLE_NURSE", "ROLE_LAB_TECH").contains(primaryRole)) {
+            receptionistRepository.findByUserId(user.getId()).ifPresent(r -> builder.shift(r.getShift() != null ? r.getShift().name() : null));
+        }
+
+        return builder.build();
     }
 }

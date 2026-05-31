@@ -36,6 +36,7 @@ public class ReceptionDeskService {
     private final BillingService billingService;
     private final PatientService patientService;
     private final AppointmentService appointmentService;
+    private final CatalogResolverService catalogResolver;
 
     /**
      * Builds the composite booking context for a patient in a single request lifecycle.
@@ -51,8 +52,8 @@ public class ReceptionDeskService {
                     .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", patientId));
         }
 
-        // Query 1: All active departments (global, not tenant-scoped)
-        List<Department> departments = departmentRepository.findByIsActiveTrue();
+        // Query 1: Active departments for this tenant only
+        List<Department> departments = departmentRepository.findByTenantIdAndIsActiveTrue(tenantId);
 
         // Query 2: All doctors for this tenant
         List<Doctor> doctors = doctorRepository.findByTenantId(tenantId);
@@ -91,6 +92,40 @@ public class ReceptionDeskService {
                 .filter(d -> d.getDepartment() != null)
                 .collect(Collectors.groupingBy(d -> d.getDepartment().getId()));
 
+        // Pre-resolve consultation fees from catalog per department
+        // Priority: Doctor's own fee (if set) > Department catalog rate > Generic CONSULT rate
+        Map<Long, BigDecimal> consultFeeByDeptId = new HashMap<>();
+        Map<Long, BigDecimal> regFeeByDeptId = new HashMap<>();
+        for (Department dept : departments) {
+            // Use non-throwing lookups to avoid poisoning the read-only transaction
+            List<HospitalService> consultServices = hospitalServiceRepository
+                    .findAllByItemTypeAndTenantIdAndActiveTrue(BillingItemType.CONSULTATION, tenantId);
+            Optional<HospitalService> deptConsult = consultServices.stream()
+                    .filter(s -> s.getDepartment() != null && s.getDepartment().getId().equals(dept.getId()))
+                    .findFirst();
+            if (deptConsult.isPresent()) {
+                consultFeeByDeptId.put(dept.getId(), deptConsult.get().getPrice());
+            } else {
+                // Fallback to generic CONSULT
+                hospitalServiceRepository.findByServiceCodeAndTenantIdAndActiveTrue("CONSULT", tenantId)
+                        .ifPresent(s -> consultFeeByDeptId.put(dept.getId(), s.getPrice()));
+            }
+
+            // Resolve department-specific registration fee (non-throwing)
+            List<HospitalService> regServices = hospitalServiceRepository
+                    .findAllByItemTypeAndTenantIdAndActiveTrue(BillingItemType.REGISTRATION, tenantId);
+            Optional<HospitalService> deptReg = regServices.stream()
+                    .filter(s -> s.getDepartment() != null && s.getDepartment().getId().equals(dept.getId()))
+                    .findFirst();
+            if (deptReg.isPresent()) {
+                regFeeByDeptId.put(dept.getId(), deptReg.get().getPrice());
+            } else {
+                // Fallback to global REG_FEE
+                hospitalServiceRepository.findByServiceCodeAndTenantIdAndActiveTrue("REG_FEE", tenantId)
+                        .ifPresent(s -> regFeeByDeptId.put(dept.getId(), s.getPrice()));
+            }
+        }
+
         // Assemble departments with doctors
         List<BookingContextResponse.DepartmentWithDoctors> deptResponses = departments.stream()
                 .map(dept -> {
@@ -107,11 +142,18 @@ public class ReceptionDeskService {
                                 int queueLength = queueLengthByDoctorId
                                         .getOrDefault(doctor.getId(), 0L).intValue();
 
+                                // Consultation fee priority: Doctor's own fee > Department catalog rate
+                                BigDecimal docFee = doctor.getConsultationFee();
+                                BigDecimal catalogFee = consultFeeByDeptId.get(dept.getId());
+                                BigDecimal effectiveFee = (docFee != null && docFee.compareTo(BigDecimal.ZERO) > 0) 
+                                        ? docFee 
+                                        : (catalogFee != null ? catalogFee : BigDecimal.ZERO);
+
                                 return BookingContextResponse.DoctorInfo.builder()
                                         .doctorId(doctor.getId())
                                         .doctorName(doctor.getUser().getFullName())
                                         .qualification(doctor.getQualification())
-                                        .consultationFee(doctor.getConsultationFee())
+                                        .consultationFee(effectiveFee)
                                         .presentToday(presentToday)
                                         .status(status)
                                         .statusNote(statusNote)
@@ -123,6 +165,7 @@ public class ReceptionDeskService {
                     return BookingContextResponse.DepartmentWithDoctors.builder()
                             .departmentId(dept.getId())
                             .departmentName(dept.getName())
+                            .registrationFee(regFeeByDeptId.get(dept.getId())) // null if no dept override
                             .doctors(doctorInfos)
                             .build();
                 })
@@ -131,10 +174,9 @@ public class ReceptionDeskService {
         // Build case paper status
         BookingContextResponse.CasePaperStatus casePaperStatus = buildCasePaperStatus(registration);
 
-        // Fetch registration fee amount
-        BigDecimal regFee = hospitalServiceRepository.findByServiceCodeAndTenantId("REG_FEE", tenantId)
-                .map(HospitalService::getPrice)
-                .orElse(BigDecimal.valueOf(100.00)); // Default if not found
+        // Fetch registration fee amount from Service Catalog (₹0 if not configured)
+        HospitalService regService = catalogResolver.resolveRequired("REG_FEE", tenantId);
+        BigDecimal regFee = regService != null ? regService.getPrice() : BigDecimal.ZERO;
 
         return BookingContextResponse.builder()
                 .patientId(patientId)

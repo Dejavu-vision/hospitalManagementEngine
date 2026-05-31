@@ -6,8 +6,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -15,6 +13,5 @@ import java.math.BigDecimal;
 public class AvailableBedSummaryResponse {
     private Long bedId;
     private String bedNumber;
-    private BigDecimal dailyPrice;
     private BedStatus status;
 }

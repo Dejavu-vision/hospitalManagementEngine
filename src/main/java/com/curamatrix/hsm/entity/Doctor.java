@@ -34,6 +34,6 @@ public class Doctor {
     @Column(name = "experience_years")
     private Integer experienceYears;
 
-    @Column(name = "consultation_fee", nullable = false)
+    @Column(name = "consultation_fee")
     private BigDecimal consultationFee;
 }

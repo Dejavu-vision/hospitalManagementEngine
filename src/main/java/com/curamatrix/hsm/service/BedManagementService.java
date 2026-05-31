@@ -98,7 +98,6 @@ public class BedManagementService {
                 .bedNumber(request.getBedNumber())
                 .room(room)
                 .status(request.getStatus())
-                .dailyPrice(request.getDailyPrice())
                 .build();
         bed.setTenantId(tenantId);
         bed = bedRepository.save(bed);
@@ -173,10 +172,7 @@ public class BedManagementService {
             List<Bed> typeBeds = entry.getValue();
             long tAvail = typeBeds.stream().filter(b -> b.getStatus() == BedStatus.AVAILABLE).count();
             long tOccup = typeBeds.stream().filter(b -> b.getStatus() == BedStatus.OCCUPIED).count();
-            BigDecimal avgPrice = typeBeds.stream()
-                    .map(Bed::getDailyPrice)
-                    .filter(Objects::nonNull)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal avgPrice = BigDecimal.ZERO;
             if (!typeBeds.isEmpty()) {
                 avgPrice = avgPrice.divide(BigDecimal.valueOf(typeBeds.size()), 2, RoundingMode.HALF_UP);
             }
@@ -251,7 +247,6 @@ public class BedManagementService {
                 .wardId(bed.getRoom().getWard().getId())
                 .wardName(bed.getRoom().getWard().getName())
                 .status(bed.getStatus())
-                .dailyPrice(bed.getDailyPrice())
                 .build();
     }
 }

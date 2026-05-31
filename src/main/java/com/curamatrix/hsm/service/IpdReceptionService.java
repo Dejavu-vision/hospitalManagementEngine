@@ -58,7 +58,6 @@ public class IpdReceptionService {
                                         .map(bed -> AvailableBedSummaryResponse.builder()
                                                 .bedId(bed.getId())
                                                 .bedNumber(bed.getBedNumber())
-                                                .dailyPrice(bed.getDailyPrice())
                                                 .status(bed.getStatus())
                                                 .build())
                                         .collect(Collectors.toList());

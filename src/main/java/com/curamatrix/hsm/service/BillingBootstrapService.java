@@ -38,8 +38,8 @@ public class BillingBootstrapService {
     }
 
     private void seedDefaultServices(Long tenantId) {
-        upsertService(tenantId, "REG_FEE", "Registration / Case Paper Fee", 100.0, BillingItemType.REGISTRATION);
-        upsertService(tenantId, "CONSULT", "Consultation Fee", 300.0, BillingItemType.CONSULTATION);
+        // No longer seed default services — admin must configure pricing in the Service Catalog
+        log.info("Skipping billing bootstrap for tenant {} — admin must configure services in Service Catalog", tenantId);
     }
 
     private void upsertService(Long tenantId, String code, String name, double price, BillingItemType type) {

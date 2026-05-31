@@ -3,7 +3,6 @@ package com.curamatrix.hsm.entity;
 import com.curamatrix.hsm.enums.BedStatus;
 import jakarta.persistence.*;
 import lombok.*;
-import java.math.BigDecimal;
 
 @Entity
 @Table(name = "beds", uniqueConstraints = {
@@ -30,7 +29,4 @@ public class Bed extends TenantAwareEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 50, nullable = false)
     private BedStatus status;
-    
-    @Column(name = "daily_price", precision = 10, scale = 2)
-    private BigDecimal dailyPrice;
 }

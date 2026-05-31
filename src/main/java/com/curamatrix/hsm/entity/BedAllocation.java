@@ -38,6 +38,12 @@ public class BedAllocation extends TenantAwareEntity {
     @Column(name = "daily_price_at_time", precision = 10, scale = 2)
     private BigDecimal dailyPriceAtTime;
     
+    @Column(name = "nursing_charge_at_time", precision = 10, scale = 2)
+    private BigDecimal nursingChargeAtTime;
+    
+    @Column(name = "diet_charge_at_time", precision = 10, scale = 2)
+    private BigDecimal dietChargeAtTime;
+    
     @Column(name = "transfer_reason")
     private String transferReason;
 }

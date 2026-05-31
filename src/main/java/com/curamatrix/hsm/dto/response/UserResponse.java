@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -25,4 +26,13 @@ public class UserResponse {
     private List<String> pageKeys;     // effective page keys
     private Long tenantId;             // which hospital/tenant this user belongs to
     private LocalDateTime createdAt;
+
+    // Doctor-specific fields (null for non-doctors)
+    private String qualification;
+    private String licenseNumber;
+    private Integer experienceYears;
+    private BigDecimal consultationFee;
+    private Long departmentId;
+    private String departmentName;
+    private String shift;
 }

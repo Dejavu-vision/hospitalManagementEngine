@@ -4,7 +4,6 @@ import com.curamatrix.hsm.enums.BedStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-import java.math.BigDecimal;
 
 @Data
 public class BedRequest {
@@ -16,6 +15,4 @@ public class BedRequest {
     
     @NotNull(message = "Status is required")
     private BedStatus status;
-    
-    private BigDecimal dailyPrice;
 }

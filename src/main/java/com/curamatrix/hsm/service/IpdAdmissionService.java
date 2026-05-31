@@ -4,6 +4,7 @@ import com.curamatrix.hsm.context.TenantContext;
 import com.curamatrix.hsm.dto.request.AdmissionRequest;
 import com.curamatrix.hsm.dto.response.AdmissionResponse;
 import com.curamatrix.hsm.entity.*;
+import com.curamatrix.hsm.entity.HospitalService;
 import com.curamatrix.hsm.enums.*;
 import com.curamatrix.hsm.exception.DuplicateResourceException;
 import com.curamatrix.hsm.exception.InvalidStateTransitionException;
@@ -36,6 +37,7 @@ public class IpdAdmissionService {
     private final AppointmentRepository appointmentRepository;
     private final BillingRepository billingRepository;
     private final PreAuthRequestRepository preAuthRequestRepository;
+    private final CatalogResolverService catalogResolver;
 
     @Transactional
     public AdmissionResponse admitPatient(AdmissionRequest request) {
@@ -98,7 +100,9 @@ public class IpdAdmissionService {
                 .bed(bed)
                 .startTime(LocalDateTime.now())
                 .isCurrent(true)
-                .dailyPriceAtTime(bed.getDailyPrice())
+                .dailyPriceAtTime(catalogResolver.resolveBedCharge(bed.getRoom().getRoomType(), tenantId).getPrice())
+                .nursingChargeAtTime(catalogResolver.resolveOptional("NURSING_CHARGE", tenantId).map(HospitalService::getPrice).orElse(null))
+                .dietChargeAtTime(catalogResolver.resolveOptional("DIET_CHARGE", tenantId).map(HospitalService::getPrice).orElse(null))
                 .build();
         allocation.setTenantId(tenantId);
         allocationRepository.save(allocation);
@@ -117,20 +121,21 @@ public class IpdAdmissionService {
         ipdBilling.setTenantId(tenantId);
         ipdBilling = billingRepository.save(ipdBilling);
 
-        // Auto-post Day 1 bed charge if the bed has a daily price
-        if (bed.getDailyPrice() != null && bed.getDailyPrice().compareTo(BigDecimal.ZERO) > 0) {
+        // Auto-post Day 1 bed charge from catalog snapshot
+        BigDecimal bedRate = allocation.getDailyPriceAtTime();
+        if (bedRate != null && bedRate.compareTo(BigDecimal.ZERO) > 0) {
             BillingItem bedCharge = BillingItem.builder()
                     .billing(ipdBilling)
                     .description("Bed Charge - " + bed.getBedNumber() + " (Day 1)")
-                    .amount(bed.getDailyPrice())
+                    .amount(bedRate)
                     .quantity(1)
                     .itemType(BillingItemType.BED_CHARGE)
                     .build();
             ipdBilling.getItems().add(bedCharge);
-            ipdBilling.setTotalAmount(bed.getDailyPrice());
-            ipdBilling.setNetAmount(bed.getDailyPrice());
+            ipdBilling.setTotalAmount(bedRate);
+            ipdBilling.setNetAmount(bedRate);
             billingRepository.save(ipdBilling);
-            log.info("Auto-posted Day 1 bed charge ₹{} for admission {}", bed.getDailyPrice(), admNumber);
+            log.info("Auto-posted Day 1 bed charge ₹{} for admission {}", bedRate, admNumber);
         }
 
         // Add deposit billing item if deposit > 0

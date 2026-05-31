@@ -48,6 +48,10 @@ dependencies {
 	// MySQL
 	runtimeOnly 'com.mysql:mysql-connector-j'
 
+	// Flyway database migrations
+	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.flywaydb:flyway-mysql'
+
 	// .env file support — auto-loads .env into Spring properties
 	implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 	

@@ -132,10 +132,8 @@ public class HospitalServiceCatalogService {
         Long tenantId = TenantContext.getTenantId();
         HospitalService service = hospitalServiceRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("HospitalService", "id", id));
-        // Soft delete or hard delete? Let's do soft delete by setting active = false
-        service.setActive(false);
-        hospitalServiceRepository.save(service);
-        log.info("Soft deleted hospital service: {} for tenant: {}", id, tenantId);
+        hospitalServiceRepository.delete(service);
+        log.info("Permanently deleted hospital service: {} for tenant: {}", id, tenantId);
     }
 
     private HospitalServiceResponse mapToResponse(HospitalService service) {
