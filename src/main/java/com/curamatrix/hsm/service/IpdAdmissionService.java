@@ -380,6 +380,66 @@ public class IpdAdmissionService {
         return result;
     }
 
+    @Transactional
+    public void transferBed(Long admissionId, Long newBedId, String transferReason) {
+        Long tenantId = TenantContext.getTenantId();
+
+        // 1. Get admission
+        IpdAdmission admission = admissionRepository.findByIdAndTenantId(admissionId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Admission", "id", admissionId));
+
+        if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
+            throw new IllegalStateException("Cannot transfer bed for a discharged admission");
+        }
+
+        // 2. Get active allocation
+        BedAllocation activeAlloc = allocationRepository.findByAdmissionIdAndIsCurrentTrueAndTenantId(admissionId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Active Bed Allocation", "admissionId", admissionId));
+
+        // If shifting to the same bed, do nothing
+        if (activeAlloc.getBed().getId().equals(newBedId)) {
+            return;
+        }
+
+        // 3. Get new bed
+        Bed newBed = bedRepository.findById(newBedId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bed", "id", newBedId));
+
+        if (newBed.getStatus() != BedStatus.AVAILABLE && newBed.getStatus() != BedStatus.CLEANING) {
+            throw new InvalidStateTransitionException("Bed Allocation", newBed.getStatus().name(), "OCCUPIED");
+        }
+
+        // 4. Close active allocation
+        activeAlloc.setIsCurrent(false);
+        activeAlloc.setEndTime(LocalDateTime.now());
+        activeAlloc.setTransferReason(transferReason != null && !transferReason.trim().isEmpty() ? transferReason.trim() : "Transferred to Bed " + newBed.getBedNumber());
+        allocationRepository.save(activeAlloc);
+
+        // Free old bed
+        Bed oldBed = activeAlloc.getBed();
+        oldBed.setStatus(BedStatus.AVAILABLE);
+        bedRepository.save(oldBed);
+
+        // 5. Occupy new bed
+        newBed.setStatus(BedStatus.OCCUPIED);
+        bedRepository.save(newBed);
+
+        // 6. Create new allocation
+        BedAllocation newAlloc = BedAllocation.builder()
+                .admission(admission)
+                .bed(newBed)
+                .startTime(LocalDateTime.now())
+                .isCurrent(true)
+                .dailyPriceAtTime(catalogResolver.resolveBedCharge(newBed.getRoom().getRoomType(), tenantId).getPrice())
+                .nursingChargeAtTime(catalogResolver.resolveOptional("NURSING_CHARGE", tenantId).map(HospitalService::getPrice).orElse(null))
+                .dietChargeAtTime(catalogResolver.resolveOptional("DIET_CHARGE", tenantId).map(HospitalService::getPrice).orElse(null))
+                .build();
+        newAlloc.setTenantId(tenantId);
+        allocationRepository.save(newAlloc);
+
+        log.info("Transferred patient in Admission {} from Bed {} to Bed {} (Reason: {})", admissionId, oldBed.getBedNumber(), newBed.getBedNumber(), transferReason);
+    }
+
     private AdmissionResponse mapToResponse(IpdAdmission admission, Bed currentBed) {
         AdmissionResponse.AdmissionResponseBuilder b = AdmissionResponse.builder()
                 .id(admission.getId())

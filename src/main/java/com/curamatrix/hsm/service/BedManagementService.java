@@ -54,11 +54,79 @@ public class BedManagementService {
         return mapToResponse(ward, false);
     }
 
+    @Transactional(readOnly = true)
     public List<WardResponse> getAllWards(boolean includeHierarchy) {
         Long tenantId = TenantContext.getTenantId();
-        return wardRepository.findByTenantId(tenantId).stream()
-                .map(w -> mapToResponse(w, includeHierarchy))
-                .collect(Collectors.toList());
+        List<Ward> wards = wardRepository.findByTenantId(tenantId);
+        
+        if (!includeHierarchy) {
+            return wards.stream().map(w -> mapToResponse(w, false)).collect(Collectors.toList());
+        }
+
+        // Preload everything to eliminate ALL database queries (0 N+1 queries!)
+        List<Room> allRooms = roomRepository.findByTenantId(tenantId);
+        List<Bed> allBeds = bedRepository.findByTenantId(tenantId);
+
+        Map<Long, List<Room>> roomsByWardId = allRooms.stream()
+                .filter(r -> r.getWard() != null)
+                .collect(Collectors.groupingBy(r -> r.getWard().getId()));
+
+        Map<Long, List<Bed>> bedsByRoomId = allBeds.stream()
+                .filter(b -> b.getRoom() != null)
+                .collect(Collectors.groupingBy(b -> b.getRoom().getId()));
+
+        List<WardResponse> responses = new ArrayList<>();
+        for (Ward ward : wards) {
+            List<RoomResponse> roomResponses = new ArrayList<>();
+            List<Room> wardRooms = roomsByWardId.getOrDefault(ward.getId(), Collections.emptyList());
+            
+            for (Room room : wardRooms) {
+                List<Bed> roomBeds = bedsByRoomId.getOrDefault(room.getId(), Collections.emptyList());
+                List<BedResponse> bedResponses = new ArrayList<>();
+                
+                for (Bed bed : roomBeds) {
+                    BigDecimal dailyPrice = null;
+                    if (room.getRoomType() != null) {
+                        try {
+                            dailyPrice = catalogResolver.resolveBedCharge(room.getRoomType(), tenantId).getPrice();
+                        } catch (Exception e) {
+                            log.debug("No bed charge configured for room type {}: {}", room.getRoomType(), e.getMessage());
+                        }
+                    }
+                    
+                    bedResponses.add(BedResponse.builder()
+                            .id(bed.getId())
+                            .bedNumber(bed.getBedNumber())
+                            .roomId(room.getId())
+                            .roomNumber(room.getRoomNumber())
+                            .wardId(ward.getId())
+                            .wardName(ward.getName())
+                            .status(bed.getStatus())
+                            .roomType(room.getRoomType() != null ? room.getRoomType().name() : null)
+                            .dailyPrice(dailyPrice)
+                            .build());
+                }
+                
+                roomResponses.add(RoomResponse.builder()
+                        .id(room.getId())
+                        .roomNumber(room.getRoomNumber())
+                        .wardId(ward.getId())
+                        .wardName(ward.getName())
+                        .roomType(room.getRoomType())
+                        .amenities(room.getAmenities())
+                        .beds(bedResponses)
+                        .build());
+            }
+            
+            responses.add(WardResponse.builder()
+                    .id(ward.getId())
+                    .name(ward.getName())
+                    .floor(ward.getFloor())
+                    .description(ward.getDescription())
+                    .rooms(roomResponses)
+                    .build());
+        }
+        return responses;
     }
 
     // --- Room Logic ---
@@ -232,7 +300,7 @@ public class BedManagementService {
             Long tenantId = TenantContext.getTenantId();
             List<BedResponse> beds = bedRepository.findByRoomIdAndTenantId(room.getId(), tenantId)
                     .stream()
-                    .map(this::mapToResponse)
+                    .map(b -> mapToResponse(b, room))
                     .collect(Collectors.toList());
             builder.beds(beds);
         }
@@ -240,14 +308,18 @@ public class BedManagementService {
     }
 
     private BedResponse mapToResponse(Bed bed) {
+        return mapToResponse(bed, bed.getRoom());
+    }
+
+    private BedResponse mapToResponse(Bed bed, Room room) {
         Long tenantId = TenantContext.getTenantId();
-        String roomTypeName = bed.getRoom().getRoomType() != null ? bed.getRoom().getRoomType().name() : null;
+        String roomTypeName = room.getRoomType() != null ? room.getRoomType().name() : null;
 
         // Look up daily price from Service Catalog
         BigDecimal dailyPrice = null;
-        if (bed.getRoom().getRoomType() != null) {
+        if (room.getRoomType() != null) {
             try {
-                dailyPrice = catalogResolver.resolveBedCharge(bed.getRoom().getRoomType(), tenantId).getPrice();
+                dailyPrice = catalogResolver.resolveBedCharge(room.getRoomType(), tenantId).getPrice();
             } catch (Exception e) {
                 log.debug("No bed charge configured for room type {}: {}", roomTypeName, e.getMessage());
             }
@@ -256,10 +328,10 @@ public class BedManagementService {
         return BedResponse.builder()
                 .id(bed.getId())
                 .bedNumber(bed.getBedNumber())
-                .roomId(bed.getRoom().getId())
-                .roomNumber(bed.getRoom().getRoomNumber())
-                .wardId(bed.getRoom().getWard().getId())
-                .wardName(bed.getRoom().getWard().getName())
+                .roomId(room.getId())
+                .roomNumber(room.getRoomNumber())
+                .wardId(room.getWard().getId())
+                .wardName(room.getWard().getName())
                 .status(bed.getStatus())
                 .roomType(roomTypeName)
                 .dailyPrice(dailyPrice)

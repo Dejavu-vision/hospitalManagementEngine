@@ -1,6 +1,7 @@
 package com.curamatrix.hsm.controller;
 
 import com.curamatrix.hsm.dto.request.AdmissionRequest;
+import com.curamatrix.hsm.dto.request.BedTransferRequest;
 import com.curamatrix.hsm.dto.response.AdmissionResponse;
 import com.curamatrix.hsm.service.IpdAdmissionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -69,6 +70,18 @@ public class IpdAdmissionController {
     @Operation(summary = "Get the running bill for a specific IPD admission")
     public ResponseEntity<Map<String, Object>> getAdmissionBilling(@PathVariable Long id) {
         return ResponseEntity.ok(admissionService.getAdmissionBilling(id));
+    }
+
+    @PostMapping("/{id}/transfer-bed/{newBedId}")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR', 'ADMIN')")
+    @Operation(summary = "Transfer patient to a different bed/ward")
+    public ResponseEntity<Void> transferBed(
+            @PathVariable Long id, 
+            @PathVariable Long newBedId,
+            @RequestBody(required = false) BedTransferRequest request) {
+        String reason = request != null ? request.getTransferReason() : null;
+        admissionService.transferBed(id, newBedId, reason);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/test/trigger-bed-charges")

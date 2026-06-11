@@ -3,6 +3,7 @@ package com.curamatrix.hsm.service;
 import com.curamatrix.hsm.context.TenantContext;
 import com.curamatrix.hsm.dto.request.IpdChargeRequest;
 import com.curamatrix.hsm.dto.request.IpdSettlementRequest;
+import com.curamatrix.hsm.dto.request.SectionDiscountRequest;
 import com.curamatrix.hsm.entity.*;
 import com.curamatrix.hsm.enums.*;
 import com.curamatrix.hsm.exception.InvalidStateTransitionException;
@@ -39,6 +40,7 @@ public class IpdBillingService {
     private final PaymentRepository paymentRepository;
     private final PreAuthRequestRepository preAuthRequestRepository;
     private final PatientRepository patientRepository;
+    private final CatalogResolverService catalogResolver;
 
     // ── Unified Lookup Helpers ────────────────────────────────────────────────
 
@@ -57,8 +59,27 @@ public class IpdBillingService {
     private List<Billing> getRelevantBillsForSummary(Long patientId, Long tenantId, IpdAdmission admission) {
         List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
         if (admission == null) {
-            // Include today's paid bills for OPD so they show up in the running bill UI
             LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+            // Check if patient was recently discharged today
+            List<IpdAdmission> recentAdmissions = admissionRepository.findByStatusAndTenantId(AdmissionStatus.DISCHARGED, tenantId).stream()
+                    .filter(a -> a.getPatient().getId().equals(patientId) && a.getActualDischargeTime() != null && !a.getActualDischargeTime().isBefore(startOfDay))
+                    .collect(Collectors.toList());
+
+            if (!recentAdmissions.isEmpty()) {
+                IpdAdmission recent = recentAdmissions.get(0);
+                Optional<Billing> ipdBillOpt = billingRepository.findByIpdAdmissionId(recent.getId());
+                if (ipdBillOpt.isPresent()) {
+                    Billing ipdBill = ipdBillOpt.get();
+                    List<Billing> result = new ArrayList<>(pendingBills);
+                    if (!result.contains(ipdBill)) {
+                        result.add(ipdBill);
+                    }
+                    result.sort(Comparator.comparing(Billing::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
+                    return result;
+                }
+            }
+
+            // Fallback: Include today's paid bills for OPD so they show up in the running bill UI
             List<Billing> todaysPaid = billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId).stream()
                     .filter(b -> b.getPaymentStatus() == PaymentStatus.PAID && b.getCreatedAt() != null && !b.getCreatedAt().isBefore(startOfDay))
                     .collect(Collectors.toList());
@@ -66,11 +87,18 @@ public class IpdBillingService {
             for (Billing b : todaysPaid) {
                 if (!result.contains(b)) result.add(b);
             }
-            // Sort by createdAt so chronological
             result.sort(Comparator.comparing(Billing::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
             return result;
+        } else {
+            Optional<Billing> ipdBillOpt = billingRepository.findByIpdAdmissionId(admission.getId());
+            if (ipdBillOpt.isPresent()) {
+                Billing ipdBill = ipdBillOpt.get();
+                if (!pendingBills.contains(ipdBill)) {
+                    pendingBills.add(ipdBill);
+                }
+            }
+            return pendingBills;
         }
-        return pendingBills;
     }
 
     private Billing getPrimaryBill(Long patientId, Long tenantId, IpdAdmission admission) {
@@ -172,6 +200,75 @@ public class IpdBillingService {
         billingRepository.save(bill);
 
         log.info("Charge {} removed for patient {}", itemId, patientId);
+
+        PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
+        BedAllocation currentAllocation = admission != null ? allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
+        return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
+    }
+
+    // ── Retroactively change a bed charge's bed and rate ──────────────────────
+
+    @Transactional
+    public Map<String, Object> changeBedForChargeRow(Long patientId, Long itemId, Long newBedId) {
+        Long tenantId = TenantContext.getTenantId();
+
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
+
+        // Find the bill containing this item
+        Billing bill = pendingBills.stream()
+                .filter(b -> b.getItems().stream().anyMatch(i -> i.getId().equals(itemId)))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
+
+        if (bill.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new InvalidStateTransitionException("Billing", "PAID", "CHANGE_BED_CHARGE");
+        }
+
+        if (bill.getRemarks() != null && bill.getRemarks().startsWith("FROZEN")) {
+            throw new InvalidStateTransitionException("Billing", "FROZEN", "CHANGE_BED_CHARGE");
+        }
+
+        BillingItem toUpdate = bill.getItems().stream()
+                .filter(i -> i.getId().equals(itemId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
+
+        if (toUpdate.getItemType() != BillingItemType.BED_CHARGE) {
+            throw new IllegalArgumentException("Only bed charge rows can have their bed edited.");
+        }
+
+        Bed newBed = bedRepository.findById(newBedId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bed", "id", newBedId));
+
+        if (!newBed.getTenantId().equals(tenantId)) {
+            throw new IllegalArgumentException("Bed does not belong to this tenant.");
+        }
+
+        // Resolve new price from Service Catalog
+        BigDecimal oldItemTotal = toUpdate.getAmount().multiply(BigDecimal.valueOf(toUpdate.getQuantity()));
+        BigDecimal newUnitPrice = catalogResolver.resolveBedCharge(newBed.getRoom().getRoomType(), tenantId).getPrice();
+        BigDecimal newItemTotal = newUnitPrice.multiply(BigDecimal.valueOf(toUpdate.getQuantity()));
+
+        // Parse date from old description if present
+        String originalDesc = toUpdate.getDescription();
+        String dateStr = "";
+        int onIdx = originalDesc.lastIndexOf(" on ");
+        if (onIdx != -1) {
+            dateStr = originalDesc.substring(onIdx);
+        } else {
+            dateStr = " on " + LocalDate.now();
+        }
+
+        toUpdate.setDescription("Daily Bed Charge (" + newBed.getBedNumber() + ")" + dateStr);
+        toUpdate.setAmount(newUnitPrice);
+
+        bill.setTotalAmount(bill.getTotalAmount().subtract(oldItemTotal).add(newItemTotal));
+        recalcNet(bill);
+        billingRepository.save(bill);
+
+        log.info("Bed charge item {} updated for patient {}: new Bed {}, rate ₹{}", itemId, patientId, newBed.getBedNumber(), newUnitPrice);
 
         PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
         BedAllocation currentAllocation = admission != null ? allocationRepository
@@ -450,11 +547,13 @@ public class IpdBillingService {
 
         BigDecimal totalCharges = BigDecimal.ZERO;
         BigDecimal totalPaid = BigDecimal.ZERO;
+        BigDecimal totalDiscount = BigDecimal.ZERO;
         Map<String, BigDecimal> byCategory = new LinkedHashMap<>();
         
         for (Billing bill : bills) {
             totalCharges = totalCharges.add(bill.getTotalAmount());
             totalPaid = totalPaid.add(bill.getPaidAmount());
+            totalDiscount = totalDiscount.add(bill.getDiscount() != null ? bill.getDiscount() : BigDecimal.ZERO);
             for (BillingItem item : bill.getItems()) {
                 String cat = item.getItemType().name();
                 BigDecimal subtotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
@@ -466,10 +565,16 @@ public class IpdBillingService {
         BigDecimal copayCollected = totalPaid.subtract(depositPaid);
         if (copayCollected.compareTo(BigDecimal.ZERO) < 0) copayCollected = BigDecimal.ZERO;
 
-        BigDecimal balanceDue = totalCharges
-                .subtract(depositPaid)
-                .subtract(tpaApprovedAmount)
-                .subtract(copayCollected);
+        boolean allPaid = !bills.isEmpty() && bills.stream().allMatch(b -> b.getPaymentStatus() == PaymentStatus.PAID);
+
+        BigDecimal balanceDue = BigDecimal.ZERO;
+        if (!allPaid) {
+            balanceDue = totalCharges
+                    .subtract(totalDiscount)
+                    .subtract(depositPaid)
+                    .subtract(tpaApprovedAmount)
+                    .subtract(copayCollected);
+        }
 
         Patient patient = patientRepository.findById(patientId).orElseThrow();
 
@@ -483,6 +588,7 @@ public class IpdBillingService {
         result.put("dischargeTime", admission != null && admission.getActualDischargeTime() != null ? admission.getActualDischargeTime().toString() : null);
         result.put("chargesByCategory", byCategory);
         result.put("totalCharges", totalCharges);
+        result.put("totalDiscount", totalDiscount);
         result.put("depositPaid", depositPaid);
         result.put("tpaApprovedAmount", tpaApprovedAmount);
         result.put("copayCollected", copayCollected);
@@ -490,8 +596,6 @@ public class IpdBillingService {
         
         boolean isFrozen = bills.stream().anyMatch(b -> b.getRemarks() != null && b.getRemarks().startsWith("FROZEN"));
         result.put("isFrozen", isFrozen);
-        
-        boolean allPaid = bills.stream().allMatch(b -> b.getPaymentStatus() == PaymentStatus.PAID);
         result.put("paymentStatus", allPaid ? "PAID" : "PENDING");
         return result;
     }
@@ -532,16 +636,29 @@ public class IpdBillingService {
             PreAuthRequest preAuth,
             BedAllocation currentAllocation
     ) {
+        Long tenantId = TenantContext.getTenantId();
         Patient patient = patientRepository.findById(patientId).orElseThrow();
         
         List<Map<String, Object>> items = new ArrayList<>();
         BigDecimal totalCharges = BigDecimal.ZERO;
         BigDecimal totalPaid = BigDecimal.ZERO;
+        BigDecimal totalDiscount = BigDecimal.ZERO;
         boolean isFrozen = false;
+
+        // Define the 6 sections in order
+        List<String> sections = List.of("ROOM_NURSING", "PROCEDURE", "DOCTOR", "LAB", "MEDICINE", "OTHER");
+        Map<String, BigDecimal> grossMap = new LinkedHashMap<>();
+        Map<String, BigDecimal> discMap = new LinkedHashMap<>();
+        
+        for (String s : sections) {
+            grossMap.put(s, BigDecimal.ZERO);
+            discMap.put(s, BigDecimal.ZERO);
+        }
         
         for (Billing bill : pendingBills) {
             totalCharges = totalCharges.add(bill.getTotalAmount());
             totalPaid = totalPaid.add(bill.getPaidAmount());
+            totalDiscount = totalDiscount.add(bill.getDiscount() != null ? bill.getDiscount() : BigDecimal.ZERO);
             if (bill.getRemarks() != null && bill.getRemarks().startsWith("FROZEN")) {
                 isFrozen = true;
             }
@@ -557,7 +674,39 @@ public class IpdBillingService {
                 m.put("isAutoCharge", item.getItemType() == BillingItemType.BED_CHARGE ||
                                        item.getItemType() == BillingItemType.NURSING_CHARGE);
                 items.add(m);
+
+                // Section breakdown grouping
+                String secKey = getSectionKey(item.getItemType());
+                BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+                grossMap.put(secKey, grossMap.get(secKey).add(itemTotal));
             }
+
+            // Section-wise discount sum
+            Map<String, BigDecimal> billSecDiscs = bill.getSectionDiscountsMap();
+            for (Map.Entry<String, BigDecimal> entry : billSecDiscs.entrySet()) {
+                String secKey = entry.getKey();
+                if (grossMap.containsKey(secKey)) {
+                    discMap.put(secKey, discMap.get(secKey).add(entry.getValue()));
+                }
+            }
+        }
+
+        List<Map<String, Object>> sectionBreakdowns = new ArrayList<>();
+        for (String s : sections) {
+            Map<String, Object> breakdown = new LinkedHashMap<>();
+            BigDecimal gross = grossMap.get(s);
+            BigDecimal discount = discMap.get(s);
+            if (discount.compareTo(gross) > 0) {
+                discount = gross;
+            }
+            BigDecimal net = gross.subtract(discount);
+
+            breakdown.put("key", s);
+            breakdown.put("label", getSectionLabel(s));
+            breakdown.put("grossAmount", gross);
+            breakdown.put("discount", discount);
+            breakdown.put("netAmount", net);
+            sectionBreakdowns.add(breakdown);
         }
 
         BigDecimal depositPaid = admission != null && admission.getDepositAmount() != null ? admission.getDepositAmount() : BigDecimal.ZERO;
@@ -568,6 +717,7 @@ public class IpdBillingService {
         }
         
         BigDecimal provisionalBalance = totalCharges
+                .subtract(totalDiscount)
                 .subtract(depositPaid)
                 .subtract(totalPaid)
                 .subtract(tpaApprovedAmount);
@@ -629,7 +779,26 @@ public class IpdBillingService {
             preAuthMap.put("insurancePolicy", policyMap);
         }
 
+        List<Map<String, Object>> bedHistory = new ArrayList<>();
+        if (admission != null) {
+            List<BedAllocation> allocations = allocationRepository
+                    .findByAdmissionIdAndTenantIdOrderByStartTimeDesc(admission.getId(), tenantId);
+            for (BedAllocation alloc : allocations) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("bedNumber", alloc.getBed().getBedNumber());
+                m.put("wardName", alloc.getBed().getRoom().getWard().getName());
+                m.put("roomType", alloc.getBed().getRoom().getRoomType() != null ? alloc.getBed().getRoom().getRoomType().name() : null);
+                m.put("startTime", alloc.getStartTime() != null ? alloc.getStartTime().toString() : null);
+                m.put("endTime", alloc.getEndTime() != null ? alloc.getEndTime().toString() : null);
+                m.put("isCurrent", alloc.getIsCurrent());
+                m.put("transferReason", alloc.getTransferReason());
+                m.put("dailyPrice", alloc.getDailyPriceAtTime());
+                bedHistory.add(m);
+            }
+        }
+
         Map<String, Object> result = new LinkedHashMap<>();
+        result.put("bedHistory", bedHistory);
         result.put("patientId", patientId);
         result.put("admissionId", admission != null ? admission.getId() : null);
         result.put("admissionNumber", admission != null ? admission.getAdmissionNumber() : "OPD");
@@ -639,7 +808,9 @@ public class IpdBillingService {
         result.put("status", admission != null ? admission.getStatus().name() : "OPD");
         result.put("isFrozen", isFrozen);
         result.put("items", items);
+        result.put("sectionBreakdowns", sectionBreakdowns);
         result.put("totalCharges", totalCharges);
+        result.put("totalDiscount", totalDiscount);
         result.put("depositPaid", depositPaid);
         result.put("provisionalBalance", provisionalBalance);
         
@@ -660,12 +831,128 @@ public class IpdBillingService {
         return result;
     }
 
+    @Transactional
+    public Map<String, Object> applySectionDiscount(Long patientId, SectionDiscountRequest req) {
+        Long tenantId = TenantContext.getTenantId();
+
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        Billing bill = getPrimaryBill(patientId, tenantId, admission);
+
+        if (bill.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new InvalidStateTransitionException("Billing", "PAID", "APPLY_SECTION_DISCOUNT");
+        }
+
+        if (bill.getRemarks() != null && bill.getRemarks().startsWith("FROZEN")) {
+            throw new InvalidStateTransitionException("Billing", "FROZEN", "APPLY_SECTION_DISCOUNT");
+        }
+
+        String section = req.getSection().toUpperCase();
+        BigDecimal discount = req.getDiscount() != null ? req.getDiscount() : BigDecimal.ZERO;
+
+        // Calculate gross charges for this section
+        BigDecimal sectionGross = BigDecimal.ZERO;
+        if (bill.getItems() != null) {
+            for (BillingItem item : bill.getItems()) {
+                if (getSectionKey(item.getItemType()).equals(section)) {
+                    BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+                    sectionGross = sectionGross.add(itemTotal);
+                }
+            }
+        }
+
+        if (discount.compareTo(sectionGross) > 0) {
+            throw new IllegalArgumentException("Discount cannot exceed the gross charges of " + getSectionLabel(section) + " (₹" + sectionGross + ")");
+        }
+
+        Map<String, BigDecimal> sectionDiscounts = bill.getSectionDiscountsMap();
+        if (discount.compareTo(BigDecimal.ZERO) == 0) {
+            sectionDiscounts.remove(section);
+        } else {
+            sectionDiscounts.put(section, discount);
+        }
+        bill.setSectionDiscountsMap(sectionDiscounts);
+
+        recalcNet(bill);
+        billingRepository.save(bill);
+
+        log.info("Section discount applied for patient {}: Section {}, Discount ₹{}", patientId, section, discount);
+
+        PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
+        BedAllocation currentAllocation = admission != null ? allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
+        return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
+    }
+
     private void recalcNet(Billing bill) {
+        // Compute section gross amounts first
+        Map<String, BigDecimal> sectionGrossMap = new HashMap<>();
+        for (String section : List.of("ROOM_NURSING", "PROCEDURE", "DOCTOR", "LAB", "MEDICINE", "OTHER")) {
+            sectionGrossMap.put(section, BigDecimal.ZERO);
+        }
+        if (bill.getItems() != null) {
+            for (BillingItem item : bill.getItems()) {
+                String section = getSectionKey(item.getItemType());
+                BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+                sectionGrossMap.put(section, sectionGrossMap.getOrDefault(section, BigDecimal.ZERO).add(itemTotal));
+            }
+        }
+
+        // Compute total discount based on section discounts, capped at each section's gross amount
+        Map<String, BigDecimal> sectionDiscounts = bill.getSectionDiscountsMap();
+        BigDecimal totalDiscount = BigDecimal.ZERO;
+        Map<String, BigDecimal> updatedDiscounts = new HashMap<>();
+        boolean changed = false;
+
+        for (Map.Entry<String, BigDecimal> entry : sectionDiscounts.entrySet()) {
+            String section = entry.getKey();
+            BigDecimal discountVal = entry.getValue();
+            BigDecimal grossVal = sectionGrossMap.getOrDefault(section, BigDecimal.ZERO);
+            if (discountVal.compareTo(grossVal) > 0) {
+                discountVal = grossVal;
+                changed = true;
+            }
+            if (discountVal.compareTo(BigDecimal.ZERO) > 0) {
+                totalDiscount = totalDiscount.add(discountVal);
+                updatedDiscounts.put(section, discountVal);
+            }
+        }
+
+        if (changed) {
+            bill.setSectionDiscountsMap(updatedDiscounts);
+        }
+
+        bill.setDiscount(totalDiscount);
+
         BigDecimal net = bill.getTotalAmount()
                 .subtract(bill.getDiscount() != null ? bill.getDiscount() : BigDecimal.ZERO)
                 .subtract(bill.getInsuranceAdjustment() != null ? bill.getInsuranceAdjustment() : BigDecimal.ZERO)
                 .add(bill.getTax() != null ? bill.getTax() : BigDecimal.ZERO);
         bill.setNetAmount(net.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : net);
+    }
+
+    private String getSectionKey(BillingItemType type) {
+        if (type == null) {
+            return "OTHER";
+        }
+        return switch (type) {
+            case BED_CHARGE, ICU_CHARGE, NURSING_CHARGE, DIET_CHARGE -> "ROOM_NURSING";
+            case PROCEDURE, SURGERY, ANAESTHESIA -> "PROCEDURE";
+            case CONSULTATION, IPD_CONSULTATION -> "DOCTOR";
+            case LAB, RADIOLOGY -> "LAB";
+            case MEDICINE -> "MEDICINE";
+            default -> "OTHER";
+        };
+    }
+
+    private String getSectionLabel(String key) {
+        return switch (key) {
+            case "ROOM_NURSING" -> "Room & Nursing";
+            case "PROCEDURE"    -> "Procedure & Surgery";
+            case "DOCTOR"       -> "Doctor Visits";
+            case "LAB"          -> "Diagnostics & Lab";
+            case "MEDICINE"     -> "Medicines & Pharmacy";
+            default             -> "Other Charges";
+        };
     }
 
     private BillingItemType mapChargeCategory(String category) {

@@ -87,4 +87,40 @@ public class Billing extends TenantAwareEntity {
     @OneToMany(mappedBy = "billing", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<BillingItem> items = new ArrayList<>();
+
+    @Column(name = "section_discounts", length = 1000)
+    private String sectionDiscounts;
+
+    public java.util.Map<String, BigDecimal> getSectionDiscountsMap() {
+        if (this.sectionDiscounts == null || this.sectionDiscounts.trim().isEmpty()) {
+            return new java.util.HashMap<>();
+        }
+        try {
+            java.util.Map<String, BigDecimal> map = new java.util.HashMap<>();
+            String[] pairs = this.sectionDiscounts.split(";");
+            for (String pair : pairs) {
+                String[] kv = pair.split(":");
+                if (kv.length == 2) {
+                    map.put(kv[0].toUpperCase(), new BigDecimal(kv[1]));
+                }
+            }
+            return map;
+        } catch (Exception e) {
+            return new java.util.HashMap<>();
+        }
+    }
+
+    public void setSectionDiscountsMap(java.util.Map<String, BigDecimal> map) {
+        if (map == null || map.isEmpty()) {
+            this.sectionDiscounts = null;
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        map.forEach((k, v) -> {
+            if (v != null) {
+                sb.append(k.toUpperCase()).append(":").append(v).append(";");
+            }
+        });
+        this.sectionDiscounts = sb.toString();
+    }
 }

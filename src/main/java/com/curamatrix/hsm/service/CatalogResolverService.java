@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Optional;
 
 @Service
@@ -19,6 +21,7 @@ import java.util.Optional;
 public class CatalogResolverService {
 
     private final HospitalServiceRepository hospitalServiceRepository;
+    private final Map<String, HospitalService> bedChargeCache = new ConcurrentHashMap<>();
 
     /**
      * Resolves REGISTRATION fee for a specific department.
@@ -59,14 +62,22 @@ public class CatalogResolverService {
      * Convention: service code = "BED_CHARGE_{ROOM_TYPE}" (e.g., BED_CHARGE_ICU)
      */
     public HospitalService resolveBedCharge(BedType roomType, Long tenantId) {
+        String cacheKey = tenantId + "_" + roomType.name();
+        if (bedChargeCache.containsKey(cacheKey)) {
+            return bedChargeCache.get(cacheKey);
+        }
+
         String serviceCode = "BED_CHARGE_" + roomType.name();
-        return hospitalServiceRepository.findByServiceCodeAndTenantIdAndActiveTrue(serviceCode, tenantId)
+        HospitalService service = hospitalServiceRepository.findByServiceCodeAndTenantIdAndActiveTrue(serviceCode, tenantId)
                 .orElseThrow(() -> {
                     log.error("Bed charge service '{}' not configured for tenant {}", serviceCode, tenantId);
                     return new ResourceNotFoundException(
                             "Bed charge service (" + serviceCode + ") is not configured for this hospital. " +
                             "Please add a BED_CHARGE service for room type '" + roomType.name() + "' in the Service Catalog.");
                 });
+
+        bedChargeCache.put(cacheKey, service);
+        return service;
     }
 
     /**

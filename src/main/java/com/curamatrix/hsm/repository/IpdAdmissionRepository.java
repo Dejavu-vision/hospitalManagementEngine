@@ -28,4 +28,7 @@ public interface IpdAdmissionRepository extends JpaRepository<IpdAdmission, Long
     boolean existsByPatientIdAndStatusAndTenantId(Long patientId, AdmissionStatus status, Long tenantId);
 
     List<IpdAdmission> findByStatusAndTenantId(AdmissionStatus status, Long tenantId);
+
+    java.util.Optional<IpdAdmission> findByIdAndTenantId(Long id, Long tenantId);
 }
+

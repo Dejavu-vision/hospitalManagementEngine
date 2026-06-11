@@ -2,6 +2,7 @@ package com.curamatrix.hsm.controller;
 
 import com.curamatrix.hsm.dto.request.IpdChargeRequest;
 import com.curamatrix.hsm.dto.request.IpdSettlementRequest;
+import com.curamatrix.hsm.dto.request.SectionDiscountRequest;
 import com.curamatrix.hsm.service.IpdBillingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -50,6 +51,16 @@ public class IpdBillingController {
         return ResponseEntity.ok(ipdBillingService.removeCharge(patientId, itemId));
     }
 
+    @PutMapping("/patient/{patientId}/charges/{itemId}/change-bed/{newBedId}")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @Operation(summary = "Retroactively update the bed and daily rate of a past daily bed charge row")
+    public ResponseEntity<Map<String, Object>> changeBedForChargeRow(
+            @PathVariable Long patientId,
+            @PathVariable Long itemId,
+            @PathVariable Long newBedId) {
+        return ResponseEntity.ok(ipdBillingService.changeBedForChargeRow(patientId, itemId, newBedId));
+    }
+
     // ── Freeze ────────────────────────────────────────────────────────────────
 
     @PostMapping("/patient/{patientId}/freeze")
@@ -91,6 +102,17 @@ public class IpdBillingController {
     @Operation(summary = "Get final bill breakdown for discharge")
     public ResponseEntity<Map<String, Object>> getFinalBill(@PathVariable Long patientId) {
         return ResponseEntity.ok(ipdBillingService.getFinalBill(patientId));
+    }
+
+    // ── Section Discounts ─────────────────────────────────────────────────────
+
+    @PostMapping("/patient/{patientId}/section-discounts")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @Operation(summary = "Apply or update a discount for a specific billing section")
+    public ResponseEntity<Map<String, Object>> applySectionDiscount(
+            @PathVariable Long patientId,
+            @Valid @RequestBody SectionDiscountRequest request) {
+        return ResponseEntity.ok(ipdBillingService.applySectionDiscount(patientId, request));
     }
 
     // ── Settlement & Discharge ────────────────────────────────────────────────
