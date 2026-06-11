@@ -35,6 +35,7 @@ public class BedManagementService {
     private final WardRepository wardRepository;
     private final RoomRepository roomRepository;
     private final BedRepository bedRepository;
+    private final CatalogResolverService catalogResolver;
 
     // --- Ward Logic ---
     
@@ -239,6 +240,19 @@ public class BedManagementService {
     }
 
     private BedResponse mapToResponse(Bed bed) {
+        Long tenantId = TenantContext.getTenantId();
+        String roomTypeName = bed.getRoom().getRoomType() != null ? bed.getRoom().getRoomType().name() : null;
+
+        // Look up daily price from Service Catalog
+        BigDecimal dailyPrice = null;
+        if (bed.getRoom().getRoomType() != null) {
+            try {
+                dailyPrice = catalogResolver.resolveBedCharge(bed.getRoom().getRoomType(), tenantId).getPrice();
+            } catch (Exception e) {
+                log.debug("No bed charge configured for room type {}: {}", roomTypeName, e.getMessage());
+            }
+        }
+
         return BedResponse.builder()
                 .id(bed.getId())
                 .bedNumber(bed.getBedNumber())
@@ -247,6 +261,9 @@ public class BedManagementService {
                 .wardId(bed.getRoom().getWard().getId())
                 .wardName(bed.getRoom().getWard().getName())
                 .status(bed.getStatus())
+                .roomType(roomTypeName)
+                .dailyPrice(dailyPrice)
                 .build();
     }
 }
+

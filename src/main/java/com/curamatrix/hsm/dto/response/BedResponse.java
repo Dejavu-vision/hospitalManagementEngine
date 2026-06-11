@@ -4,6 +4,8 @@ import com.curamatrix.hsm.enums.BedStatus;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 @Data
 @Builder
 public class BedResponse {
@@ -14,4 +16,6 @@ public class BedResponse {
     private Long wardId;
     private String wardName;
     private BedStatus status;
+    private String roomType;
+    private BigDecimal dailyPrice;
 }

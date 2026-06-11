@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,6 +28,7 @@ public class IpdReceptionService {
     private final BedRepository bedRepository;
     private final InsurancePolicyRepository insurancePolicyRepository;
     private final AppointmentRepository appointmentRepository;
+    private final CatalogResolverService catalogResolver;
 
     /**
      * Single-call context loader for the IPD Admission Wizard Step 2.
@@ -55,11 +57,23 @@ public class IpdReceptionService {
                                 List<AvailableBedSummaryResponse> beds = bedRepository
                                         .findByRoomIdAndTenantIdAndStatus(room.getId(), tenantId, BedStatus.AVAILABLE)
                                         .stream()
-                                        .map(bed -> AvailableBedSummaryResponse.builder()
-                                                .bedId(bed.getId())
-                                                .bedNumber(bed.getBedNumber())
-                                                .status(bed.getStatus())
-                                                .build())
+                                        .map(bed -> {
+                                            BigDecimal dailyPrice = null;
+                                            if (room.getRoomType() != null) {
+                                                try {
+                                                    dailyPrice = catalogResolver.resolveBedCharge(room.getRoomType(), tenantId).getPrice();
+                                                } catch (Exception e) {
+                                                    log.debug("No bed charge configured for room type {} of bed id {}: {}", 
+                                                            room.getRoomType(), bed.getId(), e.getMessage());
+                                                }
+                                            }
+                                            return AvailableBedSummaryResponse.builder()
+                                                    .bedId(bed.getId())
+                                                    .bedNumber(bed.getBedNumber())
+                                                    .status(bed.getStatus())
+                                                    .dailyPrice(dailyPrice)
+                                                    .build();
+                                        })
                                         .collect(Collectors.toList());
                                 return RoomWithBedsResponse.builder()
                                         .roomId(room.getId())
