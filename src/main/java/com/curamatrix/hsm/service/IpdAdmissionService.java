@@ -242,103 +242,178 @@ public class IpdAdmissionService {
     }
 
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> getActiveAdmissions() {
+    public List<Map<String, Object>> getActiveAdmissions(String status, String fromDate, String toDate) {
         Long tenantId = TenantContext.getTenantId();
+        boolean isPaidTab = "PAID".equalsIgnoreCase(status);
+
+        // Parse date range if provided
+        LocalDateTime startDate = fromDate != null && !fromDate.isEmpty()
+                ? LocalDate.parse(fromDate).atStartOfDay() : null;
+        LocalDateTime endDate = toDate != null && !toDate.isEmpty()
+                ? LocalDate.parse(toDate).atTime(23, 59, 59) : null;
+
         List<Map<String, Object>> resultList = new ArrayList<>();
         Set<Long> processedPatientIds = new HashSet<>();
 
-        // 1. IPD Admitted Patients
-        List<IpdAdmission> active = admissionRepository.findByStatusAndTenantId(AdmissionStatus.ADMITTED, tenantId);
+        if (isPaidTab) {
+            // ── PAID TAB: Discharged IPD + Paid OPD bills ──────────────────
+            // Default date range to today if none given (prevents loading all historical data)
+            LocalDateTime effStart = startDate != null ? startDate : LocalDate.now().atStartOfDay();
+            LocalDateTime effEnd   = endDate   != null ? endDate   : LocalDate.now().atTime(23, 59, 59);
 
-        for (IpdAdmission adm : active) {
-            processedPatientIds.add(adm.getPatient().getId());
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("id", adm.getId()); // admissionId
-            row.put("patientId", adm.getPatient().getId());
-            row.put("admissionNumber", adm.getAdmissionNumber());
-            row.put("patientName", adm.getPatient().getFirstName() + " " + adm.getPatient().getLastName());
-            row.put("patientCode", adm.getPatient().getPatientCode());
-            row.put("primaryDoctorName", adm.getPrimaryDoctor().getUser().getFullName());
-            row.put("admissionType", adm.getAdmissionType() != null ? adm.getAdmissionType().name() : "IPD");
-            row.put("admissionTime", adm.getAdmissionTime() != null ? adm.getAdmissionTime().toString() : null);
-            row.put("expectedDischargeTime", adm.getExpectedDischargeTime() != null ? adm.getExpectedDischargeTime().toString() : null);
+            // Fetch all paid bills in the date range
+            List<Billing> paidBills = billingRepository.findPaidBillsByDateRange(tenantId, effStart, effEnd);
+            List<Billing> paidOpdBills = new ArrayList<>();
 
-            long daysAdmitted = adm.getAdmissionTime() != null
-                    ? ChronoUnit.DAYS.between(adm.getAdmissionTime().toLocalDate(), LocalDateTime.now().toLocalDate()) + 1
-                    : 0;
-            row.put("daysAdmitted", daysAdmitted);
-
-            // Current bed info
-            BedAllocation alloc = allocationRepository
-                    .findByAdmissionIdAndIsCurrentTrueAndTenantId(adm.getId(), tenantId).orElse(null);
-            if (alloc != null) {
-                Bed bed = alloc.getBed();
-                row.put("bedId", bed.getId());
-                row.put("bedNumber", bed.getBedNumber());
-                row.put("wardName", bed.getRoom().getWard().getName());
-                row.put("roomNumber", bed.getRoom().getRoomNumber());
-                row.put("roomType", bed.getRoom().getRoomType().name());
-                row.put("dailyPrice", alloc.getDailyPriceAtTime());
-            }
-
-            // Running bill total
-            Billing bill = billingRepository.findByIpdAdmissionId(adm.getId()).orElse(null);
-            row.put("runningBillTotal", bill != null ? bill.getNetAmount() : BigDecimal.ZERO);
-            row.put("paidAmount", bill != null ? bill.getPaidAmount() : BigDecimal.ZERO);
-
-            resultList.add(row);
-        }
-
-        // 2. OPD Patients with Pending Bills + ALL Patients who visited today
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        List<PaymentStatus> statuses = List.of(PaymentStatus.PENDING, PaymentStatus.PARTIAL);
-        List<Billing> allUnpaid = billingRepository.findActiveOpdBills(tenantId, statuses, startOfDay);
-
-        Map<Long, List<Billing>> billsByPatient = allUnpaid.stream()
-            .filter(b -> b.getPatient() != null && !processedPatientIds.contains(b.getPatient().getId()))
-            .collect(Collectors.groupingBy(b -> b.getPatient().getId()));
-
-        for (Map.Entry<Long, List<Billing>> entry : billsByPatient.entrySet()) {
-            Patient p = entry.getValue().get(0).getPatient();
-            
-            BigDecimal totalNet = entry.getValue().stream()
-                .map(b -> b.getNetAmount() != null ? b.getNetAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-                
-            BigDecimal totalPaid = entry.getValue().stream()
-                .map(b -> b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("id", null); // No admissionId for OPD
-            row.put("patientId", p.getId());
-            row.put("admissionNumber", "OPD");
-            row.put("patientName", p.getFirstName() + " " + p.getLastName());
-            row.put("patientCode", p.getPatientCode());
-            
-            // Try to find a doctor from their bills, otherwise default
-            String docName = "OPD Consultant";
-            for (Billing b : entry.getValue()) {
-                if (b.getAppointment() != null && b.getAppointment().getDoctor() != null) {
-                    docName = b.getAppointment().getDoctor().getUser().getFullName();
-                    break;
+            for (Billing b : paidBills) {
+                if (b.getIpdAdmission() != null) {
+                    IpdAdmission adm = b.getIpdAdmission();
+                    if (!processedPatientIds.contains(adm.getPatient().getId())) {
+                        processedPatientIds.add(adm.getPatient().getId());
+                        resultList.add(buildAdmissionRow(adm, b, tenantId, true));
+                    }
+                } else if (b.getPatient() != null) {
+                    paidOpdBills.add(b);
                 }
             }
-            row.put("primaryDoctorName", docName);
-            row.put("admissionType", "OPD");
+
+            Map<Long, List<Billing>> billsByPatient = paidOpdBills.stream()
+                    .filter(b -> !processedPatientIds.contains(b.getPatient().getId()))
+                    .collect(Collectors.groupingBy(b -> b.getPatient().getId()));
+            for (Map.Entry<Long, List<Billing>> entry : billsByPatient.entrySet()) {
+                resultList.add(buildOpdRow(entry.getValue(), true));
+            }
+
+        } else {
+            // ── PENDING TAB: Active admitted IPD + Discharged Unpaid IPD + Pending OPD bills ────────
             
-            row.put("bedNumber", "OPD");
-            row.put("wardName", "Outpatient");
-            row.put("roomType", "");
-            row.put("daysAdmitted", 0);
+            // 1. Active IPD admissions (status = ADMITTED)
+            List<IpdAdmission> active;
+            if (startDate != null && endDate != null) {
+                active = admissionRepository.findAdmittedByTenantIdAndDateRange(tenantId, startDate, endDate);
+            } else {
+                active = admissionRepository.findByStatusAndTenantId(AdmissionStatus.ADMITTED, tenantId);
+            }
 
-            row.put("runningBillTotal", totalNet);
-            row.put("paidAmount", totalPaid);
+            for (IpdAdmission adm : active) {
+                processedPatientIds.add(adm.getPatient().getId());
+                resultList.add(buildAdmissionRow(adm, null, tenantId, false));
+            }
 
-            resultList.add(row);
+            List<PaymentStatus> pendingStatuses = List.of(PaymentStatus.PENDING, PaymentStatus.PARTIAL);
+
+            // 2. Discharged IPD admissions whose bill is still PENDING or PARTIAL
+            List<Billing> unpaidDischargedBills = billingRepository.findUnpaidDischargedBills(tenantId, pendingStatuses, startDate, endDate);
+            for (Billing b : unpaidDischargedBills) {
+                IpdAdmission adm = b.getIpdAdmission();
+                if (adm != null && !processedPatientIds.contains(adm.getPatient().getId())) {
+                    processedPatientIds.add(adm.getPatient().getId());
+                    resultList.add(buildAdmissionRow(adm, b, tenantId, false));
+                }
+            }
+
+            // 3. Pending OPD bills
+            List<Billing> opdBills;
+            if (startDate != null && endDate != null) {
+                opdBills = billingRepository.findOpdBillsByStatusAndDateRange(tenantId, pendingStatuses, startDate, endDate);
+            } else {
+                opdBills = billingRepository.findPendingOpdBills(tenantId, pendingStatuses);
+            }
+
+            Map<Long, List<Billing>> billsByPatient = opdBills.stream()
+                    .filter(b -> b.getPatient() != null && !processedPatientIds.contains(b.getPatient().getId()))
+                    .collect(Collectors.groupingBy(b -> b.getPatient().getId()));
+            for (Map.Entry<Long, List<Billing>> entry : billsByPatient.entrySet()) {
+                resultList.add(buildOpdRow(entry.getValue(), false));
+            }
         }
 
         return resultList;
+    }
+
+    private Map<String, Object> buildAdmissionRow(IpdAdmission adm, Billing bill, Long tenantId, boolean isPaid) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", adm.getId());
+        row.put("patientId", adm.getPatient().getId());
+        row.put("admissionNumber", adm.getAdmissionNumber());
+        row.put("patientName", adm.getPatient().getFirstName() + " " + adm.getPatient().getLastName());
+        row.put("patientCode", adm.getPatient().getPatientCode());
+        row.put("primaryDoctorName", adm.getPrimaryDoctor().getUser().getFullName());
+        row.put("admissionType", adm.getAdmissionType() != null ? adm.getAdmissionType().name() : "IPD");
+        row.put("admissionTime", adm.getAdmissionTime() != null ? adm.getAdmissionTime().toString() : null);
+        row.put("expectedDischargeTime", adm.getExpectedDischargeTime() != null ? adm.getExpectedDischargeTime().toString() : null);
+        row.put("actualDischargeTime", adm.getActualDischargeTime() != null ? adm.getActualDischargeTime().toString() : null);
+
+        long daysAdmitted = adm.getAdmissionTime() != null
+                ? ChronoUnit.DAYS.between(adm.getAdmissionTime().toLocalDate(),
+                  isPaid && adm.getActualDischargeTime() != null
+                      ? adm.getActualDischargeTime().toLocalDate()
+                      : LocalDateTime.now().toLocalDate()) + 1
+                : 0;
+        row.put("daysAdmitted", daysAdmitted);
+
+        // Current bed info (for active) or last bed (for discharged)
+        BedAllocation alloc = allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(adm.getId(), tenantId).orElse(null);
+        if (alloc != null) {
+            Bed bed = alloc.getBed();
+            row.put("bedId", bed.getId());
+            row.put("bedNumber", bed.getBedNumber());
+            row.put("wardName", bed.getRoom().getWard().getName());
+            row.put("roomNumber", bed.getRoom().getRoomNumber());
+            row.put("roomType", bed.getRoom().getRoomType().name());
+            row.put("dailyPrice", alloc.getDailyPriceAtTime());
+        }
+
+        Billing finalBill = bill != null ? bill : billingRepository.findByIpdAdmissionId(adm.getId()).orElse(null);
+        row.put("runningBillTotal", finalBill != null ? finalBill.getNetAmount() : BigDecimal.ZERO);
+        row.put("paidAmount", finalBill != null ? finalBill.getPaidAmount() : BigDecimal.ZERO);
+        row.put("paymentStatus", finalBill != null ? finalBill.getPaymentStatus().name() : "PENDING");
+        return row;
+    }
+
+    private Map<String, Object> buildOpdRow(List<Billing> bills, boolean isPaid) {
+        Patient p = bills.get(0).getPatient();
+
+        BigDecimal totalNet = bills.stream()
+                .map(b -> b.getNetAmount() != null ? b.getNetAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalPaid = bills.stream()
+                .map(b -> b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Settlement date: latest paidAt among paid bills
+        LocalDateTime settledAt = bills.stream()
+                .map(Billing::getPaidAt)
+                .filter(Objects::nonNull)
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
+
+        String docName = "OPD Consultant";
+        for (Billing b : bills) {
+            if (b.getAppointment() != null && b.getAppointment().getDoctor() != null) {
+                docName = b.getAppointment().getDoctor().getUser().getFullName();
+                break;
+            }
+        }
+
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", null);
+        row.put("patientId", p.getId());
+        row.put("admissionNumber", "OPD");
+        row.put("patientName", p.getFirstName() + " " + p.getLastName());
+        row.put("patientCode", p.getPatientCode());
+        row.put("primaryDoctorName", docName);
+        row.put("admissionType", "OPD");
+        row.put("bedNumber", "OPD");
+        row.put("wardName", "Outpatient");
+        row.put("roomType", "");
+        row.put("daysAdmitted", 0);
+        row.put("runningBillTotal", totalNet);
+        row.put("paidAmount", totalPaid);
+        row.put("paymentStatus", isPaid ? "PAID" : "PENDING");
+        row.put("actualDischargeTime", settledAt != null ? settledAt.toString() : null);
+        return row;
     }
 
     @Transactional(readOnly = true)

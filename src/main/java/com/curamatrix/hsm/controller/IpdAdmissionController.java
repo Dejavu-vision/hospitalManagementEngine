@@ -60,9 +60,12 @@ public class IpdAdmissionController {
 
     @GetMapping("/active")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR', 'ADMIN')")
-    @Operation(summary = "List all currently admitted inpatients with bed and billing info")
-    public ResponseEntity<List<Map<String, Object>>> getActiveAdmissions() {
-        return ResponseEntity.ok(admissionService.getActiveAdmissions());
+    @Operation(summary = "List admitted/discharged patients with billing info, filterable by status and date range")
+    public ResponseEntity<List<Map<String, Object>>> getActiveAdmissions(
+            @RequestParam(required = false, defaultValue = "PENDING") String status,
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String toDate) {
+        return ResponseEntity.ok(admissionService.getActiveAdmissions(status, fromDate, toDate));
     }
 
     @GetMapping("/{id}/billing")

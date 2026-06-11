@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface IpdAdmissionRepository extends JpaRepository<IpdAdmission, Long> {
@@ -28,6 +29,12 @@ public interface IpdAdmissionRepository extends JpaRepository<IpdAdmission, Long
     boolean existsByPatientIdAndStatusAndTenantId(Long patientId, AdmissionStatus status, Long tenantId);
 
     List<IpdAdmission> findByStatusAndTenantId(AdmissionStatus status, Long tenantId);
+
+    @Query("SELECT a FROM IpdAdmission a WHERE a.tenantId = :tenantId AND a.status = 'DISCHARGED' AND a.actualDischargeTime >= :startDate AND a.actualDischargeTime <= :endDate ORDER BY a.actualDischargeTime DESC")
+    List<IpdAdmission> findDischargedByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT a FROM IpdAdmission a WHERE a.tenantId = :tenantId AND a.status = 'ADMITTED' AND a.admissionTime >= :startDate AND a.admissionTime <= :endDate ORDER BY a.admissionTime DESC")
+    List<IpdAdmission> findAdmittedByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     java.util.Optional<IpdAdmission> findByIdAndTenantId(Long id, Long tenantId);
 }
