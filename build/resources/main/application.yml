@@ -7,10 +7,12 @@ spring:
     username: ${DB_USERNAME:backenduser}
     password: ${DB_PASSWORD:backenduser}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      leak-detection-threshold: 2000
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     show-sql: true
 
   flyway:

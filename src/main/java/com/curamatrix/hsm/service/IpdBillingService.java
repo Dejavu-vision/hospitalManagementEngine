@@ -338,7 +338,12 @@ public class IpdBillingService {
                 throw new InvalidStateTransitionException("Admission", "DISCHARGED", "GENERATE_INVOICE");
             }
             if (!admission.isDischargeCleared()) {
-                throw new InvalidStateTransitionException("Admission", "DISCHARGE_NOT_CLEARED", "GENERATE_INVOICE");
+                org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                boolean isBypassRole = auth != null && auth.getAuthorities().stream()
+                        .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_RECEPTIONIST"));
+                if (!isBypassRole) {
+                    throw new InvalidStateTransitionException("Admission", "DISCHARGE_NOT_CLEARED", "GENERATE_INVOICE");
+                }
             }
             admission.setInvoiceGenerated(true);
             admissionRepository.save(admission);
