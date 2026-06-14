@@ -91,6 +91,10 @@ public class Billing extends TenantAwareEntity {
     @Column(name = "section_discounts", length = 1000)
     private String sectionDiscounts;
 
+    @Column(name = "discount_approved", nullable = false)
+    @Builder.Default
+    private Boolean discountApproved = true;
+
     public java.util.Map<String, BigDecimal> getSectionDiscountsMap() {
         if (this.sectionDiscounts == null || this.sectionDiscounts.trim().isEmpty()) {
             return new java.util.HashMap<>();

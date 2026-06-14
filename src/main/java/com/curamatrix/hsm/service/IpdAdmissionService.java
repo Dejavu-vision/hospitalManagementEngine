@@ -368,6 +368,7 @@ public class IpdAdmissionService {
         Billing finalBill = bill != null ? bill : billingRepository.findByIpdAdmissionId(adm.getId()).orElse(null);
         row.put("runningBillTotal", finalBill != null ? finalBill.getNetAmount() : BigDecimal.ZERO);
         row.put("paidAmount", finalBill != null ? finalBill.getPaidAmount() : BigDecimal.ZERO);
+        row.put("discountApproved", finalBill == null || finalBill.getDiscountApproved() == null || finalBill.getDiscountApproved());
         row.put("paymentStatus", finalBill != null ? finalBill.getPaymentStatus().name() : "PENDING");
         return row;
     }

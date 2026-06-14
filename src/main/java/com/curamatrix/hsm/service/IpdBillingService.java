@@ -41,6 +41,7 @@ public class IpdBillingService {
     private final PreAuthRequestRepository preAuthRequestRepository;
     private final PatientRepository patientRepository;
     private final CatalogResolverService catalogResolver;
+    private final QueueEventService queueEventService;
 
     // ── Unified Lookup Helpers ────────────────────────────────────────────────
 
@@ -432,6 +433,17 @@ public class IpdBillingService {
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
         List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
 
+        // Block settlement if receptionist is trying to settle and discount is not approved
+        Billing primaryBillForCheck = getPrimaryBill(patientId, tenantId, admission);
+        if (primaryBillForCheck != null && primaryBillForCheck.getDiscount().compareTo(BigDecimal.ZERO) > 0) {
+            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            boolean isAdmin = auth != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+            if (!isAdmin && Boolean.FALSE.equals(primaryBillForCheck.getDiscountApproved())) {
+                throw new IllegalStateException("Discount requires admin approval before settlement.");
+            }
+        }
+
         if (admission != null) {
             if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
                 throw new InvalidStateTransitionException("Admission", "DISCHARGED", "SETTLE");
@@ -816,6 +828,8 @@ public class IpdBillingService {
         result.put("sectionBreakdowns", sectionBreakdowns);
         result.put("totalCharges", totalCharges);
         result.put("totalDiscount", totalDiscount);
+        boolean discountApproved = pendingBills.stream().allMatch(b -> b.getDiscountApproved() == null || b.getDiscountApproved());
+        result.put("discountApproved", discountApproved);
         result.put("depositPaid", depositPaid);
         result.put("provisionalBalance", provisionalBalance);
         
@@ -878,9 +892,51 @@ public class IpdBillingService {
         bill.setSectionDiscountsMap(sectionDiscounts);
 
         recalcNet(bill);
+
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (isAdmin || bill.getDiscount().compareTo(BigDecimal.ZERO) == 0) {
+            bill.setDiscountApproved(true);
+        } else {
+            bill.setDiscountApproved(false);
+        }
+
         billingRepository.save(bill);
 
         log.info("Section discount applied for patient {}: Section {}, Discount ₹{}", patientId, section, discount);
+
+        // SSE: notify admins when a receptionist applies a discount that needs approval
+        if (!isAdmin && bill.getDiscount().compareTo(BigDecimal.ZERO) > 0) {
+            Patient p = bill.getPatient();
+            String patientName = p != null ? (p.getFirstName() + " " + p.getLastName()) : "Patient #" + patientId;
+            queueEventService.broadcastDiscountRequested(tenantId, patientId, patientName, bill.getDiscount());
+        }
+
+        PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
+        BedAllocation currentAllocation = admission != null ? allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
+        return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
+    }
+
+    @Transactional
+    public Map<String, Object> approveDiscount(Long patientId) {
+        Long tenantId = TenantContext.getTenantId();
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        Billing bill = getPrimaryBill(patientId, tenantId, admission);
+
+        if (bill.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new InvalidStateTransitionException("Billing", "PAID", "APPROVE_DISCOUNT");
+        }
+
+        bill.setDiscountApproved(true);
+        billingRepository.save(bill);
+        log.info("Discount approved by admin for patient {}", patientId);
+
+        // SSE: notify receptionists that the discount has been approved
+        Patient p = bill.getPatient();
+        String patientName = p != null ? (p.getFirstName() + " " + p.getLastName()) : "Patient #" + patientId;
+        queueEventService.broadcastDiscountApproved(tenantId, patientId, patientName);
 
         PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
         BedAllocation currentAllocation = admission != null ? allocationRepository

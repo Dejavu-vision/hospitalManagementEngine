@@ -115,6 +115,13 @@ public class IpdBillingController {
         return ResponseEntity.ok(ipdBillingService.applySectionDiscount(patientId, request));
     }
 
+    @PostMapping("/patient/{patientId}/approve-discount")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Approve pending discount for a patient's bill")
+    public ResponseEntity<Map<String, Object>> approveDiscount(@PathVariable Long patientId) {
+        return ResponseEntity.ok(ipdBillingService.approveDiscount(patientId));
+    }
+
     // ── Settlement & Discharge ────────────────────────────────────────────────
 
     @PostMapping("/patient/{patientId}/final-settlement")

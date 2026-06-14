@@ -179,6 +179,81 @@ public class QueueEventService {
         return tenantEmitters == null ? 0 : tenantEmitters.size();
     }
 
+    /**
+     * Broadcasts a DISCOUNT_REQUESTED event to all connected clients of the given tenant.
+     * Called by IpdBillingService when a non-admin receptionist applies a discount.
+     * The admin's frontend filters on type=DISCOUNT_REQUESTED to show an approval prompt.
+     *
+     * @param tenantId    the tenant whose admins should be notified
+     * @param patientId   the patient whose bill has a pending discount
+     * @param patientName the patient's display name
+     * @param discount    the total discount amount requested
+     */
+    public void broadcastDiscountRequested(Long tenantId, Long patientId, String patientName, java.math.BigDecimal discount) {
+        Map<String, SseEmitter> tenantEmitters = emittersByTenant.get(tenantId);
+        if (tenantEmitters == null || tenantEmitters.isEmpty()) {
+            log.debug("No SSE clients connected for tenant={}, skipping discount-requested broadcast", tenantId);
+            return;
+        }
+
+        String timestamp = LocalDateTime.now().toString();
+        String payload = "{\"type\":\"DISCOUNT_REQUESTED\""
+                + ",\"patientId\":" + patientId
+                + ",\"patientName\":\"" + patientName + "\""
+                + ",\"discount\":" + discount
+                + ",\"tenantId\":" + tenantId
+                + ",\"timestamp\":\"" + timestamp + "\"}";
+
+        log.info("Broadcasting DISCOUNT_REQUESTED: tenant={}, patientId={}, discount={}", tenantId, patientId, discount);
+
+        List<String> staleClients = new ArrayList<>();
+        tenantEmitters.forEach((clientId, emitter) -> {
+            try {
+                emitter.send(SseEmitter.event().name("queue-update").data(payload));
+            } catch (IOException e) {
+                staleClients.add(clientId);
+            }
+        });
+        staleClients.forEach(clientId -> tenantEmitters.remove(clientId));
+    }
+
+    /**
+     * Broadcasts a DISCOUNT_APPROVED event to all connected clients of the given tenant.
+     * Called by IpdBillingService when an admin approves a pending discount.
+     * The receptionist's frontend filters on type=DISCOUNT_APPROVED to show a success toast
+     * and unlock the Discharge & Settle button.
+     *
+     * @param tenantId    the tenant whose receptionists should be notified
+     * @param patientId   the patient whose bill discount was approved
+     * @param patientName the patient's display name
+     */
+    public void broadcastDiscountApproved(Long tenantId, Long patientId, String patientName) {
+        Map<String, SseEmitter> tenantEmitters = emittersByTenant.get(tenantId);
+        if (tenantEmitters == null || tenantEmitters.isEmpty()) {
+            log.debug("No SSE clients connected for tenant={}, skipping discount-approved broadcast", tenantId);
+            return;
+        }
+
+        String timestamp = LocalDateTime.now().toString();
+        String payload = "{\"type\":\"DISCOUNT_APPROVED\""
+                + ",\"patientId\":" + patientId
+                + ",\"patientName\":\"" + patientName + "\""
+                + ",\"tenantId\":" + tenantId
+                + ",\"timestamp\":\"" + timestamp + "\"}";
+
+        log.info("Broadcasting DISCOUNT_APPROVED: tenant={}, patientId={}", tenantId, patientId);
+
+        List<String> staleClients = new ArrayList<>();
+        tenantEmitters.forEach((clientId, emitter) -> {
+            try {
+                emitter.send(SseEmitter.event().name("queue-update").data(payload));
+            } catch (IOException e) {
+                staleClients.add(clientId);
+            }
+        });
+        staleClients.forEach(clientId -> tenantEmitters.remove(clientId));
+    }
+
     private void removeEmitter(Long tenantId, String clientId, String reason) {
         Map<String, SseEmitter> tenantEmitters = emittersByTenant.get(tenantId);
         if (tenantEmitters != null) {

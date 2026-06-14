@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class RateLimitingFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
-    private final TenantRepository tenantRepository;
+    private final org.springframework.beans.factory.ObjectProvider<TenantRepository> tenantRepositoryProvider;
 
     private static final long WINDOW_MILLIS = 60 * 60 * 1000L; // 1 hour
 
@@ -97,6 +97,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     private int getMaxCallsForTenant(Long tenantId) {
+        TenantRepository tenantRepository = tenantRepositoryProvider.getIfAvailable();
+        if (tenantRepository == null) {
+            return 1000;
+        }
         return tenantRepository.findById(tenantId)
                 .map(tenant -> {
                     try {
