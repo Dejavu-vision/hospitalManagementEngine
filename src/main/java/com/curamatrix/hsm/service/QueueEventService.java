@@ -188,8 +188,9 @@ public class QueueEventService {
      * @param patientId   the patient whose bill has a pending discount
      * @param patientName the patient's display name
      * @param discount    the total discount amount requested
+     * @param targetAdminId the specific admin to receive this request (optional)
      */
-    public void broadcastDiscountRequested(Long tenantId, Long patientId, String patientName, java.math.BigDecimal discount) {
+    public void broadcastDiscountRequested(Long tenantId, Long patientId, String patientName, java.math.BigDecimal discount, Long targetAdminId) {
         Map<String, SseEmitter> tenantEmitters = emittersByTenant.get(tenantId);
         if (tenantEmitters == null || tenantEmitters.isEmpty()) {
             log.debug("No SSE clients connected for tenant={}, skipping discount-requested broadcast", tenantId);
@@ -201,6 +202,7 @@ public class QueueEventService {
                 + ",\"patientId\":" + patientId
                 + ",\"patientName\":\"" + patientName + "\""
                 + ",\"discount\":" + discount
+                + (targetAdminId != null ? ",\"targetAdminId\":" + targetAdminId : "")
                 + ",\"tenantId\":" + tenantId
                 + ",\"timestamp\":\"" + timestamp + "\"}";
 
@@ -218,30 +220,34 @@ public class QueueEventService {
     }
 
     /**
-     * Broadcasts a DISCOUNT_APPROVED event to all connected clients of the given tenant.
-     * Called by IpdBillingService when an admin approves a pending discount.
-     * The receptionist's frontend filters on type=DISCOUNT_APPROVED to show a success toast
-     * and unlock the Discharge & Settle button.
+     * Broadcasts a DISCOUNT_RESPONDED event to all connected clients of the given tenant.
+     * Called by IpdBillingService when an admin approves or rejects a pending discount.
+     * The receptionist's frontend filters on type=DISCOUNT_RESPONDED to show a success/error toast
+     * and unlock the Discharge & Settle button if approved.
      *
      * @param tenantId    the tenant whose receptionists should be notified
-     * @param patientId   the patient whose bill discount was approved
+     * @param patientId   the patient whose bill discount was responded to
      * @param patientName the patient's display name
+     * @param approved    whether the discount was approved
+     * @param feedback    optional feedback from the admin
      */
-    public void broadcastDiscountApproved(Long tenantId, Long patientId, String patientName) {
+    public void broadcastDiscountResponded(Long tenantId, Long patientId, String patientName, Boolean approved, String feedback) {
         Map<String, SseEmitter> tenantEmitters = emittersByTenant.get(tenantId);
         if (tenantEmitters == null || tenantEmitters.isEmpty()) {
-            log.debug("No SSE clients connected for tenant={}, skipping discount-approved broadcast", tenantId);
+            log.debug("No SSE clients connected for tenant={}, skipping discount-responded broadcast", tenantId);
             return;
         }
 
         String timestamp = LocalDateTime.now().toString();
-        String payload = "{\"type\":\"DISCOUNT_APPROVED\""
+        String payload = "{\"type\":\"DISCOUNT_RESPONDED\""
                 + ",\"patientId\":" + patientId
                 + ",\"patientName\":\"" + patientName + "\""
+                + ",\"approved\":" + approved
+                + (feedback != null ? ",\"feedback\":\"" + feedback.replace("\"", "\\\"") + "\"" : "")
                 + ",\"tenantId\":" + tenantId
                 + ",\"timestamp\":\"" + timestamp + "\"}";
 
-        log.info("Broadcasting DISCOUNT_APPROVED: tenant={}, patientId={}", tenantId, patientId);
+        log.info("Broadcasting DISCOUNT_RESPONDED: tenant={}, patientId={}, approved={}", tenantId, patientId, approved);
 
         List<String> staleClients = new ArrayList<>();
         tenantEmitters.forEach((clientId, emitter) -> {

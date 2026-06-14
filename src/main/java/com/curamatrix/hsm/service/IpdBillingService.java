@@ -8,6 +8,7 @@ import com.curamatrix.hsm.entity.*;
 import com.curamatrix.hsm.enums.*;
 import com.curamatrix.hsm.exception.InvalidStateTransitionException;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
+import com.curamatrix.hsm.dto.request.RespondDiscountRequest;
 import com.curamatrix.hsm.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,9 @@ public class IpdBillingService {
     private final PatientRepository patientRepository;
     private final CatalogResolverService catalogResolver;
     private final QueueEventService queueEventService;
+    private final UserRepository userRepository;
+    private final TenantRepository tenantRepository;
+
 
     // ── Unified Lookup Helpers ────────────────────────────────────────────────
 
@@ -439,10 +443,23 @@ public class IpdBillingService {
             org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
             boolean isAdmin = auth != null && auth.getAuthorities().stream()
                     .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-            if (!isAdmin && Boolean.FALSE.equals(primaryBillForCheck.getDiscountApproved())) {
+            
+            boolean requireApproval = true;
+            Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
+            if (tenant != null && tenant.getSettings() != null) {
+                Object val = tenant.getSettings().get("requireDiscountApproval");
+                if (val instanceof Boolean) {
+                    requireApproval = (Boolean) val;
+                } else if (val instanceof String) {
+                    requireApproval = Boolean.parseBoolean((String) val);
+                }
+            }
+
+            if (!isAdmin && Boolean.FALSE.equals(primaryBillForCheck.getDiscountApproved()) && requireApproval) {
                 throw new IllegalStateException("Discount requires admin approval before settlement.");
             }
         }
+
 
         if (admission != null) {
             if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
@@ -828,8 +845,24 @@ public class IpdBillingService {
         result.put("sectionBreakdowns", sectionBreakdowns);
         result.put("totalCharges", totalCharges);
         result.put("totalDiscount", totalDiscount);
+        boolean requireApproval = true;
+        Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
+        if (tenant != null && tenant.getSettings() != null) {
+            Object val = tenant.getSettings().get("requireDiscountApproval");
+            if (val instanceof Boolean) {
+                requireApproval = (Boolean) val;
+            } else if (val instanceof String) {
+                requireApproval = Boolean.parseBoolean((String) val);
+            }
+        }
+
         boolean discountApproved = pendingBills.stream().allMatch(b -> b.getDiscountApproved() == null || b.getDiscountApproved());
+        if (!requireApproval) {
+            discountApproved = true;
+        }
         result.put("discountApproved", discountApproved);
+        String discountFeedback = pendingBills.stream().map(Billing::getDiscountFeedback).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+        result.put("discountFeedback", discountFeedback);
         result.put("depositPaid", depositPaid);
         result.put("provisionalBalance", provisionalBalance);
         
@@ -893,13 +926,26 @@ public class IpdBillingService {
 
         recalcNet(bill);
 
+        boolean requireApproval = true;
+        Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
+        if (tenant != null && tenant.getSettings() != null) {
+            Object val = tenant.getSettings().get("requireDiscountApproval");
+            if (val instanceof Boolean) {
+                requireApproval = (Boolean) val;
+            } else if (val instanceof String) {
+                requireApproval = Boolean.parseBoolean((String) val);
+            }
+        }
+
         org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         boolean isAdmin = auth != null && auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (isAdmin || bill.getDiscount().compareTo(BigDecimal.ZERO) == 0) {
+        if (isAdmin || bill.getDiscount().compareTo(BigDecimal.ZERO) == 0 || !requireApproval) {
             bill.setDiscountApproved(true);
+            bill.setDiscountFeedback(null);
         } else {
             bill.setDiscountApproved(false);
+            bill.setDiscountFeedback(null);
         }
 
         billingRepository.save(bill);
@@ -907,11 +953,12 @@ public class IpdBillingService {
         log.info("Section discount applied for patient {}: Section {}, Discount ₹{}", patientId, section, discount);
 
         // SSE: notify admins when a receptionist applies a discount that needs approval
-        if (!isAdmin && bill.getDiscount().compareTo(BigDecimal.ZERO) > 0) {
+        if (!isAdmin && bill.getDiscount().compareTo(BigDecimal.ZERO) > 0 && requireApproval) {
             Patient p = bill.getPatient();
             String patientName = p != null ? (p.getFirstName() + " " + p.getLastName()) : "Patient #" + patientId;
-            queueEventService.broadcastDiscountRequested(tenantId, patientId, patientName, bill.getDiscount());
+            queueEventService.broadcastDiscountRequested(tenantId, patientId, patientName, bill.getDiscount(), req.getTargetAdminId());
         }
+
 
         PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
         BedAllocation currentAllocation = admission != null ? allocationRepository
@@ -920,28 +967,43 @@ public class IpdBillingService {
     }
 
     @Transactional
-    public Map<String, Object> approveDiscount(Long patientId) {
+    public Map<String, Object> respondDiscount(Long patientId, RespondDiscountRequest request) {
         Long tenantId = TenantContext.getTenantId();
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
         Billing bill = getPrimaryBill(patientId, tenantId, admission);
 
         if (bill.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new InvalidStateTransitionException("Billing", "PAID", "APPROVE_DISCOUNT");
+            throw new InvalidStateTransitionException("Billing", "PAID", "RESPOND_DISCOUNT");
         }
 
-        bill.setDiscountApproved(true);
+        bill.setDiscountApproved(request.getApproved());
+        bill.setDiscountFeedback(request.getFeedback());
         billingRepository.save(bill);
-        log.info("Discount approved by admin for patient {}", patientId);
+        log.info("Discount {} by admin for patient {}. Feedback: {}", request.getApproved() ? "approved" : "rejected", patientId, request.getFeedback());
 
-        // SSE: notify receptionists that the discount has been approved
+        // SSE: notify receptionists that the discount has been responded to
         Patient p = bill.getPatient();
         String patientName = p != null ? (p.getFirstName() + " " + p.getLastName()) : "Patient #" + patientId;
-        queueEventService.broadcastDiscountApproved(tenantId, patientId, patientName);
+        queueEventService.broadcastDiscountResponded(tenantId, patientId, patientName, request.getApproved(), request.getFeedback());
 
         PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
         BedAllocation currentAllocation = admission != null ? allocationRepository
                 .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
         return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
+    }
+
+    public List<Map<String, Object>> getAdmins() {
+        Long tenantId = TenantContext.getTenantId();
+        return userRepository.findAllByTenantId(tenantId).stream()
+                .filter(u -> u.getRoles().stream().anyMatch(r -> r.getName().name().equals("ROLE_ADMIN")))
+                .map(u -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", u.getId());
+                    map.put("fullName", u.getFullName());
+                    map.put("email", u.getEmail());
+                    return map;
+                })
+                .collect(Collectors.toList());
     }
 
     private void recalcNet(Billing bill) {

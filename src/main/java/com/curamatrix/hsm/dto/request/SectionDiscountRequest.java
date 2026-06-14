@@ -16,4 +16,6 @@ public class SectionDiscountRequest {
     @NotNull(message = "Discount amount is required")
     @PositiveOrZero(message = "Discount must be positive or zero")
     private BigDecimal discount;
+
+    private Long targetAdminId;
 }

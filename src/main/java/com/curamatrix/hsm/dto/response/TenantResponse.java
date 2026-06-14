@@ -32,4 +32,7 @@ public class TenantResponse {
     // Usage stats
     private Integer currentUsers;
     private Integer currentPatients;
+
+    private java.util.Map<String, Object> settings;
 }
+

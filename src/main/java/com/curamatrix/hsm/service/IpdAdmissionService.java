@@ -38,6 +38,8 @@ public class IpdAdmissionService {
     private final BillingRepository billingRepository;
     private final PreAuthRequestRepository preAuthRequestRepository;
     private final CatalogResolverService catalogResolver;
+    private final TenantRepository tenantRepository;
+
 
     @Transactional
     public AdmissionResponse admitPatient(AdmissionRequest request) {
@@ -368,7 +370,26 @@ public class IpdAdmissionService {
         Billing finalBill = bill != null ? bill : billingRepository.findByIpdAdmissionId(adm.getId()).orElse(null);
         row.put("runningBillTotal", finalBill != null ? finalBill.getNetAmount() : BigDecimal.ZERO);
         row.put("paidAmount", finalBill != null ? finalBill.getPaidAmount() : BigDecimal.ZERO);
-        row.put("discountApproved", finalBill == null || finalBill.getDiscountApproved() == null || finalBill.getDiscountApproved());
+        
+        boolean requireApproval = true;
+        Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
+        if (tenant != null && tenant.getSettings() != null) {
+            Object val = tenant.getSettings().get("requireDiscountApproval");
+            if (val instanceof Boolean) {
+                requireApproval = (Boolean) val;
+            } else if (val instanceof String) {
+                requireApproval = Boolean.parseBoolean((String) val);
+            }
+        }
+        
+        boolean isApproved = true;
+        if (finalBill != null && finalBill.getDiscountApproved() != null) {
+            isApproved = finalBill.getDiscountApproved();
+        }
+        if (!requireApproval) {
+            isApproved = true;
+        }
+        row.put("discountApproved", isApproved);
         row.put("paymentStatus", finalBill != null ? finalBill.getPaymentStatus().name() : "PENDING");
         return row;
     }

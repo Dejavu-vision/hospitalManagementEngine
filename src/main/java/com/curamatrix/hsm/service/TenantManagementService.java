@@ -67,7 +67,7 @@ public class TenantManagementService {
                 .contactPhone(request.getContactPhone())
                 .address(request.getAddress())
                 .logo(request.getLogo())
-                .settings(new HashMap<>())
+                .settings(request.getSettings() != null ? request.getSettings() : new HashMap<>())
                 .build();
 
         tenant = tenantRepository.save(tenant);
@@ -132,6 +132,10 @@ public class TenantManagementService {
         SubscriptionPlan plan = SubscriptionPlan.valueOf(request.getSubscriptionPlan());
         tenant.setMaxUsers(plan.getMaxUsers());
         tenant.setMaxPatients(plan.getMaxPatients());
+
+        if (request.getSettings() != null) {
+            tenant.setSettings(request.getSettings());
+        }
 
         tenant = tenantRepository.save(tenant);
         log.info("Tenant updated: {}", tenant.getTenantKey());
@@ -234,6 +238,7 @@ public class TenantManagementService {
                 .contactPhone(tenant.getContactPhone())
                 .address(tenant.getAddress())
                 .logo(tenant.getLogo())
+                .settings(tenant.getSettings())
                 .createdAt(tenant.getCreatedAt())
                 .currentUsers((int) userCount)
                 .currentPatients((int) patientCount)

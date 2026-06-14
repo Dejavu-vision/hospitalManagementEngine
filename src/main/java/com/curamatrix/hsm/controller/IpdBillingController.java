@@ -1,8 +1,9 @@
 package com.curamatrix.hsm.controller;
 
 import com.curamatrix.hsm.dto.request.IpdChargeRequest;
-import com.curamatrix.hsm.dto.request.IpdSettlementRequest;
+import com.curamatrix.hsm.dto.request.RespondDiscountRequest;
 import com.curamatrix.hsm.dto.request.SectionDiscountRequest;
+import com.curamatrix.hsm.dto.request.IpdSettlementRequest;
 import com.curamatrix.hsm.service.IpdBillingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -115,11 +117,20 @@ public class IpdBillingController {
         return ResponseEntity.ok(ipdBillingService.applySectionDiscount(patientId, request));
     }
 
-    @PostMapping("/patient/{patientId}/approve-discount")
+    @GetMapping("/admins")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @Operation(summary = "Get list of admins for targeting discount approvals")
+    public ResponseEntity<List<Map<String, Object>>> getAdmins() {
+        return ResponseEntity.ok(ipdBillingService.getAdmins());
+    }
+
+    @PostMapping("/patient/{patientId}/respond-discount")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Approve pending discount for a patient's bill")
-    public ResponseEntity<Map<String, Object>> approveDiscount(@PathVariable Long patientId) {
-        return ResponseEntity.ok(ipdBillingService.approveDiscount(patientId));
+    @Operation(summary = "Approve or reject pending discount for a patient's bill")
+    public ResponseEntity<Map<String, Object>> respondDiscount(
+            @PathVariable Long patientId,
+            @Valid @RequestBody RespondDiscountRequest request) {
+        return ResponseEntity.ok(ipdBillingService.respondDiscount(patientId, request));
     }
 
     // ── Settlement & Discharge ────────────────────────────────────────────────

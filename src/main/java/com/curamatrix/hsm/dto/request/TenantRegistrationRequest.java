@@ -47,4 +47,7 @@ public class TenantRegistrationRequest {
     private String adminPassword;
 
     private String adminPhone;
+
+    private java.util.Map<String, Object> settings;
 }
+
