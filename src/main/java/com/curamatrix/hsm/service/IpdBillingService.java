@@ -50,9 +50,16 @@ public class IpdBillingService {
     // ── Unified Lookup Helpers ────────────────────────────────────────────────
 
     private IpdAdmission getActiveAdmission(Long patientId, Long tenantId) {
-        return admissionRepository.findByStatusAndTenantId(AdmissionStatus.ADMITTED, tenantId).stream()
+        IpdAdmission active = admissionRepository.findByStatusAndTenantId(AdmissionStatus.ADMITTED, tenantId).stream()
                 .filter(a -> a.getPatient().getId().equals(patientId))
                 .findFirst().orElse(null);
+        if (active != null) {
+            return active;
+        }
+        return admissionRepository.findByPatientIdAndTenantId(patientId, tenantId).stream()
+                .filter(a -> a.getStatus() == AdmissionStatus.DISCHARGED)
+                .max(java.util.Comparator.comparing(IpdAdmission::getAdmissionTime, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                .orElse(null);
     }
 
     private List<Billing> getAllPendingBills(Long patientId, Long tenantId) {
@@ -140,9 +147,6 @@ public class IpdBillingService {
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
         Billing bill = getPrimaryBill(patientId, tenantId, admission);
 
-        if (bill.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new InvalidStateTransitionException("Billing", "PAID", "ADD_CHARGE");
-        }
 
         BillingItemType itemType = mapChargeCategory(req.getChargeCategory());
         int qty = req.getQuantity() != null ? req.getQuantity() : 1;
@@ -176,17 +180,13 @@ public class IpdBillingService {
         Long tenantId = TenantContext.getTenantId();
 
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
-        List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
+        List<Billing> allBills = billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId);
 
         // Find the bill containing this item
-        Billing bill = pendingBills.stream()
+        Billing bill = allBills.stream()
                 .filter(b -> b.getItems().stream().anyMatch(i -> i.getId().equals(itemId)))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
-
-        if (bill.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new InvalidStateTransitionException("Billing", "PAID", "REMOVE_CHARGE");
-        }
 
         BillingItem toRemove = bill.getItems().stream()
                 .filter(i -> i.getId().equals(itemId))
@@ -219,17 +219,13 @@ public class IpdBillingService {
         Long tenantId = TenantContext.getTenantId();
 
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
-        List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
+        List<Billing> allBills = billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId);
 
         // Find the bill containing this item
-        Billing bill = pendingBills.stream()
+        Billing bill = allBills.stream()
                 .filter(b -> b.getItems().stream().anyMatch(i -> i.getId().equals(itemId)))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
-
-        if (bill.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new InvalidStateTransitionException("Billing", "PAID", "CHANGE_BED_CHARGE");
-        }
 
         if (bill.getRemarks() != null && bill.getRemarks().startsWith("FROZEN")) {
             throw new InvalidStateTransitionException("Billing", "FROZEN", "CHANGE_BED_CHARGE");
@@ -339,8 +335,8 @@ public class IpdBillingService {
         List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
 
         if (admission != null) {
-            if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
-                throw new InvalidStateTransitionException("Admission", "DISCHARGED", "GENERATE_INVOICE");
+            if (admission.getStatus() != AdmissionStatus.ADMITTED && admission.getStatus() != AdmissionStatus.DISCHARGED) {
+                throw new InvalidStateTransitionException("Admission", admission.getStatus().name(), "GENERATE_INVOICE");
             }
             if (!admission.isDischargeCleared()) {
                 org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
@@ -403,7 +399,7 @@ public class IpdBillingService {
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
         List<Billing> relevantBills = getRelevantBillsForSummary(patientId, tenantId, admission);
 
-        if (admission != null && admission.getStatus() != AdmissionStatus.ADMITTED) {
+        if (admission != null && admission.getStatus() != AdmissionStatus.ADMITTED && admission.getStatus() != AdmissionStatus.DISCHARGED) {
             throw new InvalidStateTransitionException("Admission", admission.getStatus().name(), "UNFREEZE");
         }
 
@@ -462,9 +458,6 @@ public class IpdBillingService {
 
 
         if (admission != null) {
-            if (admission.getStatus() == AdmissionStatus.DISCHARGED) {
-                throw new InvalidStateTransitionException("Admission", "DISCHARGED", "SETTLE");
-            }
             if (!admission.isInvoiceGenerated()) {
                 throw new InvalidStateTransitionException("Admission", "INVOICE_NOT_GENERATED", "SETTLE");
             }
@@ -528,9 +521,11 @@ public class IpdBillingService {
                 bedRepository.save(bed);
             }
 
-            admission.setStatus(AdmissionStatus.DISCHARGED);
-            admission.setActualDischargeTime(LocalDateTime.now());
-            admissionRepository.save(admission);
+            if (admission.getStatus() != AdmissionStatus.DISCHARGED) {
+                admission.setStatus(AdmissionStatus.DISCHARGED);
+                admission.setActualDischargeTime(LocalDateTime.now());
+                admissionRepository.save(admission);
+            }
             log.info("IPD final settlement complete for patient {}. Bed {} released.", patientId, bedNumber);
         } else {
             log.info("OPD final settlement complete for patient {}.", patientId);
@@ -750,10 +745,15 @@ public class IpdBillingService {
             tpaApprovedAmount = preAuth.getApprovedAmount() != null ? preAuth.getApprovedAmount() : BigDecimal.ZERO;
         }
         
+        BigDecimal copayCollected = totalPaid.subtract(depositPaid);
+        if (copayCollected.compareTo(BigDecimal.ZERO) < 0) {
+            copayCollected = BigDecimal.ZERO;
+        }
+
         BigDecimal provisionalBalance = totalCharges
                 .subtract(totalDiscount)
                 .subtract(depositPaid)
-                .subtract(totalPaid)
+                .subtract(copayCollected)
                 .subtract(tpaApprovedAmount);
                 
         if (provisionalBalance.compareTo(BigDecimal.ZERO) < 0) {
@@ -890,9 +890,6 @@ public class IpdBillingService {
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
         Billing bill = getPrimaryBill(patientId, tenantId, admission);
 
-        if (bill.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new InvalidStateTransitionException("Billing", "PAID", "APPLY_SECTION_DISCOUNT");
-        }
 
         if (bill.getRemarks() != null && bill.getRemarks().startsWith("FROZEN")) {
             throw new InvalidStateTransitionException("Billing", "FROZEN", "APPLY_SECTION_DISCOUNT");
@@ -972,9 +969,6 @@ public class IpdBillingService {
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
         Billing bill = getPrimaryBill(patientId, tenantId, admission);
 
-        if (bill.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new InvalidStateTransitionException("Billing", "PAID", "RESPOND_DISCOUNT");
-        }
 
         bill.setDiscountApproved(request.getApproved());
         bill.setDiscountFeedback(request.getFeedback());
@@ -1051,6 +1045,15 @@ public class IpdBillingService {
                 .subtract(bill.getInsuranceAdjustment() != null ? bill.getInsuranceAdjustment() : BigDecimal.ZERO)
                 .add(bill.getTax() != null ? bill.getTax() : BigDecimal.ZERO);
         bill.setNetAmount(net.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : net);
+
+        // Update paymentStatus dynamically based on netAmount vs paidAmount
+        if (bill.getNetAmount().compareTo(bill.getPaidAmount()) <= 0) {
+            bill.setPaymentStatus(PaymentStatus.PAID);
+        } else if (bill.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            bill.setPaymentStatus(PaymentStatus.PARTIAL);
+        } else {
+            bill.setPaymentStatus(PaymentStatus.PENDING);
+        }
     }
 
     private String getSectionKey(BillingItemType type) {
