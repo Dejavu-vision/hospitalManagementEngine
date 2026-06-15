@@ -864,6 +864,8 @@ public class IpdBillingService {
         String discountFeedback = pendingBills.stream().map(Billing::getDiscountFeedback).filter(java.util.Objects::nonNull).findFirst().orElse(null);
         result.put("discountFeedback", discountFeedback);
         result.put("depositPaid", depositPaid);
+        result.put("totalPaid", totalPaid);
+        result.put("copayCollected", copayCollected);
         result.put("provisionalBalance", provisionalBalance);
         
         boolean allPaid = !pendingBills.isEmpty() && pendingBills.stream().allMatch(b -> b.getPaymentStatus() == PaymentStatus.PAID);
