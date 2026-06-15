@@ -755,10 +755,6 @@ public class IpdBillingService {
                 .subtract(depositPaid)
                 .subtract(copayCollected)
                 .subtract(tpaApprovedAmount);
-                
-        if (provisionalBalance.compareTo(BigDecimal.ZERO) < 0) {
-            provisionalBalance = BigDecimal.ZERO;
-        }
 
         int stayDays = 0;
         if (admission != null && admission.getAdmissionTime() != null) {
