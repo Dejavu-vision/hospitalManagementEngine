@@ -45,6 +45,8 @@ public class IpdBillingService {
     private final QueueEventService queueEventService;
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
+    private final DepartmentRepository departmentRepository;
+    private final HospitalServiceRepository hospitalServiceRepository;
 
 
     // ── Unified Lookup Helpers ────────────────────────────────────────────────
@@ -152,12 +154,19 @@ public class IpdBillingService {
         int qty = req.getQuantity() != null ? req.getQuantity() : 1;
         BigDecimal total = req.getUnitPrice().multiply(BigDecimal.valueOf(qty));
 
+        Department dept = req.getDepartmentId() != null ? 
+                departmentRepository.findById(req.getDepartmentId()).orElse(null) : null;
+        HospitalService hs = req.getServiceCatalogItemId() != null ?
+                hospitalServiceRepository.findById(req.getServiceCatalogItemId()).orElse(null) : null;
+
         BillingItem item = BillingItem.builder()
                 .billing(bill)
                 .description(req.getDescription())
                 .amount(req.getUnitPrice())
                 .quantity(qty)
                 .itemType(itemType)
+                .department(dept)
+                .hospitalService(hs)
                 .build();
 
         bill.getItems().add(item);

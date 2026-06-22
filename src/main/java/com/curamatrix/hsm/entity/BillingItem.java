@@ -1,8 +1,14 @@
 package com.curamatrix.hsm.entity;
 
 import com.curamatrix.hsm.enums.BillingItemType;
+import com.curamatrix.hsm.enums.PaymentStatus;
 import com.curamatrix.hsm.enums.InsuranceCoverage;
 import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -41,4 +47,25 @@ public class BillingItem {
     @Enumerated(EnumType.STRING)
     @Column(name = "insurance_coverage", length = 50)
     private InsuranceCoverage insuranceCoverage;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", nullable = false)
+    @Builder.Default
+    private PaymentStatus paymentStatus = PaymentStatus.PENDING;
+
+    @Column(name = "paid_amount", nullable = false)
+    @Builder.Default
+    private BigDecimal paidAmount = BigDecimal.ZERO;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hospital_service_id")
+    private HospitalService hospitalService;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private LocalDateTime createdAt;
 }

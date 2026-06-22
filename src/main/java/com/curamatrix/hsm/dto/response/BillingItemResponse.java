@@ -18,4 +18,11 @@ public class BillingItemResponse {
     private String itemType;
     private String insuranceCoverage;
     private BigDecimal subtotal;
+
+    private String paymentStatus;
+    private BigDecimal paidAmount;
+    private Long departmentId;
+    private String departmentName;
+    private Long serviceCatalogItemId;
+    private java.time.LocalDateTime createdAt;
 }
