@@ -202,6 +202,7 @@ public class IpdBillingService {
             item.setPaymentStatus(PaymentStatus.PENDING);
             item.setPaidAmount(BigDecimal.ZERO);
         }
+        item = billingItemRepository.save(item);
 
         bill.getItems().add(item);
         bill.setTotalAmount(bill.getTotalAmount().add(total));
