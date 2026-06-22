@@ -14,6 +14,7 @@ import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.BillingRepository;
 import com.curamatrix.hsm.repository.BillInsuranceSplitRepository;
 import com.curamatrix.hsm.repository.HospitalServiceRepository;
+import com.curamatrix.hsm.repository.DepartmentRepository;
 import com.curamatrix.hsm.repository.InsurancePolicyRepository;
 import com.curamatrix.hsm.repository.PatientRegistrationRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class BillingService {
     private final BillingRepository billingRepository;
     private final BillInsuranceSplitRepository splitRepository;
     private final HospitalServiceRepository hospitalServiceRepository;
+    private final DepartmentRepository departmentRepository;
     private final PatientRegistrationRepository patientRegistrationRepository;
     private final InsurancePolicyRepository insurancePolicyRepository;
     private final PatientFinancialAccountService accountService;
@@ -141,7 +143,13 @@ public class BillingService {
                 .build();
 
         billing.setTenantId(tenantId);
-        items.forEach(item -> item.setBilling(billing));
+        items.forEach(item -> {
+            item.setBilling(billing);
+            if (payNow) {
+                item.setPaymentStatus(PaymentStatus.PAID);
+                item.setPaidAmount(item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity())));
+            }
+        });
 
         Billing savedBilling = billingRepository.save(billing);
 
@@ -300,6 +308,12 @@ public class BillingService {
             billing.setPaymentStatus(PaymentStatus.PAID);
             billing.setPaidAt(LocalDateTime.now());
             billing.setPaidAmount(billing.getNetAmount()); // cap at net
+            
+            // Mark all items as PAID
+            billing.getItems().forEach(item -> {
+                item.setPaymentStatus(PaymentStatus.PAID);
+                item.setPaidAmount(item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity())));
+            });
 
             // If registration was pending, activate case paper
             boolean hasRegistration = billing.getItems().stream()
@@ -310,6 +324,28 @@ public class BillingService {
         } else {
             // Partial payment
             billing.setPaymentStatus(PaymentStatus.PARTIAL);
+            
+            // Allocate sequentially
+            BigDecimal unallocatedPayment = request.getAmount();
+            for (BillingItem item : billing.getItems()) {
+                if (unallocatedPayment.compareTo(BigDecimal.ZERO) <= 0) break;
+                if (item.getPaymentStatus() == PaymentStatus.PAID) continue;
+                
+                BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+                BigDecimal itemBalance = itemTotal.subtract(item.getPaidAmount());
+                
+                if (itemBalance.compareTo(BigDecimal.ZERO) > 0) {
+                    if (unallocatedPayment.compareTo(itemBalance) >= 0) {
+                        item.setPaidAmount(item.getPaidAmount().add(itemBalance));
+                        item.setPaymentStatus(PaymentStatus.PAID);
+                        unallocatedPayment = unallocatedPayment.subtract(itemBalance);
+                    } else {
+                        item.setPaidAmount(item.getPaidAmount().add(unallocatedPayment));
+                        item.setPaymentStatus(PaymentStatus.PARTIAL);
+                        unallocatedPayment = BigDecimal.ZERO;
+                    }
+                }
+            }
         }
 
         billing = billingRepository.save(billing);
@@ -381,6 +417,16 @@ public class BillingService {
                 .quantity(quantity)
                 .itemType(itemType)
                 .build();
+
+        if (request.getDepartmentId() != null) {
+            departmentRepository.findById(request.getDepartmentId())
+                    .ifPresent(newItem::setDepartment);
+        }
+
+        if (request.getServiceCatalogItemId() != null) {
+            hospitalServiceRepository.findById(request.getServiceCatalogItemId())
+                    .ifPresent(newItem::setHospitalService);
+        }
 
         billing.getItems().add(newItem);
         billing.setTotalAmount(billing.getTotalAmount().add(request.getAmount().multiply(BigDecimal.valueOf(quantity))));
@@ -500,6 +546,12 @@ public class BillingService {
             billing.setPaymentStatus(PaymentStatus.PAID);
             billing.setPaidAmount(billing.getNetAmount());
             billing.setPaidAt(LocalDateTime.now());
+            
+            billing.getItems().forEach(item -> {
+                item.setPaymentStatus(PaymentStatus.PAID);
+                item.setPaidAmount(item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity())));
+            });
+            
             billingRepository.save(billing);
 
             boolean hasRegistration = billing.getItems().stream()
@@ -589,6 +641,12 @@ public class BillingService {
                 .itemType(item.getItemType().name())
                 .insuranceCoverage(item.getInsuranceCoverage() != null ? item.getInsuranceCoverage().name() : null)
                 .subtotal(subtotal)
+                .paymentStatus(item.getPaymentStatus() != null ? item.getPaymentStatus().name() : "PENDING")
+                .paidAmount(item.getPaidAmount())
+                .departmentId(item.getDepartment() != null ? item.getDepartment().getId() : null)
+                .departmentName(item.getDepartment() != null ? item.getDepartment().getName() : null)
+                .serviceCatalogItemId(item.getHospitalService() != null ? item.getHospitalService().getId() : null)
+                .createdAt(item.getCreatedAt())
                 .build();
     }
 }

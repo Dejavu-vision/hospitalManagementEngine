@@ -26,4 +26,7 @@ public class AddBillingItemRequest {
 
     @NotBlank(message = "Item type is required")
     private String itemType; // CONSULTATION, LAB, MEDICINE, PROCEDURE, REGISTRATION, OTHER
+
+    private Long departmentId;
+    private Long serviceCatalogItemId;
 }

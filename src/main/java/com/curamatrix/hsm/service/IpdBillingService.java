@@ -45,6 +45,9 @@ public class IpdBillingService {
     private final QueueEventService queueEventService;
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
+    private final DepartmentRepository departmentRepository;
+    private final HospitalServiceRepository hospitalServiceRepository;
+    private final BillingItemRepository billingItemRepository;
 
 
     // ── Unified Lookup Helpers ────────────────────────────────────────────────
@@ -138,6 +141,22 @@ public class IpdBillingService {
         }
     }
 
+    private Long getCurrentUserId() {
+        try {
+            org.springframework.security.core.Authentication auth = 
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getName() != null) {
+                Optional<User> userOpt = userRepository.findByEmail(auth.getName());
+                if (userOpt.isPresent()) {
+                    return userOpt.get().getId();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to retrieve current user from context", e);
+        }
+        return null;
+    }
+
     // ── Add a manual charge to the running bill ───────────────────────────────
 
     @Transactional
@@ -152,24 +171,180 @@ public class IpdBillingService {
         int qty = req.getQuantity() != null ? req.getQuantity() : 1;
         BigDecimal total = req.getUnitPrice().multiply(BigDecimal.valueOf(qty));
 
+        Department dept = req.getDepartmentId() != null ? 
+                departmentRepository.findById(req.getDepartmentId()).orElse(null) : null;
+        HospitalService hs = req.getServiceCatalogItemId() != null ?
+                hospitalServiceRepository.findById(req.getServiceCatalogItemId()).orElse(null) : null;
+
         BillingItem item = BillingItem.builder()
                 .billing(bill)
                 .description(req.getDescription())
                 .amount(req.getUnitPrice())
                 .quantity(qty)
                 .itemType(itemType)
+                .department(dept)
+                .hospitalService(hs)
                 .build();
+
+        boolean payNow = Boolean.TRUE.equals(req.getPayNow());
+        if (payNow) {
+            item.setPaymentStatus(PaymentStatus.PAID);
+            item.setPaidAmount(total);
+            bill.setPaidAmount(bill.getPaidAmount().add(total));
+            if (req.getPaymentMethod() != null) {
+                try {
+                    bill.setPaymentMethod(PaymentMethod.valueOf(req.getPaymentMethod().toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    bill.setPaymentMethod(PaymentMethod.CASH);
+                }
+            }
+        } else {
+            item.setPaymentStatus(PaymentStatus.PENDING);
+            item.setPaidAmount(BigDecimal.ZERO);
+        }
+        item = billingItemRepository.save(item);
 
         bill.getItems().add(item);
         bill.setTotalAmount(bill.getTotalAmount().add(total));
         recalcNet(bill);
         billingRepository.save(bill);
 
+        if (payNow) {
+            Long collectedById = getCurrentUserId();
+            PaymentMethod pm = PaymentMethod.CASH;
+            if (req.getPaymentMethod() != null) {
+                try {
+                    pm = PaymentMethod.valueOf(req.getPaymentMethod().toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    pm = PaymentMethod.CASH;
+                }
+            }
+            Payment payment = Payment.builder()
+                    .patient(bill.getPatient())
+                    .billing(bill)
+                    .billingItem(item)
+                    .amount(total)
+                    .method(pm)
+                    .collectedById(collectedById)
+                    .build();
+            payment.setTenantId(tenantId);
+            paymentRepository.save(payment);
+        }
+
         log.info("Charge added for patient {}: {} x{} = ₹{}", patientId, req.getDescription(), qty, total);
 
         PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
         BedAllocation currentAllocation = admission != null ? allocationRepository
                 .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
+        return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
+    }
+
+    @Transactional
+    public Map<String, Object> settleChargeItem(Long patientId, Long itemId, String paymentMethodStr) {
+        Long tenantId = TenantContext.getTenantId();
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        Billing bill = getPrimaryBill(patientId, tenantId, admission);
+
+        BillingItem item = bill.getItems().stream()
+                .filter(i -> i.getId().equals(itemId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
+
+        BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+
+        // Mark the item as paid
+        item.setPaymentStatus(PaymentStatus.PAID);
+        item.setPaidAmount(itemTotal);
+        billingItemRepository.save(item);
+
+        // Accumulate in the bill's paidAmount as well
+        bill.setPaidAmount(bill.getPaidAmount().add(itemTotal));
+        PaymentMethod pm = PaymentMethod.CASH;
+        if (paymentMethodStr != null) {
+            try {
+                pm = PaymentMethod.valueOf(paymentMethodStr.toUpperCase());
+                bill.setPaymentMethod(pm);
+            } catch (IllegalArgumentException e) {
+                bill.setPaymentMethod(PaymentMethod.CASH);
+            }
+        }
+        recalcNet(bill);
+        billingRepository.save(bill);
+
+        Long collectedById = getCurrentUserId();
+        Payment payment = Payment.builder()
+                .patient(bill.getPatient())
+                .billing(bill)
+                .billingItem(item)
+                .amount(itemTotal)
+                .method(pm)
+                .collectedById(collectedById)
+                .build();
+        payment.setTenantId(tenantId);
+        paymentRepository.save(payment);
+
+        log.info("Billing item {} settled for patient {}: amount=₹{}, method={}", 
+                itemId, patientId, itemTotal, paymentMethodStr);
+
+        PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
+        BedAllocation currentAllocation = admission != null ? allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
+
+        return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
+    }
+
+    @Transactional
+    public Map<String, Object> settleChargeItems(Long patientId, List<Long> itemIds, String paymentMethodStr) {
+        Long tenantId = TenantContext.getTenantId();
+        IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        Billing bill = getPrimaryBill(patientId, tenantId, admission);
+        Long collectedById = getCurrentUserId();
+        PaymentMethod pm = PaymentMethod.CASH;
+        if (paymentMethodStr != null) {
+            try {
+                pm = PaymentMethod.valueOf(paymentMethodStr.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                pm = PaymentMethod.CASH;
+            }
+        }
+
+        BigDecimal totalItemPayment = BigDecimal.ZERO;
+        for (Long itemId : itemIds) {
+            BillingItem item = bill.getItems().stream()
+                    .filter(i -> i.getId().equals(itemId))
+                    .findFirst()
+                    .orElse(null);
+            if (item != null && item.getPaymentStatus() != PaymentStatus.PAID) {
+                BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+                item.setPaymentStatus(PaymentStatus.PAID);
+                item.setPaidAmount(itemTotal);
+                billingItemRepository.save(item);
+                totalItemPayment = totalItemPayment.add(itemTotal);
+
+                Payment payment = Payment.builder()
+                        .patient(bill.getPatient())
+                        .billing(bill)
+                        .billingItem(item)
+                        .amount(itemTotal)
+                        .method(pm)
+                        .collectedById(collectedById)
+                        .build();
+                payment.setTenantId(tenantId);
+                paymentRepository.save(payment);
+            }
+        }
+
+        if (totalItemPayment.compareTo(BigDecimal.ZERO) > 0) {
+            bill.setPaidAmount(bill.getPaidAmount().add(totalItemPayment));
+            bill.setPaymentMethod(pm);
+            recalcNet(bill);
+            billingRepository.save(bill);
+        }
+
+        PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
+        BedAllocation currentAllocation = admission != null ? allocationRepository
+                .findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), tenantId).orElse(null) : null;
+
         return buildUnifiedRunningBillSummary(patientId, admission, getRelevantBillsForSummary(patientId, tenantId, admission), preAuth, currentAllocation);
     }
 
@@ -487,21 +662,62 @@ public class IpdBillingService {
         if (req.getAmount() != null && req.getAmount().compareTo(BigDecimal.ZERO) > 0) {
             primaryBill.setPaidAmount(primaryBill.getPaidAmount().add(req.getAmount()));
         }
+        if (req.getRefundAmount() != null && req.getRefundAmount().compareTo(BigDecimal.ZERO) > 0) {
+            primaryBill.setPaidAmount(primaryBill.getPaidAmount().subtract(req.getRefundAmount()));
+        }
+
+        Long collectedById = getCurrentUserId();
+        PaymentMethod pm = PaymentMethod.CASH;
+        if (req.getPaymentMethod() != null) {
+            try {
+                pm = PaymentMethod.valueOf(req.getPaymentMethod().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                pm = PaymentMethod.CASH;
+            }
+        }
+
+        if (req.getAmount() != null && req.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+            Payment payment = Payment.builder()
+                    .patient(primaryBill.getPatient())
+                    .billing(primaryBill)
+                    .amount(req.getAmount())
+                    .method(pm)
+                    .referenceNumber(req.getTransactionRef())
+                    .collectedById(collectedById)
+                    .build();
+            payment.setTenantId(tenantId);
+            paymentRepository.save(payment);
+        }
+
+        if (req.getRefundAmount() != null && req.getRefundAmount().compareTo(BigDecimal.ZERO) > 0) {
+            Payment refund = Payment.builder()
+                    .patient(primaryBill.getPatient())
+                    .billing(primaryBill)
+                    .amount(req.getRefundAmount().negate())
+                    .method(pm)
+                    .referenceNumber(req.getTransactionRef())
+                    .collectedById(collectedById)
+                    .build();
+            refund.setTenantId(tenantId);
+            paymentRepository.save(refund);
+        }
 
         BigDecimal totalCharges = BigDecimal.ZERO;
         BigDecimal totalPaid = BigDecimal.ZERO;
         
         // Finalize all bills
         for (Billing bill : pendingBills) {
-            bill.setPaymentStatus(PaymentStatus.PAID);
-            bill.setPaidAt(LocalDateTime.now());
-            if (req.getPaymentMethod() != null) {
-                try {
-                    bill.setPaymentMethod(PaymentMethod.valueOf(req.getPaymentMethod().toUpperCase()));
-                } catch (IllegalArgumentException e) {
-                    bill.setPaymentMethod(PaymentMethod.CASH);
+            for (BillingItem item : bill.getItems()) {
+                if (item.getPaymentStatus() != PaymentStatus.PAID) {
+                    BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+                    item.setPaymentStatus(PaymentStatus.PAID);
+                    item.setPaidAmount(itemTotal);
+                    billingItemRepository.save(item);
                 }
             }
+            bill.setPaymentStatus(PaymentStatus.PAID);
+            bill.setPaidAt(LocalDateTime.now());
+            bill.setPaymentMethod(pm);
             billingRepository.save(bill);
             totalCharges = totalCharges.add(bill.getTotalAmount());
             totalPaid = totalPaid.add(bill.getPaidAmount());
@@ -549,7 +765,7 @@ public class IpdBillingService {
         result.put("tpaApprovedAmount", tpaApprovedAmount);
         result.put("balanceCollected", balanceCollected);
         result.put("refundAmount", refundAmount);
-        result.put("totalPaid", totalPaid);
+        result.put("totalPaid", totalPaid.add(depositPaid));
         result.put("bedReleased", bedNumber);
         result.put("dischargeTime", admission != null && admission.getActualDischargeTime() != null ? admission.getActualDischargeTime().toString() : LocalDateTime.now().toString());
         return result;
@@ -591,8 +807,7 @@ public class IpdBillingService {
         }
 
         BigDecimal depositPaid = admission != null && admission.getDepositAmount() != null ? admission.getDepositAmount() : BigDecimal.ZERO;
-        BigDecimal copayCollected = totalPaid.subtract(depositPaid);
-        if (copayCollected.compareTo(BigDecimal.ZERO) < 0) copayCollected = BigDecimal.ZERO;
+        BigDecimal copayCollected = totalPaid;
 
         boolean allPaid = !bills.isEmpty() && bills.stream().allMatch(b -> b.getPaymentStatus() == PaymentStatus.PAID);
 
@@ -691,7 +906,6 @@ public class IpdBillingService {
             if (bill.getRemarks() != null && bill.getRemarks().startsWith("FROZEN")) {
                 isFrozen = true;
             }
-            
             for (BillingItem item : bill.getItems()) {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("id", item.getId());
@@ -702,6 +916,8 @@ public class IpdBillingService {
                 m.put("totalAmount", item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity())));
                 m.put("isAutoCharge", item.getItemType() == BillingItemType.BED_CHARGE ||
                                        item.getItemType() == BillingItemType.NURSING_CHARGE);
+                m.put("paymentStatus", item.getPaymentStatus() != null ? item.getPaymentStatus().name() : "PENDING");
+                m.put("paidAmount", item.getPaidAmount() != null ? item.getPaidAmount() : BigDecimal.ZERO);
                 items.add(m);
 
                 // Section breakdown grouping
@@ -745,10 +961,7 @@ public class IpdBillingService {
             tpaApprovedAmount = preAuth.getApprovedAmount() != null ? preAuth.getApprovedAmount() : BigDecimal.ZERO;
         }
         
-        BigDecimal copayCollected = totalPaid.subtract(depositPaid);
-        if (copayCollected.compareTo(BigDecimal.ZERO) < 0) {
-            copayCollected = BigDecimal.ZERO;
-        }
+        BigDecimal copayCollected = totalPaid;
 
         BigDecimal provisionalBalance = totalCharges
                 .subtract(totalDiscount)
@@ -860,7 +1073,7 @@ public class IpdBillingService {
         String discountFeedback = pendingBills.stream().map(Billing::getDiscountFeedback).filter(java.util.Objects::nonNull).findFirst().orElse(null);
         result.put("discountFeedback", discountFeedback);
         result.put("depositPaid", depositPaid);
-        result.put("totalPaid", totalPaid);
+        result.put("totalPaid", totalPaid.add(depositPaid));
         result.put("copayCollected", copayCollected);
         result.put("provisionalBalance", provisionalBalance);
         
@@ -1047,10 +1260,15 @@ public class IpdBillingService {
         // Update paymentStatus dynamically based on netAmount vs paidAmount
         if (bill.getNetAmount().compareTo(bill.getPaidAmount()) <= 0) {
             bill.setPaymentStatus(PaymentStatus.PAID);
+            if (bill.getPaidAt() == null) {
+                bill.setPaidAt(LocalDateTime.now());
+            }
         } else if (bill.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
             bill.setPaymentStatus(PaymentStatus.PARTIAL);
+            bill.setPaidAt(null);
         } else {
             bill.setPaymentStatus(PaymentStatus.PENDING);
+            bill.setPaidAt(null);
         }
     }
 

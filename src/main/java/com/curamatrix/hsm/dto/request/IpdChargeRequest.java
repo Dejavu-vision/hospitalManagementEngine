@@ -25,4 +25,10 @@ public class IpdChargeRequest {
     private Integer quantity;
 
     private LocalDate chargeDate; // defaults to today if null
+
+    private Long departmentId;
+    private Long serviceCatalogItemId;
+
+    private Boolean payNow;
+    private String paymentMethod;
 }

@@ -62,4 +62,7 @@ public class HospitalService extends TenantAwareEntity {
     @Column(name = "gst_percentage")
     @org.hibernate.annotations.ColumnDefault("0")
     private BigDecimal gstPercentage = BigDecimal.ZERO;
+
+    @Column(name = "effective_from", nullable = false)
+    private java.time.LocalDate effectiveFrom;
 }

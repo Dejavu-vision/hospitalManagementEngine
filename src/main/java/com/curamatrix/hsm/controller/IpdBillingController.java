@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/ipd")
@@ -42,6 +43,30 @@ public class IpdBillingController {
             @PathVariable Long patientId,
             @Valid @RequestBody IpdChargeRequest request) {
         return ResponseEntity.ok(ipdBillingService.addCharge(patientId, request));
+    }
+
+    @PostMapping("/patient/{patientId}/charges/{itemId}/settle")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @Operation(summary = "Settle a specific manual charge row")
+    public ResponseEntity<Map<String, Object>> settleCharge(
+            @PathVariable Long patientId,
+            @PathVariable Long itemId,
+            @RequestBody(required = false) Map<String, String> body) {
+        String paymentMethod = body != null ? body.getOrDefault("paymentMethod", "CASH") : "CASH";
+        return ResponseEntity.ok(ipdBillingService.settleChargeItem(patientId, itemId, paymentMethod));
+    }
+
+    @PostMapping("/patient/{patientId}/charges/settle-multiple")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @Operation(summary = "Settle multiple specific manual charge rows")
+    public ResponseEntity<Map<String, Object>> settleMultipleCharges(
+            @PathVariable Long patientId,
+            @RequestBody Map<String, Object> body) {
+        List<Long> itemIds = ((List<?>) body.get("itemIds")).stream()
+                .map(id -> Long.valueOf(id.toString()))
+                .collect(Collectors.toList());
+        String paymentMethod = body.containsKey("paymentMethod") ? body.get("paymentMethod").toString() : "CASH";
+        return ResponseEntity.ok(ipdBillingService.settleChargeItems(patientId, itemIds, paymentMethod));
     }
 
     @DeleteMapping("/patient/{patientId}/charges/{itemId}")

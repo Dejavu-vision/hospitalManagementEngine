@@ -73,6 +73,7 @@ public class HospitalServiceCatalogService {
                 .isInsurancePayable(request.getIsInsurancePayable() != null ? request.getIsInsurancePayable() : true)
                 .insuranceRate(request.getInsuranceRate())
                 .gstPercentage(request.getGstPercentage())
+                .effectiveFrom(request.getEffectiveFrom())
                 .build();
         
         service.setTenantId(tenantId); // Inherited from TenantAwareEntity
@@ -113,6 +114,7 @@ public class HospitalServiceCatalogService {
         service.setIsInsurancePayable(request.getIsInsurancePayable() != null ? request.getIsInsurancePayable() : true);
         service.setInsuranceRate(request.getInsuranceRate());
         service.setGstPercentage(request.getGstPercentage());
+        service.setEffectiveFrom(request.getEffectiveFrom());
 
         if (request.getDepartmentId() != null) {
             Department dept = departmentRepository.findById(request.getDepartmentId())

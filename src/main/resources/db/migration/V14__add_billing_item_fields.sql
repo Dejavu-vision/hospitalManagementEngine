@@ -1,0 +1,9 @@
+ALTER TABLE billing_items
+ADD COLUMN payment_status VARCHAR(50) DEFAULT 'PENDING',
+ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0.00,
+ADD COLUMN department_id BIGINT NULL,
+ADD COLUMN service_catalog_item_id BIGINT NULL,
+ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE payments
+ADD COLUMN billing_item_id BIGINT NULL;

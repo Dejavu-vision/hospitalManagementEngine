@@ -30,6 +30,10 @@ public class Payment extends TenantAwareEntity {
     @JoinColumn(name = "bill_id")
     private Billing billing;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "billing_item_id")
+    private BillingItem billingItem;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
