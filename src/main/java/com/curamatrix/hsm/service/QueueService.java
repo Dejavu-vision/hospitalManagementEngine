@@ -10,6 +10,8 @@ import com.curamatrix.hsm.enums.DoctorStatus;
 import com.curamatrix.hsm.repository.AppointmentRepository;
 import com.curamatrix.hsm.repository.DoctorAvailabilityRepository;
 import com.curamatrix.hsm.repository.DoctorRepository;
+import com.curamatrix.hsm.repository.PatientRegistrationRepository;
+import com.curamatrix.hsm.entity.PatientRegistration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,7 @@ public class QueueService {
     private final AppointmentRepository appointmentRepository;
     private final DoctorRepository doctorRepository;
     private final DoctorAvailabilityRepository doctorAvailabilityRepository;
+    private final PatientRegistrationRepository patientRegistrationRepository;
 
     // ── Legacy endpoints (kept for backward compatibility) ────────────────────
 
@@ -393,6 +396,13 @@ public class QueueService {
         String patientAge = a.getPatient().getPatientCode() != null
                 ? a.getPatient().getPatientCode() : "";
 
+        // Case paper validity check
+        Long tenantId = TenantContext.getTenantId();
+        Boolean casePaperValid = patientRegistrationRepository
+                .findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(a.getPatient().getId(), tenantId)
+                .map(reg -> !reg.isExpired())
+                .orElse(false);
+
         return QueueEntryResponse.builder()
                 .appointmentId(a.getId())
                 .patientId(a.getPatient().getId())
@@ -425,6 +435,7 @@ public class QueueService {
                 .holdMinutes(a.getHeldAt() != null
                         ? Math.max(0, (int) ChronoUnit.MINUTES.between(a.getHeldAt(), LocalDateTime.now()))
                         : null)
+                .casePaperValid(casePaperValid)
                 .build();
     }
 

@@ -188,8 +188,9 @@ public class ReceptionDeskService {
 
     /**
      * Creates a case paper (patient registration billing) for a patient.
-     * Delegates to BillingService.createRegistrationBilling() and maps the result
-     * into a CasePaperResponse.
+     * This is called from the frontend "+ Create Case Paper" / "Renew" button.
+     * It creates the billing, marks it as PAID immediately (registration fee collected at desk),
+     * and issues the case paper right away.
      */
     @Transactional
     public CasePaperResponse createCasePaper(Long patientId, String paymentMethod) {
@@ -200,8 +201,11 @@ public class ReceptionDeskService {
         Patient patient = patientRepository.findByIdAndTenantId(patientId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", patientId));
 
-        // Delegate to BillingService to create the registration billing + case paper
+        // Delegate to BillingService to create the registration billing
         Billing billing = billingService.createRegistrationBilling(patient, tenantId, paymentMethod);
+
+        // Immediately issue the case paper (the receptionist is creating it explicitly)
+        billingService.issueNewCasePaperForPatient(patient, billing, tenantId);
 
         // Fetch the newly created patient registration to get issuedAt and expiresAt
         PatientRegistration registration = patientRegistrationRepository
@@ -297,10 +301,27 @@ public class ReceptionDeskService {
             finalBilling = billingService.getInvoiceById(billingId, tenantId);
         }
 
-        // 4. Case Paper Stage
+        // 4. Case Paper Stage — always ensure case paper exists after registration
+        // The case paper is a clinical entitlement (allows consultation today),
+        // independent of whether the registration fee has been paid yet.
         PatientRegistration registration = patientRegistrationRepository
                 .findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(patient.getId(), tenantId)
                 .orElse(null);
+
+        boolean hasValidCasePaper = registration != null && !registration.isExpired();
+
+        if (!hasValidCasePaper && !request.isFollowUp()) {
+            // Patient just registered — issue a case paper now
+            Patient patientEntity = patientRepository.findByIdAndTenantId(patient.getId(), tenantId)
+                    .orElse(null);
+            if (patientEntity != null) {
+                billingService.issueNewCasePaperForPatient(patientEntity, null, tenantId);
+                // Re-fetch the newly created registration
+                registration = patientRegistrationRepository
+                        .findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(patient.getId(), tenantId)
+                        .orElse(null);
+            }
+        }
 
         // 5. Build Response
         UnifiedRegistrationResponse.UnifiedRegistrationResponseBuilder builder = UnifiedRegistrationResponse.builder()

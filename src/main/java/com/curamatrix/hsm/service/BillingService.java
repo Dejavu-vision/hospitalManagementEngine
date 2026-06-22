@@ -165,10 +165,11 @@ public class BillingService {
         // Resolve registration fee from Service Catalog (₹0 if not configured)
         HospitalService regServiceResolved = catalogResolver.resolveRequired("REG_FEE", tenantId);
         BigDecimal amount = regServiceResolved != null ? regServiceResolved.getPrice() : BigDecimal.ZERO;
+        String description = regServiceResolved != null ? regServiceResolved.getServiceName() : "Registration Fee";
         BigDecimal insuranceAdjustment = BigDecimal.ZERO;
 
         BillingItem regItem = BillingItem.builder()
-                .description("Patient Registration / Case Paper")
+                .description(description)
                 .amount(amount)
                 .itemType(BillingItemType.REGISTRATION)
                 .quantity(1)
@@ -206,6 +207,15 @@ public class BillingService {
         // Note: issueNewCasePaper will be called in collectPayment() once status becomes PAID
     }
 
+    /**
+     * Issues a new case paper (PatientRegistration) for a patient.
+     * Deactivates any existing active case papers first.
+     * Exposed for ReceptionDeskService to call during explicit case paper creation.
+     */
+    public void issueNewCasePaperForPatient(Patient patient, Billing billing, Long tenantId) {
+        issueNewCasePaper(patient, billing, tenantId);
+    }
+
     private void issueNewCasePaper(Patient patient, Billing billing, Long tenantId) {
         int validityDays = 30;
         Optional<HospitalService> regService = catalogResolver.resolveOptional("REG_FEE", tenantId);
@@ -213,11 +223,19 @@ public class BillingService {
             validityDays = regService.get().getValidityPeriodDays();
         }
 
+        // Deactivate any existing active case papers for this patient
+        patientRegistrationRepository
+                .findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(patient.getId(), tenantId)
+                .ifPresent(existing -> {
+                    existing.setActive(false);
+                    patientRegistrationRepository.save(existing);
+                });
+
         PatientRegistration registration = PatientRegistration.builder()
                 .patient(patient)
                 .billing(billing)
                 .issuedAt(LocalDateTime.now())
-                .expiresAt(LocalDateTime.now().plusMonths(1).toLocalDate().atTime(23, 59, 59))
+                .expiresAt(LocalDateTime.now().plusDays(validityDays).toLocalDate().atTime(23, 59, 59))
                 .active(true)
                 .build();
         registration.setTenantId(tenantId);

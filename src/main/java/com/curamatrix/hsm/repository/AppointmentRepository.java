@@ -171,4 +171,8 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
            "GROUP BY a.patient.id")
     List<Object[]> findLastVisitDatesByPatientIds(@Param("patientIds") List<Long> patientIds,
                                                    @Param("tenantId") Long tenantId);
+
+    @Query("SELECT a FROM Appointment a WHERE a.patient.id = :patientId AND a.tenantId = :tenantId")
+    List<Appointment> findAllByPatientIdAndTenantId(@Param("patientId") Long patientId,
+                                                    @Param("tenantId") Long tenantId);
 }

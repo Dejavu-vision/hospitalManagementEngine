@@ -38,4 +38,5 @@ public class QueueEntryResponse {
     private Integer recallCount;        // number of times this token has been recalled
     private LocalDateTime heldAt;       // populated for ON_HOLD entries
     private Integer holdMinutes;        // minutes elapsed since hold (computed server-side)
+    private Boolean casePaperValid;     // whether patient has a valid (active & non-expired) case paper
 }

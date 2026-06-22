@@ -270,6 +270,7 @@
         <button class="tab-btn active" data-tab="tabHospitals">Hospitals</button>
         <button class="tab-btn" data-tab="tabUsers">User Management</button>
         <button class="tab-btn" data-tab="tabAccess">Access Control</button>
+        <button class="tab-btn" data-tab="tabPatientData">🗑 Patient Data</button>
         <button class="tab-btn" data-tab="tabSettings">⚙ Settings</button>
       </div>
 
@@ -604,6 +605,43 @@
         </div>
         <div class="controls" style="margin-top:8px;">
           <button id="btnOpenPageForm" class="btn sm">Add New Page</button>
+        </div>
+      </div>
+
+      <!-- ═══ TAB: PATIENT DATA MANAGEMENT ══════════════════════════ -->
+      <div id="tabPatientData" class="tab-content pane">
+
+        <div style="background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.25); border-radius:8px; padding:10px 14px; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+          <span style="font-size:18px;">⚠️</span>
+          <div>
+            <div style="font-size:12px; font-weight:700; color:var(--danger);">Destructive Operation</div>
+            <div style="font-size:11px; color:var(--muted);">Deleting a patient permanently removes ALL related data (appointments, billing, case papers, diagnoses, prescriptions, lab, IPD, insurance). This cannot be undone.</div>
+          </div>
+        </div>
+
+        <!-- Hospital Selector -->
+        <div class="tenant-selector">
+          <label>Select Hospital:</label>
+          <select id="pd_tenantSelect"><option value="">— Select a hospital —</option></select>
+          <button id="btnPdLoadPatients" class="btn sm secondary">Load Patients</button>
+          <span id="pd_tenantBadge" class="tenant-badge hidden"></span>
+        </div>
+
+        <!-- Search -->
+        <div class="controls" style="margin-bottom:10px;">
+          <div class="field" style="flex:1;"><input id="pd_search" type="text" placeholder="Search by name, phone, or patient code..." style="width:100%;"></div>
+          <button id="btnPdSearch" class="btn sm secondary">Search</button>
+          <span id="pd_countChip" class="chip hidden">0 patients</span>
+        </div>
+
+        <div class="notice" id="pd_msg">Select a hospital above, then click "Load Patients".</div>
+
+        <!-- Patients Table -->
+        <div style="overflow:auto; border:1px solid var(--border); border-radius:6px; margin-top:8px; max-height:400px;">
+          <table id="pd_patientsTable">
+            <thead><tr><th>ID</th><th>Code</th><th>Name</th><th>Phone</th><th>Gender</th><th>Registered</th><th>Action</th></tr></thead>
+            <tbody></tbody>
+          </table>
         </div>
       </div>
 
@@ -1716,6 +1754,92 @@
           setMsg("dg_updateMsg", "❌ Failed: " + e.message, "bad");
         }
       }
+
+      // ═══ PATIENT DATA MANAGEMENT ═══════════════════════════════
+      (function patientDataModule() {
+        let pdTenantId = null;
+
+        // Populate hospital dropdown (reuse tenant list from state if already loaded)
+        async function pdPopulateTenants() {
+          try {
+            // Reuse the same endpoint the Hospitals tab uses
+            const tenantsResponse = await api("/api/super-admin/tenants");
+            const tenants = Array.isArray(tenantsResponse) ? tenantsResponse : (tenantsResponse.content || []);
+            const sel = $("pd_tenantSelect");
+            sel.innerHTML = '<option value="">— Select a hospital —</option>';
+            tenants.forEach(t => {
+              sel.innerHTML += `<option value="${t.id}">${t.hospitalName} (${t.tenantKey})</option>`;
+            });
+          } catch(e) { setMsg("pd_msg", "Failed to load hospitals: " + e.message, "bad"); }
+        }
+
+        async function pdLoadPatients(search) {
+          const tenantId = $("pd_tenantSelect").value;
+          if (!tenantId) { setMsg("pd_msg", "Please select a hospital first.", "warn"); return; }
+          pdTenantId = tenantId;
+          const q = (search || $("pd_search").value || "").trim();
+          setMsg("pd_msg", "Loading…", "warn");
+          try {
+            const params = new URLSearchParams({ search: q, page: 0, size: 50 });
+            const data = await api(`/api/admin/patients/hospitals/${tenantId}/patients?${params}`);
+            const patients = data.content || [];
+            $("pd_countChip").classList.remove("hidden");
+            $("pd_countChip").textContent = `${data.totalElements || 0} patients`;
+            const badge = $("pd_tenantBadge");
+            badge.classList.remove("hidden");
+            badge.textContent = `Tenant #${tenantId}`;
+
+            const tbody = document.querySelector("#pd_patientsTable tbody");
+            tbody.innerHTML = "";
+            if (patients.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--muted); padding:20px;">No patients found</td></tr>';
+              setMsg("pd_msg", "No patients match the criteria.", "warn");
+              return;
+            }
+            patients.forEach(p => {
+              const regDate = p.registeredAt ? new Date(p.registeredAt).toLocaleDateString() : "—";
+              tbody.innerHTML += `<tr>
+                <td>${p.id}</td>
+                <td style="color:var(--accent-2); font-weight:600;">${p.patientCode || "—"}</td>
+                <td style="font-weight:600;">${p.firstName} ${p.lastName || ""}</td>
+                <td>${p.phone || "—"}</td>
+                <td style="text-transform:capitalize;">${(p.gender || "—").toLowerCase()}</td>
+                <td>${regDate}</td>
+                <td><button class="btn danger sm" onclick="window._pdPurge(${p.id}, '${(p.firstName + " " + (p.lastName||"")).replace(/'/g,"\\'")}', '${p.patientCode||""}')">🗑 Delete All</button></td>
+              </tr>`;
+            });
+            setMsg("pd_msg", `Loaded ${patients.length} patient(s). Click "Delete All" to permanently remove a patient and all their data.`, "ok");
+          } catch(e) {
+            setMsg("pd_msg", "Failed: " + e.message, "bad");
+          }
+        }
+
+        window._pdPurge = async function(patientId, name, code) {
+          const confirmed = await showModal(
+            "⚠️ Permanently Delete Patient?",
+            `This will DELETE "${name}" (${code || "#" + patientId}) and ALL related data:\n\n` +
+            "• Appointments & Consultations\n• Billing & Invoices\n• Case Papers\n• Diagnoses & Prescriptions\n• Lab Reports\n• IPD Admissions\n• Insurance & Payments\n\n" +
+            "This action CANNOT be undone.",
+            true
+          );
+          if (!confirmed) return;
+          setMsg("pd_msg", "Deleting patient and all data…", "warn");
+          try {
+            await api(`/api/admin/patients/${patientId}/purge?tenantId=${pdTenantId}`, { method: "DELETE" });
+            setMsg("pd_msg", `✅ Patient "${name}" and all related data permanently deleted.`, "ok");
+            pdLoadPatients(); // Refresh
+          } catch(e) {
+            setMsg("pd_msg", "❌ Delete failed: " + e.message, "bad");
+          }
+        };
+
+        $("btnPdLoadPatients").addEventListener("click", () => pdLoadPatients());
+        $("btnPdSearch").addEventListener("click", () => pdLoadPatients());
+        $("pd_search").addEventListener("keydown", e => { if (e.key === "Enter") pdLoadPatients(); });
+
+        // Populate tenants when tab becomes active
+        document.querySelector('[data-tab="tabPatientData"]').addEventListener("click", pdPopulateTenants);
+      })();
 
       // Init
       setAuthUI();
