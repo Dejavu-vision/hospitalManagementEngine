@@ -1260,10 +1260,15 @@ public class IpdBillingService {
         // Update paymentStatus dynamically based on netAmount vs paidAmount
         if (bill.getNetAmount().compareTo(bill.getPaidAmount()) <= 0) {
             bill.setPaymentStatus(PaymentStatus.PAID);
+            if (bill.getPaidAt() == null) {
+                bill.setPaidAt(LocalDateTime.now());
+            }
         } else if (bill.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
             bill.setPaymentStatus(PaymentStatus.PARTIAL);
+            bill.setPaidAt(null);
         } else {
             bill.setPaymentStatus(PaymentStatus.PENDING);
+            bill.setPaidAt(null);
         }
     }
 
