@@ -35,4 +35,7 @@ public class HospitalServiceRequest {
     private BigDecimal insuranceRate;
 
     private BigDecimal gstPercentage = BigDecimal.ZERO;
+
+    @NotNull(message = "Effective from date is required")
+    private java.time.LocalDate effectiveFrom;
 }
