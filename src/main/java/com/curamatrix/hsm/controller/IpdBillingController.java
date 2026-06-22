@@ -44,6 +44,17 @@ public class IpdBillingController {
         return ResponseEntity.ok(ipdBillingService.addCharge(patientId, request));
     }
 
+    @PostMapping("/patient/{patientId}/charges/{itemId}/settle")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @Operation(summary = "Settle a specific manual charge row")
+    public ResponseEntity<Map<String, Object>> settleCharge(
+            @PathVariable Long patientId,
+            @PathVariable Long itemId,
+            @RequestBody(required = false) Map<String, String> body) {
+        String paymentMethod = body != null ? body.getOrDefault("paymentMethod", "CASH") : "CASH";
+        return ResponseEntity.ok(ipdBillingService.settleChargeItem(patientId, itemId, paymentMethod));
+    }
+
     @DeleteMapping("/patient/{patientId}/charges/{itemId}")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     @Operation(summary = "Remove a manual charge from the running bill (before freeze)")
