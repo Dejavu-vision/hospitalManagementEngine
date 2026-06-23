@@ -105,14 +105,9 @@ public class IpdBillingService {
             result.sort(Comparator.comparing(Billing::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
             return result;
         } else {
-            Optional<Billing> ipdBillOpt = billingRepository.findByIpdAdmissionId(admission.getId());
-            if (ipdBillOpt.isPresent()) {
-                Billing ipdBill = ipdBillOpt.get();
-                if (!pendingBills.contains(ipdBill)) {
-                    pendingBills.add(ipdBill);
-                }
-            }
-            return pendingBills;
+            List<Billing> allBills = billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId);
+            allBills.sort(Comparator.comparing(Billing::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
+            return allBills;
         }
     }
 
@@ -243,12 +238,13 @@ public class IpdBillingService {
     public Map<String, Object> settleChargeItem(Long patientId, Long itemId, String paymentMethodStr) {
         Long tenantId = TenantContext.getTenantId();
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
-        Billing bill = getPrimaryBill(patientId, tenantId, admission);
-
-        BillingItem item = bill.getItems().stream()
-                .filter(i -> i.getId().equals(itemId))
-                .findFirst()
+        
+        BillingItem item = billingItemRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
+        Billing bill = item.getBilling();
+        if (bill == null) {
+            throw new ResourceNotFoundException("Billing", "itemId", itemId);
+        }
 
         BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
 
@@ -297,7 +293,6 @@ public class IpdBillingService {
     public Map<String, Object> settleChargeItems(Long patientId, List<Long> itemIds, String paymentMethodStr) {
         Long tenantId = TenantContext.getTenantId();
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
-        Billing bill = getPrimaryBill(patientId, tenantId, admission);
         Long collectedById = getCurrentUserId();
         PaymentMethod pm = PaymentMethod.CASH;
         if (paymentMethodStr != null) {
@@ -308,37 +303,38 @@ public class IpdBillingService {
             }
         }
 
-        BigDecimal totalItemPayment = BigDecimal.ZERO;
+        java.util.Set<Billing> modifiedBills = new java.util.HashSet<>();
         for (Long itemId : itemIds) {
-            BillingItem item = bill.getItems().stream()
-                    .filter(i -> i.getId().equals(itemId))
-                    .findFirst()
-                    .orElse(null);
+            BillingItem item = billingItemRepository.findById(itemId).orElse(null);
             if (item != null && item.getPaymentStatus() != PaymentStatus.PAID) {
-                BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
-                item.setPaymentStatus(PaymentStatus.PAID);
-                item.setPaidAmount(itemTotal);
-                billingItemRepository.save(item);
-                totalItemPayment = totalItemPayment.add(itemTotal);
+                Billing itemBill = item.getBilling();
+                if (itemBill != null) {
+                    BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+                    item.setPaymentStatus(PaymentStatus.PAID);
+                    item.setPaidAmount(itemTotal);
+                    billingItemRepository.save(item);
 
-                Payment payment = Payment.builder()
-                        .patient(bill.getPatient())
-                        .billing(bill)
-                        .billingItem(item)
-                        .amount(itemTotal)
-                        .method(pm)
-                        .collectedById(collectedById)
-                        .build();
-                payment.setTenantId(tenantId);
-                paymentRepository.save(payment);
+                    itemBill.setPaidAmount(itemBill.getPaidAmount().add(itemTotal));
+                    itemBill.setPaymentMethod(pm);
+                    modifiedBills.add(itemBill);
+
+                    Payment payment = Payment.builder()
+                            .patient(itemBill.getPatient())
+                            .billing(itemBill)
+                            .billingItem(item)
+                            .amount(itemTotal)
+                            .method(pm)
+                            .collectedById(collectedById)
+                            .build();
+                    payment.setTenantId(tenantId);
+                    paymentRepository.save(payment);
+                }
             }
         }
 
-        if (totalItemPayment.compareTo(BigDecimal.ZERO) > 0) {
-            bill.setPaidAmount(bill.getPaidAmount().add(totalItemPayment));
-            bill.setPaymentMethod(pm);
-            recalcNet(bill);
-            billingRepository.save(bill);
+        for (Billing modifiedBill : modifiedBills) {
+            recalcNet(modifiedBill);
+            billingRepository.save(modifiedBill);
         }
 
         PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
