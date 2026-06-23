@@ -29,4 +29,7 @@ public class AddBillingItemRequest {
 
     private Long departmentId;
     private Long serviceCatalogItemId;
+
+    private Boolean payNow;
+    private String paymentMethod;
 }

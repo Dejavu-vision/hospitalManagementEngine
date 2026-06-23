@@ -409,6 +409,7 @@ public class BillingService {
 
         BillingItemType itemType = BillingItemType.valueOf(request.getItemType().toUpperCase());
         int quantity = request.getQuantity() != null ? request.getQuantity() : 1;
+        BigDecimal itemTotal = request.getAmount().multiply(BigDecimal.valueOf(quantity));
 
         BillingItem newItem = BillingItem.builder()
                 .billing(billing)
@@ -428,14 +429,50 @@ public class BillingService {
                     .ifPresent(newItem::setHospitalService);
         }
 
+        boolean payNow = Boolean.TRUE.equals(request.getPayNow());
+        if (payNow) {
+            newItem.setPaymentStatus(PaymentStatus.PAID);
+            newItem.setPaidAmount(itemTotal);
+            billing.setPaidAmount(billing.getPaidAmount().add(itemTotal));
+            if (request.getPaymentMethod() != null) {
+                try {
+                    billing.setPaymentMethod(PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    billing.setPaymentMethod(PaymentMethod.CASH);
+                }
+            }
+        } else {
+            newItem.setPaymentStatus(PaymentStatus.PENDING);
+            newItem.setPaidAmount(BigDecimal.ZERO);
+        }
+
         billing.getItems().add(newItem);
-        billing.setTotalAmount(billing.getTotalAmount().add(request.getAmount().multiply(BigDecimal.valueOf(quantity))));
+        billing.setTotalAmount(billing.getTotalAmount().add(itemTotal));
         recalculateNetAmount(billing);
+
+        if (payNow) {
+            BigDecimal balance = billing.getNetAmount().subtract(billing.getPaidAmount());
+            if (balance.compareTo(BigDecimal.ZERO) <= 0) {
+                billing.setPaymentStatus(PaymentStatus.PAID);
+                billing.setPaidAt(LocalDateTime.now());
+                billing.setPaidAmount(billing.getNetAmount());
+            } else {
+                billing.setPaymentStatus(PaymentStatus.PARTIAL);
+            }
+        }
+
         billing = billingRepository.save(billing);
+
+        if (payNow) {
+            boolean hasRegistration = newItem.getItemType() == BillingItemType.REGISTRATION;
+            if (hasRegistration) {
+                issueNewCasePaper(billing.getPatient(), billing, tenantId);
+            }
+        }
 
         accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
 
-        log.info("Item added to billing {}: desc={}, amount={}", billingId, request.getDescription(), request.getAmount());
+        log.info("Item added to billing {}: desc={}, amount={}, payNow={}", billingId, request.getDescription(), request.getAmount(), payNow);
         return mapToResponse(billing);
     }
 
