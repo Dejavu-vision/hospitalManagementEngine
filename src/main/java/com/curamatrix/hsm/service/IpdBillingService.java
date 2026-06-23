@@ -72,43 +72,9 @@ public class IpdBillingService {
     }
 
     private List<Billing> getRelevantBillsForSummary(Long patientId, Long tenantId, IpdAdmission admission) {
-        List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
-        if (admission == null) {
-            LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-            // Check if patient was recently discharged today
-            List<IpdAdmission> recentAdmissions = admissionRepository.findByStatusAndTenantId(AdmissionStatus.DISCHARGED, tenantId).stream()
-                    .filter(a -> a.getPatient().getId().equals(patientId) && a.getActualDischargeTime() != null && !a.getActualDischargeTime().isBefore(startOfDay))
-                    .collect(Collectors.toList());
-
-            if (!recentAdmissions.isEmpty()) {
-                IpdAdmission recent = recentAdmissions.get(0);
-                Optional<Billing> ipdBillOpt = billingRepository.findByIpdAdmissionId(recent.getId());
-                if (ipdBillOpt.isPresent()) {
-                    Billing ipdBill = ipdBillOpt.get();
-                    List<Billing> result = new ArrayList<>(pendingBills);
-                    if (!result.contains(ipdBill)) {
-                        result.add(ipdBill);
-                    }
-                    result.sort(Comparator.comparing(Billing::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
-                    return result;
-                }
-            }
-
-            // Fallback: Include today's paid bills for OPD so they show up in the running bill UI
-            List<Billing> todaysPaid = billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId).stream()
-                    .filter(b -> b.getPaymentStatus() == PaymentStatus.PAID && b.getCreatedAt() != null && !b.getCreatedAt().isBefore(startOfDay))
-                    .collect(Collectors.toList());
-            List<Billing> result = new ArrayList<>(pendingBills);
-            for (Billing b : todaysPaid) {
-                if (!result.contains(b)) result.add(b);
-            }
-            result.sort(Comparator.comparing(Billing::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
-            return result;
-        } else {
-            List<Billing> allBills = billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId);
-            allBills.sort(Comparator.comparing(Billing::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
-            return allBills;
-        }
+        List<Billing> allBills = billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId);
+        allBills.sort(Comparator.comparing(Billing::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
+        return allBills;
     }
 
     private Billing getPrimaryBill(Long patientId, Long tenantId, IpdAdmission admission) {
