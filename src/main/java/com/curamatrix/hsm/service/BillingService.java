@@ -322,8 +322,11 @@ public class BillingService {
                 issueNewCasePaper(billing.getPatient(), billing, tenantId);
             }
         } else {
-            // Partial payment
-            billing.setPaymentStatus(PaymentStatus.PARTIAL);
+            if (newPaidAmount.compareTo(BigDecimal.ZERO) == 0) {
+                billing.setPaymentStatus(PaymentStatus.PENDING);
+            } else {
+                billing.setPaymentStatus(PaymentStatus.PARTIAL);
+            }
             
             // Allocate sequentially
             BigDecimal unallocatedPayment = request.getAmount();
