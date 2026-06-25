@@ -32,4 +32,5 @@ public class AddBillingItemRequest {
 
     private Boolean payNow;
     private String paymentMethod;
+    private BigDecimal paidAmount;
 }

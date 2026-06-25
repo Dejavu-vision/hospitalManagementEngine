@@ -431,9 +431,16 @@ public class BillingService {
 
         boolean payNow = Boolean.TRUE.equals(request.getPayNow());
         if (payNow) {
-            newItem.setPaymentStatus(PaymentStatus.PAID);
-            newItem.setPaidAmount(itemTotal);
-            billing.setPaidAmount(billing.getPaidAmount().add(itemTotal));
+            BigDecimal actualPaid = request.getPaidAmount() != null ? request.getPaidAmount() : itemTotal;
+            newItem.setPaidAmount(actualPaid);
+            if (actualPaid.compareTo(itemTotal) >= 0) {
+                newItem.setPaymentStatus(PaymentStatus.PAID);
+            } else if (actualPaid.compareTo(BigDecimal.ZERO) > 0) {
+                newItem.setPaymentStatus(PaymentStatus.PARTIAL);
+            } else {
+                newItem.setPaymentStatus(PaymentStatus.PENDING);
+            }
+            billing.setPaidAmount(billing.getPaidAmount().add(actualPaid));
             if (request.getPaymentMethod() != null) {
                 try {
                     billing.setPaymentMethod(PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase()));
@@ -473,6 +480,64 @@ public class BillingService {
         accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
 
         log.info("Item added to billing {}: desc={}, amount={}, payNow={}", billingId, request.getDescription(), request.getAmount(), payNow);
+        return mapToResponse(billing);
+    }
+
+    // ─── NEW: Update Billing Item Amount ─────────────────────────────────────
+
+    @Transactional
+    public BillingResponse updateBillingItemAmount(Long billingId, Long itemId, com.curamatrix.hsm.dto.request.UpdateBillingItemAmountRequest request, Long tenantId) {
+        Billing billing = billingRepository.findByIdAndTenantId(billingId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Billing", "id", billingId));
+
+        if (billing.getPaymentStatus() == PaymentStatus.PAID || billing.getPaymentStatus() == PaymentStatus.CANCELLED) {
+            throw new RuntimeException("Cannot update item amount on a fully paid or cancelled invoice");
+        }
+
+        BillingItem item = billing.getItems().stream()
+                .filter(i -> i.getId().equals(itemId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
+
+        BigDecimal newAmount = request.getAmount();
+        BigDecimal itemPaid = item.getPaidAmount() != null ? item.getPaidAmount() : BigDecimal.ZERO;
+
+        BigDecimal newTotal = newAmount.multiply(BigDecimal.valueOf(item.getQuantity()));
+        if (newTotal.compareTo(itemPaid) < 0) {
+            throw new RuntimeException("New amount cannot be less than already paid amount for this item");
+        }
+
+        // Subtract old total, add new total
+        BigDecimal oldTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+        billing.setTotalAmount(billing.getTotalAmount().subtract(oldTotal).add(newTotal));
+        
+        item.setAmount(newAmount);
+
+        // Update item payment status if it was PAID but now costs more
+        if (newTotal.compareTo(itemPaid) > 0 && itemPaid.compareTo(BigDecimal.ZERO) > 0) {
+            item.setPaymentStatus(PaymentStatus.PARTIAL);
+        } else if (newTotal.compareTo(itemPaid) == 0 && itemPaid.compareTo(BigDecimal.ZERO) > 0) {
+            item.setPaymentStatus(PaymentStatus.PAID);
+        }
+
+        recalculateNetAmount(billing);
+
+        // Update billing payment status
+        BigDecimal balance = billing.getNetAmount().subtract(billing.getPaidAmount());
+        if (balance.compareTo(BigDecimal.ZERO) <= 0) {
+            billing.setPaymentStatus(PaymentStatus.PAID);
+            billing.setPaidAt(LocalDateTime.now());
+            billing.setPaidAmount(billing.getNetAmount());
+        } else if (billing.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            billing.setPaymentStatus(PaymentStatus.PARTIAL);
+        } else {
+            billing.setPaymentStatus(PaymentStatus.PENDING);
+        }
+
+        billing = billingRepository.save(billing);
+        accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
+
+        log.info("Item {} amount updated on billing {}: new amount={}", itemId, billingId, newAmount);
         return mapToResponse(billing);
     }
 

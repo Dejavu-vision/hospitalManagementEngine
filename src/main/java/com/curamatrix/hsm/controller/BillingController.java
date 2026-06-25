@@ -80,6 +80,14 @@ public class BillingController {
         return ResponseEntity.ok(billingService.addBillingItem(id, request, TenantContext.getTenantId()));
     }
 
+    @PutMapping("/invoices/{id}/items/{itemId}/amount")
+    public ResponseEntity<BillingResponse> updateBillingItemAmount(
+            @PathVariable Long id,
+            @PathVariable Long itemId,
+            @Valid @RequestBody com.curamatrix.hsm.dto.request.UpdateBillingItemAmountRequest request) {
+        return ResponseEntity.ok(billingService.updateBillingItemAmount(id, itemId, request, TenantContext.getTenantId()));
+    }
+
     // ─── Discount ────────────────────────────────────────────────────────────
 
     @PatchMapping("/invoices/{id}/discount")

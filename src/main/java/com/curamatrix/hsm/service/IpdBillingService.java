@@ -201,7 +201,7 @@ public class IpdBillingService {
     }
 
     @Transactional
-    public Map<String, Object> settleChargeItem(Long patientId, Long itemId, String paymentMethodStr) {
+    public Map<String, Object> settleChargeItem(Long patientId, Long itemId, String paymentMethodStr, BigDecimal amountToPay) {
         Long tenantId = TenantContext.getTenantId();
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
         
@@ -213,14 +213,30 @@ public class IpdBillingService {
         }
 
         BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+        BigDecimal itemPaid = item.getPaidAmount() != null ? item.getPaidAmount() : BigDecimal.ZERO;
+        BigDecimal remainingAmount = itemTotal.subtract(itemPaid);
 
-        // Mark the item as paid
-        item.setPaymentStatus(PaymentStatus.PAID);
-        item.setPaidAmount(itemTotal);
+        BigDecimal actualPayment = (amountToPay != null) ? amountToPay : remainingAmount;
+
+        if (actualPayment.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Payment amount must be greater than zero");
+        }
+        if (actualPayment.compareTo(remainingAmount) > 0) {
+            throw new IllegalArgumentException("Payment amount cannot exceed the remaining due amount");
+        }
+
+        BigDecimal newPaidAmount = itemPaid.add(actualPayment);
+        item.setPaidAmount(newPaidAmount);
+
+        if (newPaidAmount.compareTo(itemTotal) >= 0) {
+            item.setPaymentStatus(PaymentStatus.PAID);
+        } else {
+            item.setPaymentStatus(PaymentStatus.PARTIAL);
+        }
         billingItemRepository.save(item);
 
         // Accumulate in the bill's paidAmount as well
-        bill.setPaidAmount(bill.getPaidAmount().add(itemTotal));
+        bill.setPaidAmount((bill.getPaidAmount() != null ? bill.getPaidAmount() : BigDecimal.ZERO).add(actualPayment));
         PaymentMethod pm = PaymentMethod.CASH;
         if (paymentMethodStr != null) {
             try {
@@ -238,7 +254,7 @@ public class IpdBillingService {
                 .patient(bill.getPatient())
                 .billing(bill)
                 .billingItem(item)
-                .amount(itemTotal)
+                .amount(actualPayment)
                 .method(pm)
                 .collectedById(collectedById)
                 .build();
@@ -246,7 +262,7 @@ public class IpdBillingService {
         paymentRepository.save(payment);
 
         log.info("Billing item {} settled for patient {}: amount=₹{}, method={}", 
-                itemId, patientId, itemTotal, paymentMethodStr);
+                itemId, patientId, actualPayment, paymentMethodStr);
 
         PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
         BedAllocation currentAllocation = admission != null ? allocationRepository

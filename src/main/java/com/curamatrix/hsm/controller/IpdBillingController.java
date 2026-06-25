@@ -51,9 +51,13 @@ public class IpdBillingController {
     public ResponseEntity<Map<String, Object>> settleCharge(
             @PathVariable Long patientId,
             @PathVariable Long itemId,
-            @RequestBody(required = false) Map<String, String> body) {
-        String paymentMethod = body != null ? body.getOrDefault("paymentMethod", "CASH") : "CASH";
-        return ResponseEntity.ok(ipdBillingService.settleChargeItem(patientId, itemId, paymentMethod));
+            @RequestBody(required = false) Map<String, Object> body) {
+        String paymentMethod = body != null && body.containsKey("paymentMethod") ? body.get("paymentMethod").toString() : "CASH";
+        java.math.BigDecimal amountToPay = null;
+        if (body != null && body.containsKey("amount")) {
+            amountToPay = new java.math.BigDecimal(body.get("amount").toString());
+        }
+        return ResponseEntity.ok(ipdBillingService.settleChargeItem(patientId, itemId, paymentMethod, amountToPay));
     }
 
     @PostMapping("/patient/{patientId}/charges/settle-multiple")
