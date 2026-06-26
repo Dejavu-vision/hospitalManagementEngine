@@ -48,6 +48,7 @@ public class IpdBillingService {
     private final DepartmentRepository departmentRepository;
     private final HospitalServiceRepository hospitalServiceRepository;
     private final BillingItemRepository billingItemRepository;
+    private final PatientFinancialAccountService accountService;
 
 
     // ── Unified Lookup Helpers ────────────────────────────────────────────────
@@ -269,6 +270,9 @@ public class IpdBillingService {
         payment.setTenantId(tenantId);
         paymentRepository.save(payment);
 
+        // Recalculate patient financial account so outstanding balance stays fresh
+        accountService.recalculateAccountStatus(bill.getPatient(), tenantId);
+
         log.info("Billing item {} settled for patient {}: amount=₹{}, method={}", 
                 itemId, patientId, actualPayment, paymentMethodStr);
 
@@ -325,6 +329,12 @@ public class IpdBillingService {
         for (Billing modifiedBill : modifiedBills) {
             recalcNet(modifiedBill);
             billingRepository.save(modifiedBill);
+        }
+
+        // Recalculate patient financial account
+        Patient patient = patientRepository.findById(patientId).orElse(null);
+        if (patient != null) {
+            accountService.recalculateAccountStatus(patient, tenantId);
         }
 
         PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;

@@ -51,6 +51,7 @@ public class PatientService {
     private final DoctorAvailabilityService doctorAvailabilityService;
     private final PayerMasterRepository payerMasterRepository;
     private final PatientFinancialAccountRepository patientFinancialAccountRepository;
+    private final com.curamatrix.hsm.repository.BillingRepository billingRepository;
     private final QueueEventService queueEventService;
 
     @Transactional
@@ -445,7 +446,25 @@ public class PatientService {
 
             com.curamatrix.hsm.entity.PatientFinancialAccount account = patientFinancialAccountRepository
                     .findByPatientIdAndTenantId(p.getId(), tenantId).orElse(null);
-            
+
+            // Compute live outstanding from billings
+            java.math.BigDecimal liveOutstanding = java.math.BigDecimal.ZERO;
+            try {
+                java.util.List<com.curamatrix.hsm.entity.Billing> bills = billingRepository.findAllByPatientIdAndTenantId(p.getId(), tenantId);
+                for (com.curamatrix.hsm.entity.Billing bill : bills) {
+                    if (bill.getPaymentStatus() == com.curamatrix.hsm.enums.PaymentStatus.CANCELLED) continue;
+                    if (bill.getPaymentStatus() == com.curamatrix.hsm.enums.PaymentStatus.PAID) continue;
+                    java.math.BigDecimal net = bill.getNetAmount() != null ? bill.getNetAmount() : java.math.BigDecimal.ZERO;
+                    java.math.BigDecimal paid = bill.getPaidAmount() != null ? bill.getPaidAmount() : java.math.BigDecimal.ZERO;
+                    java.math.BigDecimal balance = net.subtract(paid);
+                    if (balance.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                        liveOutstanding = liveOutstanding.add(balance);
+                    }
+                }
+            } catch (Exception e) {
+                liveOutstanding = account != null ? account.getCurrentOutstanding() : java.math.BigDecimal.ZERO;
+            }
+
             results.add(PatientSummaryResponse.builder()
                     .id(p.getId())
                     .patientCode(p.getPatientCode())
@@ -456,8 +475,8 @@ public class PatientService {
                     .gender(p.getGender() != null ? p.getGender().name() : null)
                     .lastVisitDate(lastVisitDate)
                     .casePaper(casePaper)
-                    .financialStatus(account != null ? account.getFinancialStatus().name() : com.curamatrix.hsm.enums.FinancialStatus.REGISTERED_UNPAID.name())
-                    .currentOutstanding(account != null ? account.getCurrentOutstanding() : java.math.BigDecimal.ZERO)
+                    .financialStatus(liveOutstanding.compareTo(java.math.BigDecimal.ZERO) <= 0 ? com.curamatrix.hsm.enums.FinancialStatus.FULLY_PAID.name() : com.curamatrix.hsm.enums.FinancialStatus.REGISTERED_UNPAID.name())
+                    .currentOutstanding(liveOutstanding)
                     .build());
         }
         return results;
@@ -576,19 +595,30 @@ public class PatientService {
             log.warn("Could not fetch active appointment for patient: {}", e.getMessage());
         }
 
-        // Add financial status
+        // Add financial status — compute live from billings for accuracy
         try {
-            com.curamatrix.hsm.entity.PatientFinancialAccount account = patientFinancialAccountRepository
-                    .findByPatientIdAndTenantId(patient.getId(), com.curamatrix.hsm.context.TenantContext.getTenantId()).orElse(null);
-            if (account != null) {
-                resp.setFinancialStatus(account.getFinancialStatus().name());
-                resp.setCurrentOutstanding(account.getCurrentOutstanding());
+            Long tenantId = com.curamatrix.hsm.context.TenantContext.getTenantId();
+            java.util.List<com.curamatrix.hsm.entity.Billing> bills = billingRepository.findAllByPatientIdAndTenantId(patient.getId(), tenantId);
+            java.math.BigDecimal liveOutstanding = java.math.BigDecimal.ZERO;
+            for (com.curamatrix.hsm.entity.Billing bill : bills) {
+                if (bill.getPaymentStatus() == com.curamatrix.hsm.enums.PaymentStatus.CANCELLED) continue;
+                if (bill.getPaymentStatus() == com.curamatrix.hsm.enums.PaymentStatus.PAID) continue;
+                // For PENDING or PARTIAL bills, compute actual remaining
+                java.math.BigDecimal net = bill.getNetAmount() != null ? bill.getNetAmount() : java.math.BigDecimal.ZERO;
+                java.math.BigDecimal paid = bill.getPaidAmount() != null ? bill.getPaidAmount() : java.math.BigDecimal.ZERO;
+                java.math.BigDecimal balance = net.subtract(paid);
+                if (balance.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                    liveOutstanding = liveOutstanding.add(balance);
+                }
+            }
+            resp.setCurrentOutstanding(liveOutstanding);
+            if (liveOutstanding.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+                resp.setFinancialStatus(com.curamatrix.hsm.enums.FinancialStatus.FULLY_PAID.name());
             } else {
                 resp.setFinancialStatus(com.curamatrix.hsm.enums.FinancialStatus.REGISTERED_UNPAID.name());
-                resp.setCurrentOutstanding(java.math.BigDecimal.ZERO);
             }
         } catch (Exception e) {
-            log.warn("Could not fetch financial account for patient: {}", e.getMessage());
+            log.warn("Could not compute financial status for patient: {}", e.getMessage());
             resp.setFinancialStatus(com.curamatrix.hsm.enums.FinancialStatus.REGISTERED_UNPAID.name());
             resp.setCurrentOutstanding(java.math.BigDecimal.ZERO);
         }
