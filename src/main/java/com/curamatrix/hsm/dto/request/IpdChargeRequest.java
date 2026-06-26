@@ -31,4 +31,5 @@ public class IpdChargeRequest {
 
     private Boolean payNow;
     private String paymentMethod;
+    private BigDecimal paidAmount;
 }

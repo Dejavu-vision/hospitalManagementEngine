@@ -148,10 +148,18 @@ public class IpdBillingService {
                 .build();
 
         boolean payNow = Boolean.TRUE.equals(req.getPayNow());
+        BigDecimal actualPaid = BigDecimal.ZERO;
         if (payNow) {
-            item.setPaymentStatus(PaymentStatus.PAID);
-            item.setPaidAmount(total);
-            bill.setPaidAmount(bill.getPaidAmount().add(total));
+            actualPaid = req.getPaidAmount() != null ? req.getPaidAmount() : total;
+            item.setPaidAmount(actualPaid);
+            if (actualPaid.compareTo(total) >= 0) {
+                item.setPaymentStatus(PaymentStatus.PAID);
+            } else if (actualPaid.compareTo(BigDecimal.ZERO) > 0) {
+                item.setPaymentStatus(PaymentStatus.PARTIAL);
+            } else {
+                item.setPaymentStatus(PaymentStatus.PENDING);
+            }
+            bill.setPaidAmount((bill.getPaidAmount() != null ? bill.getPaidAmount() : BigDecimal.ZERO).add(actualPaid));
             if (req.getPaymentMethod() != null) {
                 try {
                     bill.setPaymentMethod(PaymentMethod.valueOf(req.getPaymentMethod().toUpperCase()));
@@ -170,7 +178,7 @@ public class IpdBillingService {
         recalcNet(bill);
         billingRepository.save(bill);
 
-        if (payNow) {
+        if (payNow && actualPaid.compareTo(BigDecimal.ZERO) > 0) {
             Long collectedById = getCurrentUserId();
             PaymentMethod pm = PaymentMethod.CASH;
             if (req.getPaymentMethod() != null) {
@@ -184,7 +192,7 @@ public class IpdBillingService {
                     .patient(bill.getPatient())
                     .billing(bill)
                     .billingItem(item)
-                    .amount(total)
+                    .amount(actualPaid)
                     .method(pm)
                     .collectedById(collectedById)
                     .build();
