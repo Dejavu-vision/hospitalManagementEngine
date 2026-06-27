@@ -47,6 +47,14 @@ public class HospitalServiceController {
         return ResponseEntity.status(HttpStatus.CREATED).body(catalogService.createService(request));
     }
 
+    @PostMapping("/bulk")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Bulk create or update hospital services")
+    public ResponseEntity<List<HospitalServiceResponse>> bulkSaveServices(
+            @Valid @RequestBody List<HospitalServiceRequest> requests) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(catalogService.bulkSaveServices(requests));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Update an existing hospital service")

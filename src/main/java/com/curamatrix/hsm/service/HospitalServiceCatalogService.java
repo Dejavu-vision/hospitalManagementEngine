@@ -138,6 +138,72 @@ public class HospitalServiceCatalogService {
         log.info("Permanently deleted hospital service: {} for tenant: {}", id, tenantId);
     }
 
+    @Transactional
+    public List<HospitalServiceResponse> bulkSaveServices(List<HospitalServiceRequest> requests) {
+        Long tenantId = TenantContext.getTenantId();
+        List<HospitalServiceResponse> responses = new java.util.ArrayList<>();
+
+        for (HospitalServiceRequest request : requests) {
+            java.util.Optional<HospitalService> existingOpt = hospitalServiceRepository.findByServiceCodeAndTenantId(request.getServiceCode(), tenantId);
+
+            HospitalService service;
+            if (existingOpt.isPresent()) {
+                service = existingOpt.get();
+                service.setServiceName(request.getServiceName());
+                service.setPrice(request.getPrice());
+                service.setItemType(request.getItemType());
+                service.setActive(request.isActive());
+                if (request.getDescription() != null) {
+                    service.setDescription(request.getDescription());
+                }
+                if (request.getValidityPeriodDays() != null) {
+                    service.setValidityPeriodDays(request.getValidityPeriodDays());
+                }
+                if (request.getIsInsurancePayable() != null) {
+                    service.setIsInsurancePayable(request.getIsInsurancePayable());
+                }
+                if (request.getInsuranceRate() != null) {
+                    service.setInsuranceRate(request.getInsuranceRate());
+                }
+                if (request.getGstPercentage() != null) {
+                    service.setGstPercentage(request.getGstPercentage());
+                }
+                if (request.getEffectiveFrom() != null) {
+                    service.setEffectiveFrom(request.getEffectiveFrom());
+                }
+            } else {
+                service = HospitalService.builder()
+                        .serviceName(request.getServiceName())
+                        .serviceCode(request.getServiceCode())
+                        .price(request.getPrice())
+                        .itemType(request.getItemType())
+                        .active(request.isActive())
+                        .description(request.getDescription())
+                        .validityPeriodDays(request.getValidityPeriodDays())
+                        .isInsurancePayable(request.getIsInsurancePayable() != null ? request.getIsInsurancePayable() : true)
+                        .insuranceRate(request.getInsuranceRate())
+                        .gstPercentage(request.getGstPercentage() != null ? request.getGstPercentage() : java.math.BigDecimal.ZERO)
+                        .effectiveFrom(request.getEffectiveFrom() != null ? request.getEffectiveFrom() : java.time.LocalDate.now())
+                        .build();
+                service.setTenantId(tenantId);
+            }
+
+            if (request.getDepartmentId() != null) {
+                Department dept = departmentRepository.findById(request.getDepartmentId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Department", "id", request.getDepartmentId()));
+                service.setDepartment(dept);
+            } else {
+                service.setDepartment(null);
+            }
+
+            service = hospitalServiceRepository.save(service);
+            responses.add(mapToResponse(service));
+        }
+
+        log.info("Bulk saved {} hospital services for tenant: {}", requests.size(), tenantId);
+        return responses;
+    }
+
     private HospitalServiceResponse mapToResponse(HospitalService service) {
         return HospitalServiceResponse.builder()
                 .id(service.getId())
