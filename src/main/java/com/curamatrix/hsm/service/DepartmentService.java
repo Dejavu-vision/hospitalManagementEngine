@@ -11,6 +11,8 @@ import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.DepartmentRepository;
 import com.curamatrix.hsm.repository.DoctorAvailabilityRepository;
 import com.curamatrix.hsm.repository.DoctorRepository;
+import com.curamatrix.hsm.repository.HospitalServiceRepository;
+import com.curamatrix.hsm.entity.HospitalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,6 +31,7 @@ public class DepartmentService {
     private final DoctorRepository doctorRepository;
     private final DoctorAvailabilityRepository availabilityRepository;
     private final DepartmentRepository departmentRepository;
+    private final HospitalServiceRepository hospitalServiceRepository;
 
     // ─── Department CRUD ─────────────────────────────────────────────────────
 
@@ -95,8 +98,19 @@ public class DepartmentService {
         Long tenantId = TenantContext.getTenantId();
         Department department = departmentRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Department", "id", id));
-        departmentRepository.delete(department);
-        log.info("Deleted department: {} for tenant: {}", id, tenantId);
+        
+        // Soft delete the department
+        department.setIsActive(false);
+        departmentRepository.save(department);
+
+        // Deactivate all services belonging to this department
+        List<HospitalService> services = hospitalServiceRepository.findAllByTenantIdAndDepartmentId(tenantId, id);
+        for (HospitalService service : services) {
+            service.setActive(false);
+        }
+        hospitalServiceRepository.saveAll(services);
+
+        log.info("Soft deleted department: {} and deactivated its {} services for tenant: {}", id, services.size(), tenantId);
     }
 
     // ─── Doctor Availability ─────────────────────────────────────────────────
