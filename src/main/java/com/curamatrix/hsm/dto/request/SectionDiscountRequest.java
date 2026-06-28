@@ -18,4 +18,7 @@ public class SectionDiscountRequest {
     private BigDecimal discount;
 
     private Long targetAdminId;
+
+    /** Name of the admin who approved/applied this discount (for audit trail) */
+    private String approvedByName;
 }

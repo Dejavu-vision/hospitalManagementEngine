@@ -1068,6 +1068,8 @@ public class IpdBillingService {
         result.put("discountApproved", discountApproved);
         String discountFeedback = pendingBills.stream().map(Billing::getDiscountFeedback).filter(java.util.Objects::nonNull).findFirst().orElse(null);
         result.put("discountFeedback", discountFeedback);
+        String discountApprovedBy = pendingBills.stream().map(Billing::getDiscountApprovedBy).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+        result.put("discountApprovedBy", discountApprovedBy);
         result.put("depositPaid", depositPaid);
         result.put("totalPaid", totalPaid.add(depositPaid));
         result.put("copayCollected", copayCollected);
@@ -1147,9 +1149,19 @@ public class IpdBillingService {
         if (isAdmin || bill.getDiscount().compareTo(BigDecimal.ZERO) == 0 || !requireApproval) {
             bill.setDiscountApproved(true);
             bill.setDiscountFeedback(null);
+            // Store who approved — either the admin applying directly, or the named approver passed from UI
+            if (req.getApprovedByName() != null && !req.getApprovedByName().isBlank()) {
+                bill.setDiscountApprovedBy(req.getApprovedByName());
+            } else if (auth != null && auth.getName() != null) {
+                bill.setDiscountApprovedBy(auth.getName());
+            }
         } else {
             bill.setDiscountApproved(false);
             bill.setDiscountFeedback(null);
+            // For non-admin: store who was selected to approve (pending approval)
+            if (req.getApprovedByName() != null && !req.getApprovedByName().isBlank()) {
+                bill.setDiscountApprovedBy(req.getApprovedByName());
+            }
         }
 
         billingRepository.save(bill);
@@ -1172,15 +1184,25 @@ public class IpdBillingService {
 
     @Transactional
     public Map<String, Object> respondDiscount(Long patientId, RespondDiscountRequest request) {
+        return respondDiscount(patientId, request, null);
+    }
+
+    @Transactional
+    public Map<String, Object> respondDiscount(Long patientId, RespondDiscountRequest request, String approvedBy) {
         Long tenantId = TenantContext.getTenantId();
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
         Billing bill = getPrimaryBill(patientId, tenantId, admission);
 
-
         bill.setDiscountApproved(request.getApproved());
         bill.setDiscountFeedback(request.getFeedback());
+
+        // Store who responded to the discount (admin email/name from JWT Principal)
+        if (approvedBy != null && !approvedBy.isBlank()) {
+            bill.setDiscountApprovedBy(approvedBy);
+        }
+
         billingRepository.save(bill);
-        log.info("Discount {} by admin for patient {}. Feedback: {}", request.getApproved() ? "approved" : "rejected", patientId, request.getFeedback());
+        log.info("Discount {} by '{}' for patient {}. Feedback: {}", request.getApproved() ? "approved" : "rejected", approvedBy, patientId, request.getFeedback());
 
         // SSE: notify receptionists that the discount has been responded to
         Patient p = bill.getPatient();

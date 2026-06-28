@@ -158,8 +158,10 @@ public class IpdBillingController {
     @Operation(summary = "Approve or reject pending discount for a patient's bill")
     public ResponseEntity<Map<String, Object>> respondDiscount(
             @PathVariable Long patientId,
-            @Valid @RequestBody RespondDiscountRequest request) {
-        return ResponseEntity.ok(ipdBillingService.respondDiscount(patientId, request));
+            @Valid @RequestBody RespondDiscountRequest request,
+            java.security.Principal principal) {
+        String approvedBy = principal != null ? principal.getName() : null;
+        return ResponseEntity.ok(ipdBillingService.respondDiscount(patientId, request, approvedBy));
     }
 
     // ── Settlement & Discharge ────────────────────────────────────────────────
