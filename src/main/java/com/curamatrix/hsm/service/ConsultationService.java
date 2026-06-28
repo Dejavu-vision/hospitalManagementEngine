@@ -270,8 +270,26 @@ public class ConsultationService {
     public List<PatientResponse> getDoctorPatients(Long doctorId) {
         Long tenantId = TenantContext.getTenantId();
         List<Patient> patients = appointmentRepository.findDistinctPatientsByDoctor(doctorId, tenantId);
+
+        // Batch-load last visit dates for all patients to avoid N+1 queries
+        List<Long> patientIds = patients.stream().map(Patient::getId).collect(Collectors.toList());
+        java.util.Map<Long, java.time.LocalDate> lastVisitMap = new java.util.HashMap<>();
+        if (!patientIds.isEmpty()) {
+            appointmentRepository.findLastVisitDatesByPatientIds(patientIds, tenantId)
+                .forEach(row -> {
+                    Long pid = ((Number) row[0]).longValue();
+                    if (row[1] != null) {
+                        lastVisitMap.put(pid, (java.time.LocalDate) row[1]);
+                    }
+                });
+        }
+
         return patients.stream()
-                .map(this::mapToPatientResponse)
+                .map(p -> {
+                    PatientResponse resp = mapToPatientResponse(p);
+                    resp.setLastVisitDate(lastVisitMap.get(p.getId()));
+                    return resp;
+                })
                 .collect(Collectors.toList());
     }
 
