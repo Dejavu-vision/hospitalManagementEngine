@@ -95,6 +95,9 @@ public class Billing extends TenantAwareEntity {
     @Builder.Default
     private Boolean discountApproved = true;
 
+    @Column(name = "discount_approved_by", length = 100)
+    private String discountApprovedBy;
+
     @Column(name = "discount_feedback", length = 500)
     private String discountFeedback;
 

@@ -5,6 +5,7 @@ import com.curamatrix.hsm.dto.request.CollectPaymentRequest;
 import com.curamatrix.hsm.dto.response.BillingItemResponse;
 import com.curamatrix.hsm.dto.response.BillingResponse;
 import com.curamatrix.hsm.dto.response.BillingSummaryResponse;
+import com.curamatrix.hsm.dto.response.DiscountBreakdownDTO;
 import com.curamatrix.hsm.dto.response.InsuranceSplitResponse;
 import com.curamatrix.hsm.entity.*;
 import com.curamatrix.hsm.enums.BillingItemType;
@@ -382,6 +383,11 @@ public class BillingService {
 
     @Transactional
     public BillingResponse applyDiscount(Long billingId, BigDecimal discount, Long tenantId) {
+        return applyDiscount(billingId, discount, tenantId, null);
+    }
+
+    @Transactional
+    public BillingResponse applyDiscount(Long billingId, BigDecimal discount, Long tenantId, String appliedBy) {
         Billing billing = billingRepository.findByIdAndTenantId(billingId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Billing", "id", billingId));
 
@@ -390,12 +396,19 @@ public class BillingService {
         }
 
         billing.setDiscount(discount);
+
+        // Track who applied the discount
+        if (appliedBy != null && !appliedBy.isBlank()) {
+            billing.setDiscountApprovedBy(appliedBy);
+            billing.setDiscountApproved(true);
+        }
+
         recalculateNetAmount(billing);
         billing = billingRepository.save(billing);
 
         accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
 
-        log.info("Discount applied to billing {}: discount={}, newNet={}", billingId, discount, billing.getNetAmount());
+        log.info("Discount applied to billing {} by {}: discount={}, newNet={}", billingId, appliedBy, discount, billing.getNetAmount());
         return mapToResponse(billing);
     }
 
@@ -692,6 +705,40 @@ public class BillingService {
 
         Patient patient = billing.getPatient();
 
+        // Parse discount breakdown from sectionDiscounts
+        List<DiscountBreakdownDTO> discountBreakdown = new java.util.ArrayList<>();
+        try {
+            java.util.Map<String, BigDecimal> sectionDiscountsMap = billing.getSectionDiscountsMap();
+            BigDecimal sumOfDepartmentDiscounts = BigDecimal.ZERO;
+            
+            for (java.util.Map.Entry<String, BigDecimal> entry : sectionDiscountsMap.entrySet()) {
+                BigDecimal amount = entry.getValue();
+                if (amount == null) {
+                    amount = BigDecimal.ZERO; // Handle null amounts
+                }
+                // Only include non-zero discount amounts
+                if (amount.compareTo(BigDecimal.ZERO) > 0) {
+                    discountBreakdown.add(DiscountBreakdownDTO.builder()
+                            .departmentName(entry.getKey())
+                            .discountAmount(amount)
+                            .build());
+                    sumOfDepartmentDiscounts = sumOfDepartmentDiscounts.add(amount);
+                }
+            }
+            
+            // Validate sum of department discounts against aggregate discount
+            if (!discountBreakdown.isEmpty() && billing.getDiscount() != null) {
+                BigDecimal difference = sumOfDepartmentDiscounts.subtract(billing.getDiscount()).abs();
+                if (difference.compareTo(new BigDecimal("0.01")) > 0) {
+                    log.warn("Discount mismatch for billing {}: sum of department discounts (₹{}) != aggregate discount (₹{})",
+                            billing.getId(), sumOfDepartmentDiscounts, billing.getDiscount());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse section discounts for billing {}: {}", billing.getId(), e.getMessage());
+            // Continue with empty breakdown - graceful error handling
+        }
+
         BillingResponse resp = BillingResponse.builder()
                 .id(billing.getId())
                 .invoiceNumber(billing.getInvoiceNumber())
@@ -713,6 +760,10 @@ public class BillingService {
                 .paidAt(billing.getPaidAt())
                 .createdByName(billing.getCreatedBy() != null ? billing.getCreatedBy().getFullName() : null)
                 .remarks(billing.getRemarks())
+                .discountBreakdown(discountBreakdown)
+                .discountApproved(billing.getDiscountApproved())
+                .discountApprovedBy(billing.getDiscountApprovedBy())
+                .discountFeedback(billing.getDiscountFeedback())
                 .build();
 
         // Attach insurance split if present

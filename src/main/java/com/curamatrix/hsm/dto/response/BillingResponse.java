@@ -40,4 +40,10 @@ public class BillingResponse {
     private String createdByName;
     private String remarks;
     private InsuranceSplitResponse insuranceSplit;
+
+    // Discount breakdown fields
+    private List<DiscountBreakdownDTO> discountBreakdown;
+    private Boolean discountApproved;
+    private String discountApprovedBy;
+    private String discountFeedback;
 }

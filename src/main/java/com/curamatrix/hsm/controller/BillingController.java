@@ -93,9 +93,13 @@ public class BillingController {
     @PatchMapping("/invoices/{id}/discount")
     public ResponseEntity<BillingResponse> applyDiscount(
             @PathVariable Long id,
-            @RequestBody Map<String, BigDecimal> body) {
-        BigDecimal discount = body.getOrDefault("discount", BigDecimal.ZERO);
-        return ResponseEntity.ok(billingService.applyDiscount(id, discount, TenantContext.getTenantId()));
+            @RequestBody Map<String, Object> body,
+            java.security.Principal principal) {
+        BigDecimal discount = body.get("discount") != null
+                ? new java.math.BigDecimal(body.get("discount").toString())
+                : BigDecimal.ZERO;
+        String appliedBy = principal != null ? principal.getName() : null;
+        return ResponseEntity.ok(billingService.applyDiscount(id, discount, TenantContext.getTenantId(), appliedBy));
     }
 
     // ─── Registration / Case Paper Billing ───────────────────────────────────

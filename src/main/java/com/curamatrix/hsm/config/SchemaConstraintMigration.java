@@ -34,6 +34,9 @@ public class SchemaConstraintMigration implements CommandLineRunner {
 
         // Clean up legacy PENDING_ACCEPTANCE appointments to CHECKED_IN
         cleanupPendingAcceptanceAppointments();
+
+        // Ensure billing discount breakdown columns exist (idempotent — safe to run every startup)
+        ensureBillingDiscountColumns();
     }
 
     private void cleanupPendingAcceptanceAppointments() {
@@ -92,6 +95,36 @@ public class SchemaConstraintMigration implements CommandLineRunner {
             }
         } catch (Exception e) {
             log.warn("SchemaConstraintMigration: error processing table '{}': {}", table, e.getMessage());
+        }
+    }
+
+    /**
+     * Ensures discount breakdown columns exist on the billings table.
+     * Checks information_schema before altering — completely safe to run on every startup.
+     * This permanently fixes the case where Flyway V16 hasn't run on the target DB.
+     */
+    private void ensureBillingDiscountColumns() {
+        addColumnIfMissing("billings", "section_discounts",   "VARCHAR(1000) NULL");
+        addColumnIfMissing("billings", "discount_approved_by","VARCHAR(100) NULL");
+        addColumnIfMissing("billings", "discount_feedback",   "VARCHAR(500) NULL");
+        addColumnIfMissing("billings", "discount_approved",   "BOOLEAN NOT NULL DEFAULT TRUE");
+    }
+
+    private void addColumnIfMissing(String table, String column, String definition) {
+        try {
+            Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                Integer.class, table, column);
+
+            if (count == null || count == 0) {
+                jdbc.execute("ALTER TABLE `" + table + "` ADD COLUMN `" + column + "` " + definition);
+                log.info("SchemaConstraintMigration: added missing column '{}.{}'", table, column);
+            } else {
+                log.debug("SchemaConstraintMigration: column '{}.{}' already exists — skipping", table, column);
+            }
+        } catch (Exception e) {
+            log.warn("SchemaConstraintMigration: could not ensure column '{}.{}': {}", table, column, e.getMessage());
         }
     }
 }
