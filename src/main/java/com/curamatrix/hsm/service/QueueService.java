@@ -110,13 +110,22 @@ public class QueueService {
     // ── New rich dashboard endpoint ───────────────────────────────────────────
 
     public QueueDashboardResponse getQueueDashboard(Long selectedDoctorId) {
+        return getQueueDashboard(selectedDoctorId, null, null);
+    }
+
+    public QueueDashboardResponse getQueueDashboard(Long selectedDoctorId, LocalDate fromDate, LocalDate toDate) {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
 
+        LocalDate effectiveFrom = fromDate != null ? fromDate : today;
+        LocalDate effectiveTo = toDate != null ? toDate : today;
+
         // All today's appointments (all statuses — for stats and recent activity)
         // Deduplicate by appointment ID in case JOIN FETCH produces duplicates
-        List<Appointment> allToday = appointmentRepository.findAllByDateAndTenant(today, tenantId)
+        List<Appointment> allToday = ((fromDate != null || toDate != null)
+                ? appointmentRepository.findAllByDateRangeAndTenant(effectiveFrom, effectiveTo, tenantId)
+                : appointmentRepository.findAllByDateAndTenant(today, tenantId))
                 .stream()
                 .collect(Collectors.collectingAndThen(
                         Collectors.toMap(a -> a.getId(), a -> a, (a, b) -> a, java.util.LinkedHashMap::new),
@@ -134,8 +143,13 @@ public class QueueService {
 
         // Status counts
         Map<AppointmentStatus, Long> counts = new EnumMap<>(AppointmentStatus.class);
-        appointmentRepository.countByStatusForDate(today, tenantId)
-                .forEach(row -> counts.put((AppointmentStatus) row[0], (Long) row[1]));
+        if (fromDate != null || toDate != null) {
+            appointmentRepository.countByStatusForDateRange(effectiveFrom, effectiveTo, tenantId)
+                    .forEach(row -> counts.put((AppointmentStatus) row[0], (Long) row[1]));
+        } else {
+            appointmentRepository.countByStatusForDate(today, tenantId)
+                    .forEach(row -> counts.put((AppointmentStatus) row[0], (Long) row[1]));
+        }
 
         long totalTokens = allToday.size();
         long waiting = counts.getOrDefault(AppointmentStatus.BOOKED, 0L)
@@ -145,8 +159,9 @@ public class QueueService {
         long noShows = counts.getOrDefault(AppointmentStatus.NO_SHOW, 0L);
 
         // Doctor availability map
-        List<DoctorAvailability> availabilities = doctorAvailabilityRepository
-                .findByAvailabilityDateAndTenantId(today, tenantId);
+        List<DoctorAvailability> availabilities = (fromDate != null || toDate != null)
+                ? doctorAvailabilityRepository.findByAvailabilityDateBetweenAndTenantId(effectiveFrom, effectiveTo, tenantId)
+                : doctorAvailabilityRepository.findByAvailabilityDateAndTenantId(today, tenantId);
         Map<Long, DoctorAvailability> availMap = availabilities.stream()
                 .collect(Collectors.toMap(da -> da.getDoctor().getId(), da -> da, (a, b) -> a));
 
@@ -243,8 +258,9 @@ public class QueueService {
         List<QueueEntryResponse> heldPatients = new ArrayList<>();
         String waitingQueueLabel = "Waiting Queue";
         if (queueDoctorId != null) {
-            List<Appointment> docQueue = appointmentRepository
-                    .findTodayQueueByDoctorAndTenant(queueDoctorId, today, tenantId);
+            List<Appointment> docQueue = (fromDate != null || toDate != null)
+                    ? appointmentRepository.findQueueByDoctorAndDateRangeAndTenant(queueDoctorId, effectiveFrom, effectiveTo, tenantId)
+                    : appointmentRepository.findTodayQueueByDoctorAndTenant(queueDoctorId, today, tenantId);
             Doctor queueDoc = docQueue.isEmpty() ? null : docQueue.get(0).getDoctor();
             if (queueDoc != null && queueDoc.getDepartment() != null) {
                 waitingQueueLabel = "Waiting Queue — " + queueDoc.getDepartment().getName();
@@ -297,7 +313,7 @@ public class QueueService {
         List<QueueDashboardResponse.RecentActivity> recentActivity = buildRecentActivity(allToday);
 
         return QueueDashboardResponse.builder()
-                .date(today)
+                .date(effectiveFrom)
                 .totalTokensToday(totalTokens)
                 .currentlyWaiting(waiting)
                 .servedToday(served)

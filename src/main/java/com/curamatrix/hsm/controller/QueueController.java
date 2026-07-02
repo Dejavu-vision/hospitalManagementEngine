@@ -57,8 +57,10 @@ public class QueueController {
     @GetMapping("/queue-dashboard")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<QueueDashboardResponse> getQueueDashboard(
-            @RequestParam(required = false) Long doctorId) {
-        return ResponseEntity.ok(queueService.getQueueDashboard(doctorId));
+            @RequestParam(required = false) Long doctorId,
+            @RequestParam(name = "from_date", required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate fromDate,
+            @RequestParam(name = "to_date", required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate toDate) {
+        return ResponseEntity.ok(queueService.getQueueDashboard(doctorId, fromDate, toDate));
     }
 
     public record NotifyDoctorRequest(Long appointmentId, Long doctorId, String patientName) {}

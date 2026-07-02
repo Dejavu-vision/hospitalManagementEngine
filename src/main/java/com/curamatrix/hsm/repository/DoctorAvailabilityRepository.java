@@ -13,4 +13,6 @@ public interface DoctorAvailabilityRepository extends JpaRepository<DoctorAvaila
             Long doctorId, LocalDate date, Long tenantId);
 
     List<DoctorAvailability> findByAvailabilityDateAndTenantId(LocalDate date, Long tenantId);
+
+    List<DoctorAvailability> findByAvailabilityDateBetweenAndTenantId(LocalDate fromDate, LocalDate toDate, Long tenantId);
 }

@@ -175,4 +175,34 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     @Query("SELECT a FROM Appointment a WHERE a.patient.id = :patientId AND a.tenantId = :tenantId")
     List<Appointment> findAllByPatientIdAndTenantId(@Param("patientId") Long patientId,
                                                     @Param("tenantId") Long tenantId);
+
+    @Query("SELECT DISTINCT a FROM Appointment a " +
+           "JOIN FETCH a.patient " +
+           "JOIN FETCH a.doctor d " +
+           "JOIN FETCH d.user " +
+           "LEFT JOIN FETCH d.department " +
+           "WHERE a.appointmentDate >= :fromDate AND a.appointmentDate <= :toDate AND a.tenantId = :tenantId " +
+           "ORDER BY a.doctor.id, a.tokenNumber, a.appointmentTime")
+    List<Appointment> findAllByDateRangeAndTenant(@Param("fromDate") LocalDate fromDate,
+                                                  @Param("toDate") LocalDate toDate,
+                                                  @Param("tenantId") Long tenantId);
+
+    @Query("SELECT a.status, COUNT(a) FROM Appointment a " +
+           "WHERE a.appointmentDate >= :fromDate AND a.appointmentDate <= :toDate AND a.tenantId = :tenantId GROUP BY a.status")
+    List<Object[]> countByStatusForDateRange(@Param("fromDate") LocalDate fromDate,
+                                             @Param("toDate") LocalDate toDate,
+                                             @Param("tenantId") Long tenantId);
+
+    @Query("SELECT DISTINCT a FROM Appointment a " +
+           "JOIN FETCH a.patient " +
+           "JOIN FETCH a.doctor d " +
+           "JOIN FETCH d.user " +
+           "LEFT JOIN FETCH d.department " +
+           "WHERE a.doctor.id = :doctorId " +
+           "AND a.appointmentDate >= :fromDate AND a.appointmentDate <= :toDate AND a.tenantId = :tenantId " +
+           "ORDER BY a.appointmentDate ASC, CASE WHEN a.type = 'WALK_IN' THEN a.tokenNumber ELSE 999999 END, a.appointmentTime")
+    List<Appointment> findQueueByDoctorAndDateRangeAndTenant(@Param("doctorId") Long doctorId,
+                                                             @Param("fromDate") LocalDate fromDate,
+                                                             @Param("toDate") LocalDate toDate,
+                                                             @Param("tenantId") Long tenantId);
 }
