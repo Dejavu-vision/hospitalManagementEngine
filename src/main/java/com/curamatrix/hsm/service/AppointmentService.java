@@ -405,7 +405,7 @@ public class AppointmentService {
     }
 
     @Transactional
-    public AppointmentResponse reassignDoctor(Long appointmentId, Long newDoctorId) {
+    public AppointmentResponse reassignDoctor(Long appointmentId, Long newDoctorId, String position) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
         Doctor newDoctor = doctorRepository.findById(newDoctorId)
@@ -413,10 +413,29 @@ public class AppointmentService {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
 
-        // Reassign keeps the existing token — no new token needed, patient keeps their place
         appointment.setDoctor(newDoctor);
         appointment.setReassignNeeded(false);
+
+        if ("TOP".equalsIgnoreCase(position)) {
+            // Find current minimum token for the new doctor today (Emergency placement at top of queue)
+            Integer minToken = appointmentRepository.findMinTokenNumber(newDoctor.getId(), today, tenantId);
+            int nextMin = (minToken != null) ? minToken - 1 : 0;
+            if (nextMin > 0) nextMin = 0; // Emergency tokens are <= 0
+            appointment.setTokenNumber(nextMin);
+        } else {
+            // Find current maximum token for the new doctor today (Standard placement at bottom of queue)
+            Integer maxToken = appointmentRepository.findMaxTokenNumber(newDoctor.getId(), today, tenantId);
+            int nextMax = (maxToken != null) ? maxToken + 1 : 1;
+            if (nextMax < 1) nextMax = 1; // Standard tokens are >= 1
+            appointment.setTokenNumber(nextMax);
+        }
+
         appointment = appointmentRepository.save(appointment);
+
+        try {
+            queueEventService.broadcastQueueUpdate(tenantId, newDoctor.getId());
+        } catch (Exception e) {}
+
         return mapToResponse(appointment);
     }
 

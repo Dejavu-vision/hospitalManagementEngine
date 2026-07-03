@@ -127,8 +127,9 @@ public class AppointmentController {
     @PreAuthorize("hasRole('RECEPTIONIST')")
     public ResponseEntity<AppointmentResponse> reassignDoctor(
             @PathVariable Long id,
-            @RequestParam Long newDoctorId) {
-        return ResponseEntity.ok(appointmentService.reassignDoctor(id, newDoctorId));
+            @RequestParam Long newDoctorId,
+            @RequestParam(value = "position", defaultValue = "BOTTOM") String position) {
+        return ResponseEntity.ok(appointmentService.reassignDoctor(id, newDoctorId, position));
     }
 
     @GetMapping("/{id}/status-log")

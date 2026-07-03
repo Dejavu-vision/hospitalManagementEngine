@@ -439,8 +439,8 @@ public class QueueService {
                 .status(a.getStatus())
                 .type(a.getType())
                 .visitType(visitType)
-                .priorityCategory("REGULAR")
-                .priorityLabel("Normal")
+                .priorityCategory(a.getTokenNumber() != null && a.getTokenNumber() <= 0 ? "EMERGENCY" : "REGULAR")
+                .priorityLabel(a.getTokenNumber() != null && a.getTokenNumber() <= 0 ? "Emergency" : "Normal")
                 .checkedInAt(a.getCheckedInAt())
                 .queuePosition(position)
                 .estimatedWaitMinutes(estWaitMinutes)
@@ -460,6 +460,9 @@ public class QueueService {
 
     private String formatToken(Integer tokenNumber, com.curamatrix.hsm.enums.AppointmentType type) {
         if (tokenNumber == null) return "—";
+        if (tokenNumber <= 0) {
+            return "EMERGENCY";
+        }
         if (type == com.curamatrix.hsm.enums.AppointmentType.WALK_IN) {
             return "T-" + String.format("%03d", tokenNumber);
         }

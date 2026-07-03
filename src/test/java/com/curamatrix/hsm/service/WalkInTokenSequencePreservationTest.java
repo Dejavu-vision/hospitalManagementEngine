@@ -659,4 +659,63 @@ class WalkInTokenSequencePreservationTest {
         System.out.println("Tenant isolation is maintained");
         System.out.println("============================================");
     }
+
+    @Test
+    void testReassignDoctorQueuePlacement() {
+        TenantContext.setTenantId(TENANT_A_ID);
+        SecurityContextHolder.setContext(
+                SecurityContextHolder.createEmptyContext()
+        );
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        testReceptionistA.getEmail(),
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_RECEPTIONIST"))
+                )
+        );
+
+        // Create appointment 1 for Doctor A
+        WalkInRequest request1 = new WalkInRequest();
+        request1.setPatientId(testPatientA.getId());
+        request1.setDoctorId(testDoctorA.getId());
+        request1.setNotes("Doctor A patient 1");
+        request1.setPayNow(false);
+        request1.setFollowUp(false);
+        request1.setCounter("A1");
+        AppointmentResponse appt1 = appointmentService.createWalkIn(request1);
+
+        // Create appointment 2 for Doctor A
+        WalkInRequest request2 = new WalkInRequest();
+        request2.setPatientId(testPatientA.getId());
+        request2.setDoctorId(testDoctorA.getId());
+        request2.setNotes("Doctor A patient 2");
+        request2.setPayNow(false);
+        request2.setFollowUp(false);
+        request2.setCounter("A2");
+        AppointmentResponse appt2 = appointmentService.createWalkIn(request2);
+
+        // Reassign appointment 2 to Doctor B with position "TOP" (Emergency)
+        AppointmentResponse reassignedTop = appointmentService.reassignDoctor(appt2.getId(), testDoctorB.getId(), "TOP");
+        assertEquals(testDoctorB.getId(), reassignedTop.getDoctorId());
+        assertTrue(reassignedTop.getTokenNumber() <= 0, "Emergency token number should be <= 0");
+
+        // Create a walk-in for Doctor B directly (will be token 1)
+        WalkInRequest requestB = new WalkInRequest();
+        requestB.setPatientId(testPatientA.getId());
+        requestB.setDoctorId(testDoctorB.getId());
+        requestB.setNotes("Doctor B standard patient");
+        requestB.setPayNow(false);
+        requestB.setFollowUp(false);
+        requestB.setCounter("B1");
+        AppointmentResponse apptB = appointmentService.createWalkIn(requestB);
+        assertEquals(1, apptB.getTokenNumber());
+
+        // Reassign appointment 1 to Doctor B with position "BOTTOM"
+        AppointmentResponse reassignedBottom = appointmentService.reassignDoctor(appt1.getId(), testDoctorB.getId(), "BOTTOM");
+        assertEquals(testDoctorB.getId(), reassignedBottom.getDoctorId());
+        assertEquals(2, reassignedBottom.getTokenNumber(), "Should be placed at bottom of queue (token 2)");
+
+        TenantContext.clear();
+        SecurityContextHolder.clearContext();
+    }
 }

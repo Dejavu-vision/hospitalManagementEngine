@@ -38,6 +38,18 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
            "AND a.appointmentDate = :date AND a.type = 'WALK_IN'")
     Integer findMaxTokenNumber(@Param("doctorId") Long doctorId, @Param("date") LocalDate date);
     
+    @Query("SELECT MIN(a.tokenNumber) FROM Appointment a WHERE a.doctor.id = :doctorId " +
+           "AND a.appointmentDate = :date AND a.tenantId = :tenantId")
+    Integer findMinTokenNumber(@Param("doctorId") Long doctorId, 
+                               @Param("date") LocalDate date, 
+                               @Param("tenantId") Long tenantId);
+
+    @Query("SELECT MAX(a.tokenNumber) FROM Appointment a WHERE a.doctor.id = :doctorId " +
+           "AND a.appointmentDate = :date AND a.tenantId = :tenantId")
+    Integer findMaxTokenNumber(@Param("doctorId") Long doctorId, 
+                               @Param("date") LocalDate date, 
+                               @Param("tenantId") Long tenantId);
+    
     @Query("SELECT a FROM Appointment a WHERE " +
            "(:date IS NULL OR a.appointmentDate = :date) AND " +
            "(:doctorId IS NULL OR a.doctor.id = :doctorId) AND " +
