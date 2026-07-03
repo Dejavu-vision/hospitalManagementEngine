@@ -159,9 +159,7 @@ public class QueueService {
         long noShows = counts.getOrDefault(AppointmentStatus.NO_SHOW, 0L);
 
         // Doctor availability map
-        List<DoctorAvailability> availabilities = (fromDate != null || toDate != null)
-                ? doctorAvailabilityRepository.findByAvailabilityDateBetweenAndTenantId(effectiveFrom, effectiveTo, tenantId)
-                : doctorAvailabilityRepository.findByAvailabilityDateAndTenantId(today, tenantId);
+        List<DoctorAvailability> availabilities = doctorAvailabilityRepository.findByAvailabilityDateAndTenantId(today, tenantId);
         Map<Long, DoctorAvailability> availMap = availabilities.stream()
                 .collect(Collectors.toMap(da -> da.getDoctor().getId(), da -> da, (a, b) -> a));
 

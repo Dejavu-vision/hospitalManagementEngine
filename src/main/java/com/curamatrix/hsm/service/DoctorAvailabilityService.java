@@ -158,8 +158,8 @@ public class DoctorAvailabilityService {
                 .build();
         doctorStatusLogRepository.save(logRecord);
 
-        // 2. Offline mid-queue logic
-        if (newStatus == DoctorStatus.OFFLINE) {
+        // 2. Offline / Away / Emergency / Procedure mid-queue logic
+        if (newStatus != DoctorStatus.AVAILABLE) {
             List<Appointment> activeAppts = appointmentRepository.findActiveByDoctorAndDateAndTenant(doctorId, today, tenantId);
             for (Appointment appt : activeAppts) {
                 AppointmentStatus currentApptStatus = appt.getStatus();
@@ -180,6 +180,15 @@ public class DoctorAvailabilityService {
                     appointmentStatusLogRepository.save(apptStatusLog);
                 }
                 appointmentRepository.save(appt);
+            }
+        } else {
+            // When returning to AVAILABLE, clear the reassignment flag for remaining active appointments
+            List<Appointment> activeAppts = appointmentRepository.findActiveByDoctorAndDateAndTenant(doctorId, today, tenantId);
+            for (Appointment appt : activeAppts) {
+                if (appt.getReassignNeeded()) {
+                    appt.setReassignNeeded(false);
+                    appointmentRepository.save(appt);
+                }
             }
         }
 
