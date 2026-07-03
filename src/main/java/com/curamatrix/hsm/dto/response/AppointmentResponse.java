@@ -41,4 +41,5 @@ public class AppointmentResponse {
     private String counter;
     private Integer activeQueueLength;
     private Integer recallCount;
+    private Boolean reassignNeeded;
 }

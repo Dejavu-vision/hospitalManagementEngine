@@ -14,6 +14,8 @@ public class DoctorStatusUpdateRequest {
     /** Optional note — e.g. "Back in 30 min", "Emergency surgery" */
     private String statusNote;
 
+    private String reason;
+
     /** Estimated return time — required when ON_BREAK or IN_SURGERY */
     private LocalTime availableFrom;
 

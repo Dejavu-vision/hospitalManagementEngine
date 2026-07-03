@@ -176,7 +176,8 @@ public class AppointmentService {
         Appointment appointment = Appointment.builder()
                 .patient(patient).doctor(doctor).bookedBy(bookedBy)
                 .appointmentDate(today).type(AppointmentType.WALK_IN)
-                .tokenNumber(nextToken).status(AppointmentStatus.BOOKED)
+                .tokenNumber(nextToken).status(AppointmentStatus.CHECKED_IN)
+                .checkedInAt(LocalDateTime.now())
                 .notes(encodedNotes).build();
         appointment = appointmentRepository.save(appointment);
 
@@ -191,7 +192,7 @@ public class AppointmentService {
             billing = billingService.createAppointmentBilling(appointment, request.isPayNow());
         }
 
-        recordStatusLog(appointment, null, AppointmentStatus.BOOKED, bookedBy);
+        recordStatusLog(appointment, null, AppointmentStatus.CHECKED_IN, bookedBy);
 
         AppointmentResponse response = mapToResponse(appointment);
         if (billing != null) response.setBillingId(billing.getId());
@@ -414,6 +415,7 @@ public class AppointmentService {
 
         // Reassign keeps the existing token — no new token needed, patient keeps their place
         appointment.setDoctor(newDoctor);
+        appointment.setReassignNeeded(false);
         appointment = appointmentRepository.save(appointment);
         return mapToResponse(appointment);
     }
@@ -535,6 +537,7 @@ public class AppointmentService {
                 .heldAt(appointment.getHeldAt())
                 .createdAt(appointment.getCreatedAt())
                 .recallCount(appointment.getRecallCount())
+                .reassignNeeded(appointment.getReassignNeeded())
                 .build();
     }
 }

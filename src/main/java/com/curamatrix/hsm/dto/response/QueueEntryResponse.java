@@ -39,4 +39,5 @@ public class QueueEntryResponse {
     private LocalDateTime heldAt;       // populated for ON_HOLD entries
     private Integer holdMinutes;        // minutes elapsed since hold (computed server-side)
     private Boolean casePaperValid;     // whether patient has a valid (active & non-expired) case paper
+    private Boolean reassignNeeded;
 }

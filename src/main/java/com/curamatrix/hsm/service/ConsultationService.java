@@ -70,8 +70,8 @@ public class ConsultationService {
         appointment.setConsultationStart(LocalDateTime.now());
         appointment = appointmentRepository.save(appointment);
 
-        // Update doctor status to IN_CONSULTATION
-        updateDoctorStatus(doctor.getId(), DoctorStatus.IN_CONSULTATION);
+        // Update doctor status to AVAILABLE
+        updateDoctorStatus(doctor.getId(), DoctorStatus.AVAILABLE);
 
         log.info("Arrival confirmed for appointment {} by doctor {}", appointmentId, doctor.getId());
         return mapToAppointmentResponse(appointment);
@@ -169,11 +169,11 @@ public class ConsultationService {
         appointment.setConsultationEnd(LocalDateTime.now());
         appointmentRepository.save(appointment);
 
-        // Conditionally reset doctor status to ON_DUTY if no remaining IN_PROGRESS appointments
+        // Conditionally reset doctor status to AVAILABLE if no remaining IN_PROGRESS appointments
         Long remainingInProgress = appointmentRepository.countOtherInProgressByDoctor(
                 doctor.getId(), LocalDate.now(), tenantId, appointment.getId());
         if (remainingInProgress == 0) {
-            updateDoctorStatus(doctor.getId(), DoctorStatus.ON_DUTY);
+            updateDoctorStatus(doctor.getId(), DoctorStatus.AVAILABLE);
         }
 
         log.info("Consultation submitted for appointment {} by doctor {}", request.getAppointmentId(), doctor.getId());

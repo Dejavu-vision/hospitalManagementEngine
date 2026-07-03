@@ -299,7 +299,7 @@ public class PatientService {
         try {
             com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest statusReq = 
                     new com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest();
-            statusReq.setStatus(com.curamatrix.hsm.enums.DoctorStatus.IN_CONSULTATION);
+            statusReq.setStatus(com.curamatrix.hsm.enums.DoctorStatus.AVAILABLE);
             doctorAvailabilityService.updateStatus(doctor.getId(), statusReq);
         } catch (Exception e) {
             log.warn("Could not update doctor status to IN_CONSULTATION on patient checkin: {}", e.getMessage());
@@ -344,7 +344,7 @@ public class PatientService {
                 if (remainingInProgress == 0) {
                     com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest statusReq = 
                             new com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest();
-                    statusReq.setStatus(com.curamatrix.hsm.enums.DoctorStatus.ON_DUTY);
+                    statusReq.setStatus(com.curamatrix.hsm.enums.DoctorStatus.AVAILABLE);
                     doctorAvailabilityService.updateStatus(appt.getDoctor().getId(), statusReq);
                 }
             } catch (Exception e) {

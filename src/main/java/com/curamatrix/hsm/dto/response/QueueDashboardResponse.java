@@ -66,6 +66,7 @@ public class QueueDashboardResponse {
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class ActiveQueueSummary {
         private Long doctorId;
+        private Long userId;
         private String doctorName;
         private String qualification;
         private Long departmentId;

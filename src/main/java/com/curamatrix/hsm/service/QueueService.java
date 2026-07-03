@@ -187,7 +187,7 @@ public class QueueService {
                     .collect(Collectors.toList());
 
             DoctorAvailability avail = availMap.get(doctorId);
-            DoctorStatus status = avail != null ? avail.getStatus() : DoctorStatus.OFF_DUTY;
+            DoctorStatus status = avail != null ? avail.getStatus() : DoctorStatus.OFFLINE;
 
             long waitingForDoc = activeForDoc.stream()
                     .filter(a -> a.getStatus() == AppointmentStatus.BOOKED
@@ -213,6 +213,7 @@ public class QueueService {
 
             activeQueues.add(QueueDashboardResponse.ActiveQueueSummary.builder()
                     .doctorId(doctorId)
+                    .userId(doc.getUser() != null ? doc.getUser().getId() : null)
                     .doctorName(doc.getUser().getFullName())
                     .qualification(doc.getQualification())
                     .departmentId(doc.getDepartment() != null ? doc.getDepartment().getId() : null)
@@ -372,6 +373,7 @@ public class QueueService {
                 .checkedInAt(a.getCheckedInAt())
                 .queuePosition(position)
                 .estimatedWaitMinutes(estWaitMinutes)
+                .reassignNeeded(a.getReassignNeeded())
                 .build();
     }
 
@@ -452,6 +454,7 @@ public class QueueService {
                         ? Math.max(0, (int) ChronoUnit.MINUTES.between(a.getHeldAt(), LocalDateTime.now()))
                         : null)
                 .casePaperValid(casePaperValid)
+                .reassignNeeded(a.getReassignNeeded())
                 .build();
     }
 
@@ -464,13 +467,13 @@ public class QueueService {
     }
 
     private String toStatusLabel(DoctorStatus status) {
-        if (status == null) return "Idle";
+        if (status == null) return "Offline";
         return switch (status) {
-            case ON_DUTY -> "Active";
-            case IN_CONSULTATION -> "Busy";
-            case ON_BREAK -> "Break";
-            case IN_SURGERY -> "Surgery";
-            case OFF_DUTY -> "Idle";
+            case AVAILABLE -> "Available";
+            case AWAY -> "Away";
+            case IN_EMERGENCY -> "In Emergency";
+            case IN_PROCEDURE -> "In Procedure";
+            case OFFLINE -> "Offline";
         };
     }
 

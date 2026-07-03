@@ -81,4 +81,8 @@ public class Appointment extends TenantAwareEntity {
 
     @Column(name = "held_at")
     private LocalDateTime heldAt;
+
+    @Column(name = "reassign_needed", nullable = false)
+    @Builder.Default
+    private Boolean reassignNeeded = false;
 }

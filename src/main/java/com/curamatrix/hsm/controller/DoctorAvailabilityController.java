@@ -64,11 +64,23 @@ public class DoctorAvailabilityController {
         return ResponseEntity.ok(availabilityService.upsertAvailability(doctorId, request));
     }
 
+    @PatchMapping("/api/doctors/{doctorId}/availability")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<DoctorAvailabilityResponse> updateAvailabilityStatus(
+            @PathVariable Long doctorId,
+            @Valid @RequestBody DoctorStatusUpdateRequest request,
+            Authentication auth) {
+        availabilityService.verifyDoctorSelfUpdate(doctorId, auth.getName());
+        return ResponseEntity.ok(availabilityService.updateStatus(doctorId, request));
+    }
+
     @PatchMapping("/api/doctors/{doctorId}/status")
-    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN', 'DOCTOR')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<DoctorAvailabilityResponse> updateStatus(
             @PathVariable Long doctorId,
-            @Valid @RequestBody DoctorStatusUpdateRequest request) {
+            @Valid @RequestBody DoctorStatusUpdateRequest request,
+            Authentication auth) {
+        availabilityService.verifyDoctorSelfUpdate(doctorId, auth.getName());
         return ResponseEntity.ok(availabilityService.updateStatus(doctorId, request));
     }
 }

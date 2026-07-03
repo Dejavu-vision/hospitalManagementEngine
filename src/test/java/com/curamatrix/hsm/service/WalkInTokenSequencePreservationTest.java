@@ -85,12 +85,14 @@ class WalkInTokenSequencePreservationTest {
 
     @BeforeEach
     void setUp() {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+
         // Create Tenant A
         TenantContext.setTenantId(TENANT_A_ID);
         tenantA = Tenant.builder()
-                .tenantKey("test-hospital-preservation-a")
-                .hospitalName("Test Hospital A")
-                .contactEmail("testa@hospital.com")
+                .tenantKey("test-pres-a-" + suffix)
+                .hospitalName("Test Hospital A " + suffix)
+                .contactEmail("testa-" + suffix + "@hospital.com")
                 .contactPhone("1111111111")
                 .address("Test Address A")
                 .subscriptionPlan("BASIC")
@@ -102,7 +104,7 @@ class WalkInTokenSequencePreservationTest {
 
         // Create department for Tenant A
         Department departmentA = Department.builder()
-                .name("General Medicine A")
+                .name("General Medicine A " + suffix)
                 .description("General Medicine Department A")
                 .isActive(true)
                 .build();
@@ -110,7 +112,7 @@ class WalkInTokenSequencePreservationTest {
 
         // Create doctor user for Tenant A
         User doctorUserA = User.builder()
-                .email("doctor.preservation.a@test.com")
+                .email("doctor.pres.a-" + suffix + "@test.com")
                 .password("password")
                 .fullName("Dr. Test Doctor A")
                 .phone("9876543210")
@@ -123,7 +125,7 @@ class WalkInTokenSequencePreservationTest {
         testDoctorA = Doctor.builder()
                 .user(doctorUserA)
                 .department(departmentA)
-                .licenseNumber("DOC-PRES-A-001")
+                .licenseNumber("DOC-PRES-A-" + suffix)
                 .consultationFee(new java.math.BigDecimal("500.00"))
                 .experienceYears(10)
                 .qualification("MBBS, MD")
@@ -132,7 +134,7 @@ class WalkInTokenSequencePreservationTest {
 
         // Create receptionist user for Tenant A
         testReceptionistA = User.builder()
-                .email("receptionist.preservation.a@test.com")
+                .email("recept.pres.a-" + suffix + "@test.com")
                 .password("password")
                 .fullName("Test Receptionist A")
                 .phone("9876543211")
@@ -143,25 +145,32 @@ class WalkInTokenSequencePreservationTest {
 
         // Create patient for Tenant A
         testPatientA = Patient.builder()
-                .patientCode("PAT-PRES-A-001")
+                .patientCode("PAT-PRES-A-" + suffix)
                 .firstName("John")
                 .lastName("Doe")
                 .dateOfBirth(LocalDate.of(1990, 1, 1))
                 .gender(com.curamatrix.hsm.enums.Gender.MALE)
                 .phone("9999999991")
-                .email("john.doe.preservation.a@test.com")
+                .email("john.doe.pres.a-" + suffix + "@test.com")
                 .address("Test Address A")
                 .bloodGroup(com.curamatrix.hsm.enums.BloodGroup.O_POSITIVE)
                 .build();
         testPatientA.setTenantId(TENANT_A_ID);
         testPatientA = patientRepository.save(testPatientA);
 
+        // Pre-create PatientFinancialAccount to avoid concurrent inserts
+        PatientFinancialAccount pfaA = PatientFinancialAccount.builder()
+                .patient(testPatientA)
+                .build();
+        pfaA.setTenantId(TENANT_A_ID);
+        entityManager.persist(pfaA);
+
         // Create Tenant B
         TenantContext.setTenantId(TENANT_B_ID);
         tenantB = Tenant.builder()
-                .tenantKey("test-hospital-preservation-b")
-                .hospitalName("Test Hospital B")
-                .contactEmail("testb@hospital.com")
+                .tenantKey("test-pres-b-" + suffix)
+                .hospitalName("Test Hospital B " + suffix)
+                .contactEmail("testb-" + suffix + "@hospital.com")
                 .contactPhone("2222222222")
                 .address("Test Address B")
                 .subscriptionPlan("BASIC")
@@ -173,7 +182,7 @@ class WalkInTokenSequencePreservationTest {
 
         // Create department for Tenant B
         Department departmentB = Department.builder()
-                .name("General Medicine B")
+                .name("General Medicine B " + suffix)
                 .description("General Medicine Department B")
                 .isActive(true)
                 .build();
@@ -181,7 +190,7 @@ class WalkInTokenSequencePreservationTest {
 
         // Create doctor user for Tenant B
         User doctorUserB = User.builder()
-                .email("doctor.preservation.b@test.com")
+                .email("doctor.pres.b-" + suffix + "@test.com")
                 .password("password")
                 .fullName("Dr. Test Doctor B")
                 .phone("9876543220")
@@ -194,7 +203,7 @@ class WalkInTokenSequencePreservationTest {
         testDoctorB = Doctor.builder()
                 .user(doctorUserB)
                 .department(departmentB)
-                .licenseNumber("DOC-PRES-B-001")
+                .licenseNumber("DOC-PRES-B-" + suffix)
                 .consultationFee(new java.math.BigDecimal("500.00"))
                 .experienceYears(10)
                 .qualification("MBBS, MD")
@@ -203,7 +212,7 @@ class WalkInTokenSequencePreservationTest {
 
         // Create receptionist user for Tenant B
         testReceptionistB = User.builder()
-                .email("receptionist.preservation.b@test.com")
+                .email("recept.pres.b-" + suffix + "@test.com")
                 .password("password")
                 .fullName("Test Receptionist B")
                 .phone("9876543221")
@@ -214,18 +223,25 @@ class WalkInTokenSequencePreservationTest {
 
         // Create patient for Tenant B
         testPatientB = Patient.builder()
-                .patientCode("PAT-PRES-B-001")
+                .patientCode("PAT-PRES-B-" + suffix)
                 .firstName("Jane")
                 .lastName("Smith")
                 .dateOfBirth(LocalDate.of(1992, 2, 2))
                 .gender(com.curamatrix.hsm.enums.Gender.FEMALE)
                 .phone("9999999992")
-                .email("jane.smith.preservation.b@test.com")
+                .email("jane.smith.pres.b-" + suffix + "@test.com")
                 .address("Test Address B")
                 .bloodGroup(com.curamatrix.hsm.enums.BloodGroup.A_POSITIVE)
                 .build();
         testPatientB.setTenantId(TENANT_B_ID);
         testPatientB = patientRepository.save(testPatientB);
+
+        // Pre-create PatientFinancialAccount to avoid concurrent inserts
+        PatientFinancialAccount pfaB = PatientFinancialAccount.builder()
+                .patient(testPatientB)
+                .build();
+        pfaB.setTenantId(TENANT_B_ID);
+        entityManager.persist(pfaB);
 
         // Clear context after setup
         TenantContext.clear();
@@ -243,8 +259,8 @@ class WalkInTokenSequencePreservationTest {
      */
     private void insertTokenSequenceDirectly(LocalDate date, Long tenantId, int counter) {
         entityManager.createNativeQuery(
-                "INSERT INTO walk_in_token_sequence (appointment_date, tenant_id, doctor_id, counter, last_token, created_at, updated_at) " +
-                "VALUES (:date, :tenantId, :doctorId, :counter, :counter, NOW(), NOW())")
+                "INSERT INTO walk_in_token_sequence (appointment_date, tenant_id, doctor_id, counter, last_token) " +
+                "VALUES (:date, :tenantId, :doctorId, :counter, :counter)")
                 .setParameter("date", date)
                 .setParameter("tenantId", tenantId)
                 .setParameter("doctorId", tenantId.equals(TENANT_A_ID) ? testDoctorA.getId() : testDoctorB.getId())
@@ -312,16 +328,16 @@ class WalkInTokenSequencePreservationTest {
     void testUpdateCounterIncrementsCorrectly() {
         // Test with various initial counter values
         int[] initialCounters = {1, 10, 25, 50, 99};
-        LocalDate baseDate = LocalDate.now().minusDays(5);
 
         for (int i = 0; i < initialCounters.length; i++) {
             int initialCounter = initialCounters[i];
-            LocalDate testDate = baseDate.plusDays(i);
+            LocalDate testDate = LocalDate.now();
 
             // Create existing sequence directly in database (bypasses INSERT bug)
             WalkInTokenSequence existingSequence = new WalkInTokenSequence();
             existingSequence.setAppointmentDate(testDate);
             existingSequence.setTenantId(TENANT_A_ID);
+            existingSequence.setDoctorId(testDoctorA.getId());
             existingSequence.setLastToken(initialCounter);
             tokenSequenceRepository.save(existingSequence);
 
@@ -360,6 +376,10 @@ class WalkInTokenSequencePreservationTest {
             assertEquals(initialCounter + 1, afterUpdate.getLastToken(),
                     "Final counter should be " + (initialCounter + 1));
 
+            // Clean up the sequence record for this iteration so the next iteration can insert a new one
+            tokenSequenceRepository.delete(existingSequence);
+            tokenSequenceRepository.flush();
+
             TenantContext.clear();
             SecurityContextHolder.clearContext();
         }
@@ -383,13 +403,14 @@ class WalkInTokenSequencePreservationTest {
      */
     @Test
     void testConcurrentUpdatesPreventRaceConditions() throws InterruptedException, ExecutionException {
-        LocalDate testDate = LocalDate.now().minusDays(1);
+        LocalDate testDate = LocalDate.now();
         int concurrentRequests = 20;
 
         // Create initial sequence directly in database (bypasses INSERT bug)
         WalkInTokenSequence initialSequence = new WalkInTokenSequence();
         initialSequence.setAppointmentDate(testDate);
         initialSequence.setTenantId(TENANT_A_ID);
+        initialSequence.setDoctorId(testDoctorA.getId());
         initialSequence.setLastToken(1);
         tokenSequenceRepository.save(initialSequence);
 
@@ -398,77 +419,114 @@ class WalkInTokenSequencePreservationTest {
                 .orElseThrow(() -> new AssertionError("Initial sequence should exist"));
         assertEquals(1, savedSequence.getLastToken(), "Initial counter should be 1");
 
-        // Create thread pool for concurrent requests
-        ExecutorService executor = Executors.newFixedThreadPool(concurrentRequests);
-        List<Future<Integer>> futures = new ArrayList<>();
+        // Commit the setup transaction so concurrent threads can see the tenant, doctor, patient, etc.
+        org.springframework.test.context.transaction.TestTransaction.flagForCommit();
+        org.springframework.test.context.transaction.TestTransaction.end();
 
-        // Submit concurrent walk-in creation requests
-        for (int i = 0; i < concurrentRequests; i++) {
-            final int requestNum = i;
-            Future<Integer> future = executor.submit(() -> {
-                // Each thread needs its own tenant context and security context
-                TenantContext.setTenantId(TENANT_A_ID);
-                SecurityContextHolder.getContext().setAuthentication(
-                        new UsernamePasswordAuthenticationToken(
-                                testReceptionistA.getEmail(),
-                                null,
-                                List.of(new SimpleGrantedAuthority("ROLE_RECEPTIONIST"))
-                        )
-                );
+        try {
+            // Create thread pool for concurrent requests
+            ExecutorService executor = Executors.newFixedThreadPool(concurrentRequests);
+            List<Future<Integer>> futures = new ArrayList<>();
 
-                try {
-                    WalkInRequest request = new WalkInRequest();
-                    request.setPatientId(testPatientA.getId());
-                    request.setDoctorId(testDoctorA.getId());
-                    request.setNotes("Concurrent walk-in " + requestNum);
-                    request.setPayNow(false);
-                    request.setFollowUp(false);
-                    request.setCounter("C" + requestNum);
+            // Submit concurrent walk-in creation requests
+            for (int i = 0; i < concurrentRequests; i++) {
+                final int requestNum = i;
+                Future<Integer> future = executor.submit(() -> {
+                    // Each thread needs its own tenant context and security context
+                    TenantContext.setTenantId(TENANT_A_ID);
+                    SecurityContextHolder.getContext().setAuthentication(
+                            new UsernamePasswordAuthenticationToken(
+                                    testReceptionistA.getEmail(),
+                                    null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_RECEPTIONIST"))
+                            )
+                    );
 
-                    AppointmentResponse response = appointmentService.createWalkIn(request);
-                    return response.getTokenNumber();
-                } finally {
-                    TenantContext.clear();
-                    SecurityContextHolder.clearContext();
+                    try {
+                        WalkInRequest request = new WalkInRequest();
+                        request.setPatientId(testPatientA.getId());
+                        request.setDoctorId(testDoctorA.getId());
+                        request.setNotes("Concurrent walk-in " + requestNum);
+                        request.setPayNow(false);
+                        request.setFollowUp(false);
+                        request.setCounter("C" + requestNum);
+
+                        AppointmentResponse response = appointmentService.createWalkIn(request);
+                        return response.getTokenNumber();
+                    } finally {
+                        TenantContext.clear();
+                        SecurityContextHolder.clearContext();
+                    }
+                });
+                futures.add(future);
+            }
+
+            // Collect all token numbers
+            List<Integer> tokenNumbers = new ArrayList<>();
+            for (Future<Integer> future : futures) {
+                tokenNumbers.add(future.get());
+            }
+
+            executor.shutdown();
+            executor.awaitTermination(30, TimeUnit.SECONDS);
+
+            // Verify all tokens are unique
+            Set<Integer> uniqueTokens = new HashSet<>(tokenNumbers);
+            assertEquals(concurrentRequests, uniqueTokens.size(),
+                    "All " + concurrentRequests + " tokens should be unique (no duplicates from race conditions)");
+
+            // Verify tokens form a contiguous sequence starting from 2 (since we started with counter = 1)
+            Set<Integer> expectedTokens = IntStream.rangeClosed(2, concurrentRequests + 1)
+                    .boxed()
+                    .collect(Collectors.toSet());
+            assertEquals(expectedTokens, uniqueTokens,
+                    "Tokens should form contiguous sequence {2.." + (concurrentRequests + 1) + "}");
+
+            // Verify final counter value
+            TenantContext.setTenantId(TENANT_A_ID);
+            WalkInTokenSequence finalSequence = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID, testDoctorA.getId())
+                    .orElseThrow(() -> new AssertionError("Final sequence should exist"));
+            assertEquals(concurrentRequests + 1, finalSequence.getLastToken(),
+                    "Final counter should be " + (concurrentRequests + 1));
+            TenantContext.clear();
+
+            System.out.println("=== Concurrent Updates Test Completed ===");
+            System.out.println("Verified " + concurrentRequests + " concurrent token generations");
+            System.out.println("All tokens unique: " + uniqueTokens.size() + " distinct values");
+            System.out.println("Pessimistic locking prevented race conditions");
+            System.out.println("=========================================");
+        } finally {
+            TenantContext.clear();
+            SecurityContextHolder.clearContext();
+
+            // Run cleanup inside a new transaction to delete committed setup and concurrent walk-ins data
+            org.springframework.test.context.transaction.TestTransaction.start();
+            entityManager.joinTransaction();
+            try {
+                entityManager.createNativeQuery("DELETE FROM appointment_status_log WHERE tenant_id IN (1001, 1002)").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM billing_items WHERE billing_id IN (SELECT id FROM billings WHERE tenant_id IN (1001, 1002))").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM billings WHERE tenant_id IN (1001, 1002)").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM appointments WHERE tenant_id IN (1001, 1002)").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM patient_registrations WHERE tenant_id IN (1001, 1002)").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM patient_financial_account WHERE tenant_id IN (1001, 1002)").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM patients WHERE tenant_id IN (1001, 1002)").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM walk_in_token_sequence WHERE tenant_id IN (1001, 1002)").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM doctors WHERE user_id IN (SELECT id FROM users WHERE tenant_id IN (1001, 1002))").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM users WHERE tenant_id IN (1001, 1002)").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM departments WHERE tenant_id IN (1001, 1002)").executeUpdate();
+                if (tenantA != null && tenantA.getId() != null) {
+                    entityManager.createNativeQuery("DELETE FROM tenants WHERE id = " + tenantA.getId()).executeUpdate();
                 }
-            });
-            futures.add(future);
+                if (tenantB != null && tenantB.getId() != null) {
+                    entityManager.createNativeQuery("DELETE FROM tenants WHERE id = " + tenantB.getId()).executeUpdate();
+                }
+            } catch (Exception e) {
+                System.err.println("Clean up failed: " + e.getMessage());
+            } finally {
+                org.springframework.test.context.transaction.TestTransaction.flagForCommit();
+                org.springframework.test.context.transaction.TestTransaction.end();
+            }
         }
-
-        // Collect all token numbers
-        List<Integer> tokenNumbers = new ArrayList<>();
-        for (Future<Integer> future : futures) {
-            tokenNumbers.add(future.get());
-        }
-
-        executor.shutdown();
-        executor.awaitTermination(30, TimeUnit.SECONDS);
-
-        // Verify all tokens are unique
-        Set<Integer> uniqueTokens = new HashSet<>(tokenNumbers);
-        assertEquals(concurrentRequests, uniqueTokens.size(),
-                "All " + concurrentRequests + " tokens should be unique (no duplicates from race conditions)");
-
-        // Verify tokens form a contiguous sequence starting from 2 (since we started with counter = 1)
-        Set<Integer> expectedTokens = IntStream.rangeClosed(2, concurrentRequests + 1)
-                .boxed()
-                .collect(Collectors.toSet());
-        assertEquals(expectedTokens, uniqueTokens,
-                "Tokens should form contiguous sequence {2.." + (concurrentRequests + 1) + "}");
-
-        // Verify final counter value
-        TenantContext.setTenantId(TENANT_A_ID);
-        WalkInTokenSequence finalSequence = tokenSequenceRepository.findForUpdate(testDate, TENANT_A_ID, testDoctorA.getId())
-                .orElseThrow(() -> new AssertionError("Final sequence should exist"));
-        assertEquals(concurrentRequests + 1, finalSequence.getLastToken(),
-                "Final counter should be " + (concurrentRequests + 1));
-        TenantContext.clear();
-
-        System.out.println("=== Concurrent Updates Test Completed ===");
-        System.out.println("Verified " + concurrentRequests + " concurrent token generations");
-        System.out.println("All tokens unique: " + uniqueTokens.size() + " distinct values");
-        System.out.println("Pessimistic locking prevented race conditions");
-        System.out.println("=========================================");
     }
 
     /**
@@ -484,12 +542,13 @@ class WalkInTokenSequencePreservationTest {
      */
     @Test
     void testCrossTenantIsolationMaintained() {
-        LocalDate testDate = LocalDate.now().minusDays(2);
+        LocalDate testDate = LocalDate.now();
 
         // Create initial sequence for Tenant A directly in database (bypasses INSERT bug)
         WalkInTokenSequence sequenceA = new WalkInTokenSequence();
         sequenceA.setAppointmentDate(testDate);
         sequenceA.setTenantId(TENANT_A_ID);
+        sequenceA.setDoctorId(testDoctorA.getId());
         sequenceA.setLastToken(1);
         tokenSequenceRepository.save(sequenceA);
 
@@ -529,6 +588,7 @@ class WalkInTokenSequencePreservationTest {
         WalkInTokenSequence sequenceB = new WalkInTokenSequence();
         sequenceB.setAppointmentDate(testDate);
         sequenceB.setTenantId(TENANT_B_ID);
+        sequenceB.setDoctorId(testDoctorB.getId());
         sequenceB.setLastToken(1);
         tokenSequenceRepository.save(sequenceB);
 

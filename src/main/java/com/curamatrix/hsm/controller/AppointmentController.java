@@ -108,7 +108,7 @@ public class AppointmentController {
     }
 
     @PostMapping("/{id}/hold")
-    @PreAuthorize("hasAnyRole('ROLE_RECEPTIONIST', 'ROLE_DOCTOR')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR')")
     public ResponseEntity<AppointmentResponse> holdAppointment(@PathVariable Long id) {
         log.info("Holding appointment: {}", id);
         AppointmentResponse response = appointmentService.holdAppointment(id);
@@ -116,7 +116,7 @@ public class AppointmentController {
     }
 
     @PostMapping("/{id}/resume")
-    @PreAuthorize("hasAnyRole('ROLE_RECEPTIONIST', 'ROLE_DOCTOR')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR')")
     public ResponseEntity<AppointmentResponse> resumeAppointment(@PathVariable Long id) {
         log.info("Resuming appointment: {}", id);
         AppointmentResponse response = appointmentService.resumeAppointment(id);

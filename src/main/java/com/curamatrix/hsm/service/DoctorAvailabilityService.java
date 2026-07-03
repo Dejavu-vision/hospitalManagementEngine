@@ -7,17 +7,27 @@ import com.curamatrix.hsm.dto.response.DoctorAvailabilityResponse;
 import com.curamatrix.hsm.entity.Doctor;
 import com.curamatrix.hsm.entity.DoctorAvailability;
 import com.curamatrix.hsm.entity.User;
+import com.curamatrix.hsm.entity.DoctorStatusLog;
+import com.curamatrix.hsm.entity.Appointment;
+import com.curamatrix.hsm.entity.AppointmentStatusLog;
 import com.curamatrix.hsm.enums.DoctorStatus;
+import com.curamatrix.hsm.enums.AppointmentStatus;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
 import com.curamatrix.hsm.repository.DoctorAvailabilityRepository;
 import com.curamatrix.hsm.repository.DoctorRepository;
 import com.curamatrix.hsm.repository.UserRepository;
+import com.curamatrix.hsm.repository.DoctorStatusLogRepository;
+import com.curamatrix.hsm.repository.AppointmentRepository;
+import com.curamatrix.hsm.repository.AppointmentStatusLogRepository;
+import com.curamatrix.hsm.service.QueueEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -31,6 +41,10 @@ public class DoctorAvailabilityService {
     private final DoctorAvailabilityRepository availabilityRepository;
     private final DoctorRepository doctorRepository;
     private final UserRepository userRepository;
+    private final DoctorStatusLogRepository doctorStatusLogRepository;
+    private final AppointmentRepository appointmentRepository;
+    private final AppointmentStatusLogRepository appointmentStatusLogRepository;
+    private final QueueEventService queueEventService;
 
     public DoctorAvailabilityResponse getAvailabilityByEmail(String email) {
         User user = userRepository.findByEmail(email)
@@ -52,7 +66,7 @@ public class DoctorAvailabilityService {
                 .findByDoctorIdAndAvailabilityDateAndTenantId(doctorId, date, tenantId);
         Doctor doctor = doctorRepository.findById(doctorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", doctorId));
-        // Default: present and ON_DUTY when no record exists
+        // Default: present and AVAILABLE when no record exists
         return record.map(r -> toResponse(r, doctor))
                 .orElseGet(() -> DoctorAvailabilityResponse.builder()
                         .userId(doctor.getUser().getId())
@@ -61,7 +75,7 @@ public class DoctorAvailabilityService {
                         .departmentName(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
                         .date(date)
                         .isPresent(false)
-                        .status(DoctorStatus.OFF_DUTY)
+                        .status(DoctorStatus.OFFLINE)
                         .build());
     }
 
@@ -84,7 +98,7 @@ public class DoctorAvailabilityService {
                                     .departmentName(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
                                     .date(today)
                                     .isPresent(false)
-                                    .status(DoctorStatus.OFF_DUTY)
+                                    .status(DoctorStatus.OFFLINE)
                                     .build());
                 }).collect(Collectors.toList());
     }
@@ -100,15 +114,15 @@ public class DoctorAvailabilityService {
                         .doctor(doctor).availabilityDate(request.getDate()).build());
         record.setIsPresent(request.getIsPresent());
         if (!request.getIsPresent()) {
-            record.setStatus(DoctorStatus.OFF_DUTY);
-        } else if (record.getStatus() == DoctorStatus.OFF_DUTY) {
-            record.setStatus(DoctorStatus.ON_DUTY);
+            record.setStatus(DoctorStatus.OFFLINE);
+        } else if (record.getStatus() == DoctorStatus.OFFLINE) {
+            record.setStatus(DoctorStatus.AVAILABLE);
         }
         record = availabilityRepository.save(record);
         return toResponse(record, doctor);
     }
 
-    /** Update real-time status (used by receptionist during the day) */
+    /** Update real-time status (used by receptionist or doctor during the day) */
     public DoctorAvailabilityResponse updateStatus(Long doctorId, DoctorStatusUpdateRequest request) {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
@@ -119,18 +133,81 @@ public class DoctorAvailabilityService {
                 .orElseGet(() -> DoctorAvailability.builder()
                         .doctor(doctor).availabilityDate(today).isPresent(true).build());
 
-        record.setStatus(request.getStatus());
-        record.setStatusNote(request.getStatusNote());
+        DoctorStatus oldStatus = record.getStatus();
+        DoctorStatus newStatus = request.getStatus();
+
+        record.setStatus(newStatus);
+        String note = request.getReason() != null ? request.getReason() : request.getStatusNote();
+        record.setStatusNote(note);
         record.setAvailableFrom(request.getAvailableFrom());
         if (request.getDutyStart() != null) record.setDutyStart(request.getDutyStart());
         if (request.getDutyEnd() != null) record.setDutyEnd(request.getDutyEnd());
 
         // Sync isPresent with status
-        record.setIsPresent(request.getStatus() != DoctorStatus.OFF_DUTY);
+        record.setIsPresent(newStatus != DoctorStatus.OFFLINE);
 
         record = availabilityRepository.save(record);
-        log.info("Doctor {} status updated to {} by receptionist", doctorId, request.getStatus());
+
+        // 1. Create audit log
+        User currentUser = getCurrentUser();
+        DoctorStatusLog logRecord = DoctorStatusLog.builder()
+                .doctor(doctor)
+                .previousStatus(oldStatus)
+                .newStatus(newStatus)
+                .changedBy(currentUser)
+                .build();
+        doctorStatusLogRepository.save(logRecord);
+
+        // 2. Offline mid-queue logic
+        if (newStatus == DoctorStatus.OFFLINE) {
+            List<Appointment> activeAppts = appointmentRepository.findActiveByDoctorAndDateAndTenant(doctorId, today, tenantId);
+            for (Appointment appt : activeAppts) {
+                AppointmentStatus currentApptStatus = appt.getStatus();
+                
+                appt.setReassignNeeded(true);
+
+                if (currentApptStatus == AppointmentStatus.IN_PROGRESS || currentApptStatus == AppointmentStatus.RECALLED) {
+                    appt.setStatus(AppointmentStatus.CHECKED_IN);
+                    appt.setConsultationStart(null);
+                    appt.setConsultationEnd(null);
+
+                    AppointmentStatusLog apptStatusLog = AppointmentStatusLog.builder()
+                            .appointment(appt)
+                            .previousStatus(currentApptStatus)
+                            .newStatus(AppointmentStatus.CHECKED_IN)
+                            .changedBy(currentUser)
+                            .build();
+                    appointmentStatusLogRepository.save(apptStatusLog);
+                }
+                appointmentRepository.save(appt);
+            }
+        }
+
+        // 3. Broadcast queue update via SSE
+        try {
+            queueEventService.broadcastQueueUpdate(tenantId, doctorId);
+        } catch (Exception e) {
+            log.warn("Failed to broadcast queue update for doctor status change: {}", e.getMessage());
+        }
+
+        log.info("Doctor {} status updated to {} by {}", doctorId, newStatus, currentUser.getEmail());
         return toResponse(record, doctor);
+    }
+
+    public void verifyDoctorSelfUpdate(Long doctorId, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        Doctor doctor = doctorRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Only doctors can update their own status"));
+        if (!doctor.getId().equals(doctorId)) {
+            throw new org.springframework.security.access.AccessDeniedException("You can only update your own availability status");
+        }
+    }
+
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
     }
 
     private DoctorAvailabilityResponse toResponse(DoctorAvailability r, Doctor doctor) {

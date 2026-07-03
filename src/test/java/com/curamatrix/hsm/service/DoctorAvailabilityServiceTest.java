@@ -9,6 +9,9 @@ import com.curamatrix.hsm.enums.DoctorStatus;
 import com.curamatrix.hsm.repository.DoctorAvailabilityRepository;
 import com.curamatrix.hsm.repository.DoctorRepository;
 import com.curamatrix.hsm.repository.UserRepository;
+import com.curamatrix.hsm.repository.DoctorStatusLogRepository;
+import com.curamatrix.hsm.repository.AppointmentRepository;
+import com.curamatrix.hsm.repository.AppointmentStatusLogRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,12 +48,28 @@ class DoctorAvailabilityServiceTest {
     private DoctorRepository doctorRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private DoctorStatusLogRepository doctorStatusLogRepository;
+    @Mock
+    private AppointmentRepository appointmentRepository;
+    @Mock
+    private AppointmentStatusLogRepository appointmentStatusLogRepository;
+    @Mock
+    private QueueEventService queueEventService;
 
     private DoctorAvailabilityService service;
 
     @BeforeEach
     void setUp() {
-        service = new DoctorAvailabilityService(availabilityRepository, doctorRepository, userRepository);
+        service = new DoctorAvailabilityService(
+                availabilityRepository,
+                doctorRepository,
+                userRepository,
+                doctorStatusLogRepository,
+                appointmentRepository,
+                appointmentStatusLogRepository,
+                queueEventService
+        );
         TenantContext.setTenantId(1L);
     }
 
@@ -195,7 +214,7 @@ class DoctorAvailabilityServiceTest {
         avail.setDoctor(doctor);
         avail.setAvailabilityDate(LocalDate.now());
         avail.setIsPresent(true);
-        avail.setStatus(DoctorStatus.ON_DUTY);
+        avail.setStatus(DoctorStatus.AVAILABLE);
 
         when(doctorRepository.findByTenantId(1L)).thenReturn(List.of(doctor));
         when(availabilityRepository.findByDoctorIdAndAvailabilityDateAndTenantId(1L, LocalDate.now(), 1L))
@@ -209,7 +228,7 @@ class DoctorAvailabilityServiceTest {
         assertEquals(10L, resp.getUserId());
         assertEquals("Dr. Patel", resp.getDoctorName());
         assertTrue(resp.getIsPresent());
-        assertEquals(DoctorStatus.ON_DUTY, resp.getStatus());
+        assertEquals(DoctorStatus.AVAILABLE, resp.getStatus());
     }
 
     @Test
@@ -232,7 +251,7 @@ class DoctorAvailabilityServiceTest {
         assertEquals(2L, resp.getDoctorId());
         assertEquals("Dr. Kumar", resp.getDoctorName());
         assertFalse(resp.getIsPresent());
-        assertEquals(DoctorStatus.OFF_DUTY, resp.getStatus());
+        assertEquals(DoctorStatus.OFFLINE, resp.getStatus());
     }
 
     @Test

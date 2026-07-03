@@ -32,7 +32,7 @@ public class DoctorAvailability extends TenantAwareEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     @Builder.Default
-    private DoctorStatus status = DoctorStatus.OFF_DUTY;
+    private DoctorStatus status = DoctorStatus.OFFLINE;
 
     /** Optional note — e.g. "Back in 30 min", "Emergency surgery" */
     @Column(name = "status_note")

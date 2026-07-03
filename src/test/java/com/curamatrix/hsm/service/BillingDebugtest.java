@@ -26,6 +26,26 @@ public class BillingDebugtest {
     @Autowired
     private IpdBillingService ipdBillingService;
 
+    @Autowired
+    private javax.sql.DataSource dataSource;
+
+    @Test
+    public void testPrintDoctorAvailabilityColumns() throws Exception {
+        try (java.sql.Connection conn = dataSource.getConnection()) {
+            try (java.sql.ResultSet rs = conn.getMetaData().getColumns(null, null, "doctor_availability", null)) {
+                System.out.println("--- COLUMNS FOR doctor_availability ---");
+                while (rs.next()) {
+                    System.out.println("Column: " + rs.getString("COLUMN_NAME") + 
+                                       ", Type: " + rs.getString("TYPE_NAME") + 
+                                       ", Size: " + rs.getInt("COLUMN_SIZE") + 
+                                       ", Default: " + rs.getString("COLUMN_DEF") + 
+                                       ", Nullable: " + rs.getString("IS_NULLABLE"));
+                }
+                System.out.println("---------------------------------------");
+            }
+        }
+    }
+
     @Test
     @org.springframework.transaction.annotation.Transactional
     public void testBillingItemsQuery() {
@@ -88,7 +108,7 @@ public class BillingDebugtest {
 
         try {
             // Run settlement
-            ipdBillingService.settleChargeItem(patientId, itemId, "CASH");
+            ipdBillingService.settleChargeItem(patientId, itemId, "CASH", null);
 
             // Verify changes
             BillingItem updatedItem = billingItemRepository.findById(itemId).orElseThrow();

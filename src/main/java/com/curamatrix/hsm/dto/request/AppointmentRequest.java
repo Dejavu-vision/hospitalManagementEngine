@@ -1,6 +1,6 @@
 package com.curamatrix.hsm.dto.request;
 
-import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -16,7 +16,7 @@ public class AppointmentRequest {
     private Long doctorId;
 
     @NotNull(message = "Appointment date is required")
-    @Future(message = "Appointment date must be in the future")
+    @FutureOrPresent(message = "Appointment date must be in the present or future")
     private LocalDate appointmentDate;
 
     @NotNull(message = "Appointment time is required")

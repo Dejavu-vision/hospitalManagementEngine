@@ -101,6 +101,12 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
                                                        @Param("date") LocalDate date,
                                                        @Param("tenantId") Long tenantId);
 
+    @Query("SELECT a FROM Appointment a WHERE a.doctor.id = :doctorId AND a.appointmentDate = :date " +
+           "AND a.tenantId = :tenantId AND a.status IN ('BOOKED', 'CHECKED_IN', 'IN_PROGRESS', 'ON_HOLD', 'RECALLED')")
+    List<Appointment> findActiveByDoctorAndDateAndTenant(@Param("doctorId") Long doctorId,
+                                                         @Param("date") LocalDate date,
+                                                         @Param("tenantId") Long tenantId);
+
     // Doctor queue lengths for auto-assignment
     @Query("SELECT a.doctor.id, COUNT(a) FROM Appointment a " +
            "WHERE a.doctor.department.id = :deptId AND a.appointmentDate = :date " +

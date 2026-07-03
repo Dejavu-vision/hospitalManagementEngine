@@ -134,10 +134,10 @@ public class ReceptionDeskService {
                     List<BookingContextResponse.DoctorInfo> doctorInfos = deptDoctors.stream()
                             .map(doctor -> {
                                 DoctorAvailability avail = availabilityByDoctorId.get(doctor.getId());
-                                // Default: if no availability record, doctor is assumed present & ON_DUTY.
-                                // The receptionist can explicitly mark OFF_DUTY if needed.
+                                // Default: if no availability record, doctor is assumed present & AVAILABLE.
+                                // The receptionist can explicitly mark OFFLINE if needed.
                                 boolean presentToday = avail == null || Boolean.TRUE.equals(avail.getIsPresent());
-                                DoctorStatus status = avail != null ? avail.getStatus() : DoctorStatus.ON_DUTY;
+                                DoctorStatus status = avail != null ? avail.getStatus() : DoctorStatus.AVAILABLE;
                                 String statusNote = avail != null ? avail.getStatusNote() : null;
                                 int queueLength = queueLengthByDoctorId
                                         .getOrDefault(doctor.getId(), 0L).intValue();

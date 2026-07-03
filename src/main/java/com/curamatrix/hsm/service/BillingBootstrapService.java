@@ -73,6 +73,7 @@ public class BillingBootstrapService {
                 .serviceName(name)
                 .price(BigDecimal.valueOf(price))
                 .itemType(type)
+                .effectiveFrom(java.time.LocalDate.now())
                 .active(true)
                 .build();
         service.setTenantId(tenantId);
