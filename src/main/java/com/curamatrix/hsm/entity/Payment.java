@@ -54,3 +54,5 @@ public class Payment extends TenantAwareEntity {
     @Column(updatable = false)
     private LocalDateTime timestamp;
 }
+.
+

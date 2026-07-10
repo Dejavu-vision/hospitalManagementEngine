@@ -395,7 +395,12 @@ public class BillingService {
             throw new RuntimeException("Cannot apply discount to a fully paid invoice");
         }
 
-        billing.setDiscount(discount);
+        BigDecimal currentDiscount = billing.getDiscount() != null ? billing.getDiscount() : BigDecimal.ZERO;
+        if (discount.compareTo(BigDecimal.ZERO) == 0) {
+            billing.setDiscount(BigDecimal.ZERO);
+        } else {
+            billing.setDiscount(currentDiscount.add(discount));
+        }
 
         // Track who applied the discount
         if (appliedBy != null && !appliedBy.isBlank()) {
