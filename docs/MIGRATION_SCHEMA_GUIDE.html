@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CuraMatrix HSM Data Migration Schema Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+  --text:#e6edf3;--text2:#8b949e;--text3:#8b949e;
+  --blue:#58a6ff;--blue-bg:rgba(88,166,255,0.1);
+  --green:#3fb950;--green-bg:rgba(63,185,80,0.1);
+  --purple:#bc8cff;--purple-bg:rgba(188,140,255,0.1);
+  --amber:#d29922;--amber-bg:rgba(210,153,34,0.1);
+  --red:#f85149;--red-bg:rgba(248,81,73,0.1);
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Outfit',system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;}
+.page{max-width:1080px;margin:0 auto;padding:40px 20px 80px;}
+.header{margin-bottom:40px;border-bottom: 1px solid var(--border);padding-bottom: 20px;}
+.eyebrow{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.14em;margin-bottom:10px;}
+h1{font-size:32px;font-weight:700;letter-spacing:-0.02em;color:var(--text);}
+h1 span{color:var(--blue);}
+.header p{color:var(--text2);font-size:14px;margin-top:8px;}
+
+h2{font-size:22px;color:var(--text);margin-top:40px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:8px;}
+h3{font-size:16px;color:var(--blue);margin-top:24px;margin-bottom:12px;font-family:var(--mono);}
+p{margin-bottom:16px;color:var(--text2);}
+ul, ol{margin-bottom:16px;padding-left:20px;color:var(--text2);}
+li{margin-bottom:6px;}
+
+.table-block{margin-bottom:32px;}
+.table-name{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.tname{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--blue);}
+.tname-desc{font-size:12px;color:var(--text2);}
+
+table{width:100%;border-collapse:collapse;border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-bottom:24px;}
+th{background:var(--bg3);padding:12px 14px;text-align:left;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid var(--border2);}
+td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,0.02);}
+
+.col-name{font-family:var(--mono);font-weight:600;color:var(--text);}
+.col-type{font-family:var(--mono);font-size:12px;color:var(--purple);}
+.col-notes{font-size:12px;color:var(--text2);}
+
+.badge{display:inline-block;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:3px;}
+.b-pk{background:rgba(210,153,34,0.2);color:var(--amber);}
+.b-fk{background:rgba(88,166,255,0.15);color:var(--blue);}
+.b-idx{background:rgba(63,185,80,0.15);color:var(--green);}
+.b-uniq{background:rgba(188,140,255,0.15);color:var(--purple);}
+
+pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px;overflow-x:auto;font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--text);margin-bottom:24px;}
+.kw{color:var(--blue);}
+.str{color:var(--amber);}
+.cmt{color:var(--text3);font-style:italic;}
+.fn{color:var(--purple);}
+.type{color:var(--green);}
+
+.info-note {
+  background: var(--blue-bg);
+  border: 1px solid var(--blue);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  color: var(--text);
+}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="header">
+  <div class="eyebrow">CuraMatrix HSM DB Schema</div>
+  <h1>Data Migration <span>Schema Guide</span></h1>
+  <p>Consolidated 50-table topological database guide & sequence templates optimized for safe data imports.</p>
+</div>
+
+<div class="info-note">
+  <strong>💡 Tip:</strong> To avoid foreign key constraint errors during bulk imports, insert data in the topological order shown below, or execute <code>SET FOREIGN_KEY_CHECKS = 0;</code> prior to loading.
+</div>
+
+<h2>1. Migration Sequence (Topological Sort Order)</h2>
+<p>Due to complex foreign key relationships, insert records in the exact phase sequence below:</p>
+<ol>
+  <li><strong>Phase 1 (Global Lookups):</strong> <code>tenants</code>, <code>roles</code>, <code>ui_pages</code>, <code>medicines</code>, <code>blocked_tokens</code></li>
+  <li><strong>Phase 2 (Accounts & Staff):</strong> <code>users</code>, <code>user_roles</code>, <code>user_pages</code>, <code>role_pages</code>, <code>user_access_audit</code>, <code>departments</code>, <code>doctors</code>, <code>doctor_availability</code>, <code>doctor_status_log</code>, <code>receptionists</code></li>
+  <li><strong>Phase 3 (Hospital Setup):</strong> <code>wards</code>, <code>rooms</code>, <code>beds</code>, <code>lab_services</code>, <code>hospital_services</code>, <code>service_pricing_tiers</code>, <code>payer_master</code>, <code>walk_in_token_sequence</code>, <code>employee_id_sequence</code>, <code>ipd_admission_sequence</code></li>
+  <li><strong>Phase 4 (Patients):</strong> <code>patients</code>, <code>patient_registrations</code>, <code>patient_financial_account</code>, <code>insurance_policies</code></li>
+  <li><strong>Phase 5 (OPD & General):</strong> <code>appointments</code>, <code>appointment_status_log</code>, <code>ipd_vital_signs</code>, <code>financial_blocks</code>, <code>diagnoses</code>, <code>prescriptions</code>, <code>medicine_inventory</code></li>
+  <li><strong>Phase 6 (In-Patient Stays):</strong> <code>ipd_admissions</code>, <code>ipd_daily_progress_notes</code>, <code>bed_allocations</code>, <code>pre_auth_requests</code>, <code>pre_auth_coverage_items</code></li>
+  <li><strong>Phase 7 (Lab Tests):</strong> <code>lab_prescriptions</code>, <code>lab_tests</code>, <code>lab_results</code>, <code>lab_documents</code>, <code>lab_test_status_log</code></li>
+  <li><strong>Phase 8 (Invoices & Receipts):</strong> <code>billings</code>, <code>billing_items</code>, <code>bill_insurance_splits</code>, <code>payments</code>, <code>payment_plans</code>, <code>bill_allocations</code></li>
+</ol>
+
+<h2>2. Core Table Schemas</h2>
+
+<div class="table-block">
+  <div class="table-name"><span class="tname">tenants</span><span class="tname-desc">SaaS hospitals boundary details</span></div>
+  <table>
+    <tr><th>Column</th><th>Type</th><th>Key / Null</th><th>Notes</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">BIGINT</td><td><span class="badge b-pk">PK</span> Auto-Increment</td><td>Primary unique identifier</td></tr>
+    <tr><td class="col-name">tenant_key</td><td class="col-type">VARCHAR(100)</td><td><span class="badge b-uniq">UNIQUE</span> NOT NULL</td><td>Key code, e.g. "apollo-pune"</td></tr>
+    <tr><td class="col-name">hospital_name</td><td class="col-type">VARCHAR(255)</td><td>NOT NULL</td><td>Full hospital name</td></tr>
+    <tr><td class="col-name">subscription_plan</td><td class="col-type">VARCHAR(50)</td><td>NOT NULL</td><td>BASIC, PRO, ENTERPRISE</td></tr>
+    <tr><td class="col-name">is_active</td><td class="col-type">BOOLEAN</td><td>DEFAULT true</td><td>Flag for tenant access control</td></tr>
+  </table>
+</div>
+
+<div class="table-block">
+  <div class="table-name"><span class="tname">users</span><span class="tname-desc">User accounts assigned to tenants</span></div>
+  <table>
+    <tr><th>Column</th><th>Type</th><th>Key / Null</th><th>Notes</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">BIGINT</td><td><span class="badge b-pk">PK</span> Auto-Increment</td><td>Unique user account ID</td></tr>
+    <tr><td class="col-name">tenant_id</td><td class="col-type">BIGINT</td><td><span class="badge b-fk">FK -> tenants.id</span></td><td>Tenant scope identifier</td></tr>
+    <tr><td class="col-name">email</td><td class="col-type">VARCHAR(255)</td><td><span class="badge b-uniq">UNIQUE</span> NOT NULL</td><td>Authentication email</td></tr>
+    <tr><td class="col-name">password</td><td class="col-type">VARCHAR(255)</td><td>NOT NULL</td><td>BCrypt password hash</td></tr>
+    <tr><td class="col-name">full_name</td><td class="col-type">VARCHAR(255)</td><td>NOT NULL</td><td>Staff display name</td></tr>
+  </table>
+</div>
+
+<div class="table-block">
+  <div class="table-name"><span class="tname">doctors</span><span class="tname-desc">Doctor profiles associated to users</span></div>
+  <table>
+    <tr><th>Column</th><th>Type</th><th>Key / Null</th><th>Notes</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">BIGINT</td><td><span class="badge b-pk">PK</span> Auto-Increment</td><td>Unique doctor ID</td></tr>
+    <tr><td class="col-name">user_id</td><td class="col-type">BIGINT</td><td><span class="badge b-fk">FK -> users.id</span> <span class="badge b-uniq">UNIQUE</span></td><td>Linked user account</td></tr>
+    <tr><td class="col-name">department_id</td><td class="col-type">BIGINT</td><td><span class="badge b-fk">FK -> departments.id</span></td><td>Hospital department association</td></tr>
+    <tr><td class="col-name">license_number</td><td class="col-type">VARCHAR(255)</td><td><span class="badge b-uniq">UNIQUE</span> NOT NULL</td><td>Medical license number</td></tr>
+    <tr><td class="col-name">consultation_fee</td><td class="col-type">DECIMAL(10,2)</td><td>NOT NULL</td><td>Default fee for OPD appointments</td></tr>
+  </table>
+</div>
+
+<div class="table-block">
+  <div class="table-name"><span class="tname">patients</span><span class="tname-desc">Patient registration records</span></div>
+  <table>
+    <tr><th>Column</th><th>Type</th><th>Key / Null</th><th>Notes</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">BIGINT</td><td><span class="badge b-pk">PK</span> Auto-Increment</td><td>Unique patient record ID</td></tr>
+    <tr><td class="col-name">tenant_id</td><td class="col-type">BIGINT</td><td><span class="badge b-fk">FK -> tenants.id</span></td><td>Tenant scope identifier</td></tr>
+    <tr><td class="col-name">patient_code</td><td class="col-type">VARCHAR(255)</td><td><span class="badge b-uniq">UNIQUE</span> NOT NULL</td><td>Hospital code (e.g. PT-0001)</td></tr>
+    <tr><td class="col-name">first_name</td><td class="col-type">VARCHAR(255)</td><td>NOT NULL</td><td>Patient first name</td></tr>
+    <tr><td class="col-name">phone</td><td class="col-type">VARCHAR(255)</td><td>NOT NULL</td><td>Contact phone number</td></tr>
+  </table>
+</div>
+
+<h2>3. Migration Script Template</h2>
+<pre>
+<span class="cmt">-- Disabling foreign key constraints to support quick insertion</span>
+<span class="kw">SET</span> UNIQUE_CHECKS = 0;
+<span class="kw">SET</span> FOREIGN_KEY_CHECKS = 0;
+
+<span class="cmt">-- 1. Insert Base Tenant</span>
+<span class="kw">INSERT INTO</span> tenants (id, tenant_key, hospital_name, subscription_plan, subscription_start, subscription_end, is_active)
+<span class="kw">VALUES</span> (1, <span class="str">'default-hospital'</span>, <span class="str">'CuraMatrix Diagnostic Center'</span>, <span class="str">'ENTERPRISE'</span>, <span class="fn">CURDATE</span>(), <span class="fn">DATE_ADD</span>(<span class="fn">CURDATE</span>(), <span class="kw">INTERVAL</span> 1 <span class="kw">YEAR</span>), 1);
+
+<span class="cmt">-- 2. Insert Default Roles</span>
+<span class="kw">INSERT INTO</span> roles (id, name) <span class="kw">VALUES</span> 
+(1, <span class="str">'ROLE_SUPER_ADMIN'</span>),
+(2, <span class="str">'ROLE_ADMIN'</span>),
+(3, <span class="str">'ROLE_DOCTOR'</span>),
+(4, <span class="str">'ROLE_RECEPTIONIST'</span>);
+
+<span class="cmt">-- 3. Insert Admin Account (BCrypt hash for admin123)</span>
+<span class="kw">INSERT INTO</span> users (id, tenant_id, email, password, full_name, is_active, created_at)
+<span class="kw">VALUES</span> (1, 1, <span class="str">'admin@curamatrix.com'</span>, <span class="str">'$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'</span>, <span class="str">'Administrator'</span>, 1, <span class="fn">NOW</span>());
+
+<span class="cmt">-- Map user to role</span>
+<span class="kw">INSERT INTO</span> user_roles (user_id, role_id) <span class="kw">VALUES</span> (1, 2);
+
+<span class="cmt">-- Restore key validations</span>
+<span class="kw">SET</span> FOREIGN_KEY_CHECKS = 1;
+<span class="kw">SET</span> UNIQUE_CHECKS = 1;
+</pre>
+
+</div>
+</body>
+</html>
