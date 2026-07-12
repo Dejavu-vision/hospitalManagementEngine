@@ -402,10 +402,7 @@ public class IpdBillingService {
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
 
-        if (toRemove.getItemType() == BillingItemType.BED_CHARGE ||
-            toRemove.getItemType() == BillingItemType.NURSING_CHARGE) {
-            throw new IllegalArgumentException("Auto-generated bed/nursing charges cannot be removed manually.");
-        }
+
 
         BigDecimal itemTotal = toRemove.getAmount().multiply(BigDecimal.valueOf(toRemove.getQuantity()));
         bill.getItems().remove(toRemove);
