@@ -383,12 +383,6 @@ public class IpdAdmissionService {
         }
         
         boolean isApproved = true;
-        if (finalBill != null && finalBill.getDiscountApproved() != null) {
-            isApproved = finalBill.getDiscountApproved();
-        }
-        if (!requireApproval) {
-            isApproved = true;
-        }
         row.put("discountApproved", isApproved);
         row.put("paymentStatus", finalBill != null ? finalBill.getPaymentStatus().name() : "PENDING");
         return row;

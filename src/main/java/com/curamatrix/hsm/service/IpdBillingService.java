@@ -639,28 +639,8 @@ public class IpdBillingService {
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
         List<Billing> pendingBills = getAllPendingBills(patientId, tenantId);
 
-        // Block settlement if receptionist is trying to settle and discount is not approved
-        Billing primaryBillForCheck = getPrimaryBill(patientId, tenantId, admission);
-        if (primaryBillForCheck != null && primaryBillForCheck.getDiscount().compareTo(BigDecimal.ZERO) > 0) {
-            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-            boolean isAdmin = auth != null && auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-            
-            boolean requireApproval = true;
-            Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
-            if (tenant != null && tenant.getSettings() != null) {
-                Object val = tenant.getSettings().get("requireDiscountApproval");
-                if (val instanceof Boolean) {
-                    requireApproval = (Boolean) val;
-                } else if (val instanceof String) {
-                    requireApproval = Boolean.parseBoolean((String) val);
-                }
-            }
+        // Discount approval block removed to allow receptionist to settle the bill immediately.
 
-            if (!isAdmin && Boolean.FALSE.equals(primaryBillForCheck.getDiscountApproved()) && requireApproval) {
-                throw new IllegalStateException("Discount requires admin approval before settlement.");
-            }
-        }
 
 
         if (admission != null) {
@@ -1202,34 +1182,18 @@ public class IpdBillingService {
         org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         boolean isAdmin = auth != null && auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (isAdmin || bill.getDiscount().compareTo(BigDecimal.ZERO) == 0 || !requireApproval) {
-            bill.setDiscountApproved(true);
-            bill.setDiscountFeedback(null);
-            // Store who approved — either the admin applying directly, or the named approver passed from UI
-            if (req.getApprovedByName() != null && !req.getApprovedByName().isBlank()) {
-                bill.setDiscountApprovedBy(req.getApprovedByName());
-            } else if (auth != null && auth.getName() != null) {
-                bill.setDiscountApprovedBy(auth.getName());
-            }
-        } else {
-            bill.setDiscountApproved(false);
-            bill.setDiscountFeedback(null);
-            // For non-admin: store who was selected to approve (pending approval)
-            if (req.getApprovedByName() != null && !req.getApprovedByName().isBlank()) {
-                bill.setDiscountApprovedBy(req.getApprovedByName());
-            }
+        bill.setDiscountApproved(true);
+        bill.setDiscountFeedback(null);
+        // Store who approved — either the admin applying directly, or the named approver passed from UI
+        if (req.getApprovedByName() != null && !req.getApprovedByName().isBlank()) {
+            bill.setDiscountApprovedBy(req.getApprovedByName());
+        } else if (auth != null && auth.getName() != null) {
+            bill.setDiscountApprovedBy(auth.getName());
         }
 
         billingRepository.save(bill);
 
         log.info("Section discount applied for patient {}: Section {}, Discount ₹{}", patientId, section, discount);
-
-        // SSE: notify admins when a receptionist applies a discount that needs approval
-        if (!isAdmin && bill.getDiscount().compareTo(BigDecimal.ZERO) > 0 && requireApproval) {
-            Patient p = bill.getPatient();
-            String patientName = p != null ? (p.getFirstName() + " " + p.getLastName()) : "Patient #" + patientId;
-            queueEventService.broadcastDiscountRequested(tenantId, patientId, patientName, bill.getDiscount(), req.getTargetAdminId());
-        }
 
 
         PreAuthRequest preAuth = admission != null ? loadPreAuth(admission.getId(), tenantId) : null;
