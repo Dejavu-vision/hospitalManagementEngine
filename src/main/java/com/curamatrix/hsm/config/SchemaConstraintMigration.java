@@ -37,6 +37,25 @@ public class SchemaConstraintMigration implements CommandLineRunner {
 
         // Ensure billing discount breakdown columns exist (idempotent — safe to run every startup)
         ensureBillingDiscountColumns();
+
+        // Drop legacy tenant_id column from role_pages if it exists
+        dropTenantIdFromRolePages();
+    }
+
+    private void dropTenantIdFromRolePages() {
+        try {
+            Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'role_pages' AND COLUMN_NAME = 'tenant_id'",
+                Integer.class);
+
+            if (count != null && count > 0) {
+                jdbc.execute("ALTER TABLE `role_pages` DROP COLUMN `tenant_id`");
+                log.info("SchemaConstraintMigration: dropped legacy column 'role_pages.tenant_id'");
+            }
+        } catch (Exception e) {
+            log.warn("SchemaConstraintMigration: could not drop legacy column 'role_pages.tenant_id': {}", e.getMessage());
+        }
     }
 
     private void cleanupPendingAcceptanceAppointments() {

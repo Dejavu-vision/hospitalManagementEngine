@@ -11,6 +11,9 @@ import java.util.Set;
 public class UserAccessResponse {
     private Long userId;
     private String email;
+    private String fullName;
+    private String hospitalName;
+    private String tenantKey;
     private Set<String> roles;
     private List<PageAccessDto> pages;
 }

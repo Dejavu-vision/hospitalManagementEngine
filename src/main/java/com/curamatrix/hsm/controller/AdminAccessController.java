@@ -34,8 +34,9 @@ public class AdminAccessController {
     // ─── User access lookup ─────────────────────────────────────
 
     @GetMapping("/users/{userId}")
-    public ResponseEntity<UserAccessResponse> getUserAccess(@PathVariable Long userId) {
-        return ResponseEntity.ok(accessControlService.getUserAccess(userId));
+    public ResponseEntity<UserAccessResponse> getUserAccess(@PathVariable Long userId,
+                                                            @RequestParam(required = false) Long tenantId) {
+        return ResponseEntity.ok(accessControlService.getUserAccess(userId, tenantId));
     }
 
     // ─── User page overrides ────────────────────────────────────

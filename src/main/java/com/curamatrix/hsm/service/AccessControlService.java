@@ -30,6 +30,7 @@ public class AccessControlService {
         private final UiPageRepository uiPageRepository;
         private final UserRepository userRepository;
         private final UserAccessAuditRepository userAccessAuditRepository;
+        private final TenantRepository tenantRepository;
 
         // ─── Helpers ────────────────────────────────────────────────
 
@@ -72,8 +73,16 @@ public class AccessControlService {
          * /api/me/access).
          */
         public UserAccessResponse getUserAccess(Long userId) {
+                return getUserAccess(userId, null);
+        }
+
+        public UserAccessResponse getUserAccess(Long userId, Long tenantId) {
                 User user = userRepository.findById(userId)
                                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+                if (tenantId != null && !user.getTenantId().equals(tenantId)) {
+                        throw new IllegalArgumentException("User does not belong to the selected hospital branch.");
+                }
 
                 Set<String> roleNames = user.getRoles().stream()
                                 .map(r -> r.getName().name())
@@ -92,9 +101,16 @@ public class AccessControlService {
                                 .sorted(Comparator.comparing(PageAccessDto::getPageKey))
                                 .collect(Collectors.toList());
 
+                Tenant tenant = tenantRepository.findById(user.getTenantId()).orElse(null);
+                String hospitalName = tenant != null ? tenant.getHospitalName() : "Unknown Branch";
+                String tenantKey = tenant != null ? tenant.getTenantKey() : "Unknown Key";
+
                 return UserAccessResponse.builder()
                                 .userId(user.getId())
                                 .email(user.getEmail())
+                                .fullName(user.getFullName())
+                                .hospitalName(hospitalName)
+                                .tenantKey(tenantKey)
                                 .roles(roleNames)
                                 .pages(pages)
                                 .build();
