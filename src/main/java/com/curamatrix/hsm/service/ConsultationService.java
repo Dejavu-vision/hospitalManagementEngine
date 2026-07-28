@@ -249,6 +249,12 @@ public class ConsultationService {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
 
+        // If doctor is offline, return empty queue
+        DoctorAvailabilityResponse availability = doctorAvailabilityService.getAvailability(doctorId, today);
+        if (availability != null && availability.getStatus() == DoctorStatus.OFFLINE) {
+            return Collections.emptyList();
+        }
+
         List<Appointment> queue = appointmentRepository
                 .findTodayQueueByDoctorAndTenant(doctorId, today, tenantId);
 

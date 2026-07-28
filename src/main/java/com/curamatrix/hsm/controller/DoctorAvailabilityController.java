@@ -65,22 +65,26 @@ public class DoctorAvailabilityController {
     }
 
     @PatchMapping("/api/doctors/{doctorId}/availability")
-    @PreAuthorize("hasRole('DOCTOR')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<DoctorAvailabilityResponse> updateAvailabilityStatus(
             @PathVariable Long doctorId,
             @Valid @RequestBody DoctorStatusUpdateRequest request,
             Authentication auth) {
-        availabilityService.verifyDoctorSelfUpdate(doctorId, auth.getName());
+        if (auth.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_RECEPTIONIST"))) {
+            availabilityService.verifyDoctorSelfUpdate(doctorId, auth.getName());
+        }
         return ResponseEntity.ok(availabilityService.updateStatus(doctorId, request));
     }
 
     @PatchMapping("/api/doctors/{doctorId}/status")
-    @PreAuthorize("hasRole('DOCTOR')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<DoctorAvailabilityResponse> updateStatus(
             @PathVariable Long doctorId,
             @Valid @RequestBody DoctorStatusUpdateRequest request,
             Authentication auth) {
-        availabilityService.verifyDoctorSelfUpdate(doctorId, auth.getName());
+        if (auth.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_RECEPTIONIST"))) {
+            availabilityService.verifyDoctorSelfUpdate(doctorId, auth.getName());
+        }
         return ResponseEntity.ok(availabilityService.updateStatus(doctorId, request));
     }
 }
