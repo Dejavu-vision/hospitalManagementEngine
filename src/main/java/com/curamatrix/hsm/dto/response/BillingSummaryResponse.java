@@ -16,6 +16,8 @@ public class BillingSummaryResponse {
     private long paidCount;
     private long partialCount;
 
+    private long cancelledCount;
+
     private BigDecimal totalRevenue;
     private BigDecimal pendingAmount;
     private BigDecimal collectedToday;

@@ -57,6 +57,10 @@ public class BillingItem {
     @Builder.Default
     private BigDecimal paidAmount = BigDecimal.ZERO;
 
+    @Column(name = "discount", nullable = false)
+    @Builder.Default
+    private BigDecimal discount = BigDecimal.ZERO;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id")
     private Department department;

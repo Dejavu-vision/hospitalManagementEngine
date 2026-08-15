@@ -570,6 +570,7 @@ public class BillingService {
         long pendingCount = billingRepository.countByTenantIdAndPaymentStatus(tenantId, PaymentStatus.PENDING);
         long paidCount = billingRepository.countByTenantIdAndPaymentStatus(tenantId, PaymentStatus.PAID);
         long partialCount = billingRepository.countByTenantIdAndPaymentStatus(tenantId, PaymentStatus.PARTIAL);
+        long cancelledCount = billingRepository.countByTenantIdAndPaymentStatus(tenantId, PaymentStatus.CANCELLED);
 
         BigDecimal totalRevenue = billingRepository.sumNetAmountByTenantIdAndPaymentStatus(tenantId, PaymentStatus.PAID);
         BigDecimal pendingAmount = billingRepository.sumNetAmountByTenantIdAndPaymentStatus(tenantId, PaymentStatus.PENDING);
@@ -584,6 +585,7 @@ public class BillingService {
                 .pendingCount(pendingCount)
                 .paidCount(paidCount)
                 .partialCount(partialCount)
+                .cancelledCount(cancelledCount)
                 .totalRevenue(totalRevenue)
                 .pendingAmount(pendingAmount)
                 .collectedToday(collectedToday)

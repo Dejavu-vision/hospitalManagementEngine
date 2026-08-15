@@ -57,7 +57,11 @@ public class IpdBillingController {
         if (body != null && body.containsKey("amount")) {
             amountToPay = new java.math.BigDecimal(body.get("amount").toString());
         }
-        return ResponseEntity.ok(ipdBillingService.settleChargeItem(patientId, itemId, paymentMethod, amountToPay));
+        java.math.BigDecimal discount = null;
+        if (body != null && body.containsKey("discount")) {
+            discount = new java.math.BigDecimal(body.get("discount").toString());
+        }
+        return ResponseEntity.ok(ipdBillingService.settleChargeItem(patientId, itemId, paymentMethod, amountToPay, discount));
     }
 
     @PostMapping("/patient/{patientId}/charges/settle-multiple")
@@ -70,7 +74,7 @@ public class IpdBillingController {
                 .map(id -> Long.valueOf(id.toString()))
                 .collect(Collectors.toList());
         String paymentMethod = body.containsKey("paymentMethod") ? body.get("paymentMethod").toString() : "CASH";
-        return ResponseEntity.ok(ipdBillingService.settleChargeItems(patientId, itemIds, paymentMethod));
+        return ResponseEntity.ok(ipdBillingService.settleChargeItems(patientId, itemIds, paymentMethod, body));
     }
 
     @DeleteMapping("/patient/{patientId}/charges/{itemId}")
@@ -90,6 +94,17 @@ public class IpdBillingController {
             @PathVariable Long itemId,
             @PathVariable Long newBedId) {
         return ResponseEntity.ok(ipdBillingService.changeBedForChargeRow(patientId, itemId, newBedId));
+    }
+
+    @PutMapping("/patient/{patientId}/charges/{itemId}/discount")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @Operation(summary = "Update discount on a specific manual charge row")
+    public ResponseEntity<Map<String, Object>> updateChargeDiscount(
+            @PathVariable Long patientId,
+            @PathVariable Long itemId,
+            @RequestBody Map<String, Object> body) {
+        java.math.BigDecimal discount = new java.math.BigDecimal(body.get("discount").toString());
+        return ResponseEntity.ok(ipdBillingService.updateChargeDiscount(patientId, itemId, discount));
     }
 
     // ── Freeze ────────────────────────────────────────────────────────────────
