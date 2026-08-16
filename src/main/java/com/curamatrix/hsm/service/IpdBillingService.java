@@ -701,7 +701,7 @@ public class IpdBillingService {
 
         if (admission != null) {
             if (!admission.isInvoiceGenerated()) {
-                throw new InvalidStateTransitionException("Admission", "INVOICE_NOT_GENERATED", "SETTLE");
+                generateInvoice(patientId);
             }
         }
 
