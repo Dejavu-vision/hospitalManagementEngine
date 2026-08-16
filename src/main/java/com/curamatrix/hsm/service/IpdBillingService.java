@@ -1386,7 +1386,13 @@ public class IpdBillingService {
                     .sorted(Comparator.comparing(BillingItem::getId, Comparator.nullsLast(Comparator.naturalOrder())))
                     .collect(Collectors.toList());
 
-            BigDecimal remainingCash = totalCashPaid;
+            BigDecimal depositPaid = (bill.getIpdAdmission() != null && bill.getIpdAdmission().getDepositAmount() != null)
+                    ? bill.getIpdAdmission().getDepositAmount()
+                    : BigDecimal.ZERO;
+            BigDecimal insuranceAdjustment = bill.getInsuranceAdjustment() != null
+                    ? bill.getInsuranceAdjustment()
+                    : BigDecimal.ZERO;
+            BigDecimal remainingCash = totalCashPaid.add(depositPaid).add(insuranceAdjustment);
             for (BillingItem item : sortedItems) {
                 if (item.getItemType() == BillingItemType.DEPOSIT) {
                     continue;
