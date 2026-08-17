@@ -37,6 +37,7 @@ public class ReceptionDeskService {
     private final PatientService patientService;
     private final AppointmentService appointmentService;
     private final CatalogResolverService catalogResolver;
+    private final BillingRepository billingRepository;
 
     /**
      * Builds the composite booking context for a patient in a single request lifecycle.
@@ -315,7 +316,11 @@ public class ReceptionDeskService {
             Patient patientEntity = patientRepository.findByIdAndTenantId(patient.getId(), tenantId)
                     .orElse(null);
             if (patientEntity != null) {
-                billingService.issueNewCasePaperForPatient(patientEntity, null, tenantId);
+                Billing billingEntity = null;
+                if (billingId != null) {
+                    billingEntity = billingRepository.findById(billingId).orElse(null);
+                }
+                billingService.issueNewCasePaperForPatient(patientEntity, billingEntity, tenantId);
                 // Re-fetch the newly created registration
                 registration = patientRegistrationRepository
                         .findFirstByPatientIdAndTenantIdAndActiveTrueOrderByExpiresAtDesc(patient.getId(), tenantId)

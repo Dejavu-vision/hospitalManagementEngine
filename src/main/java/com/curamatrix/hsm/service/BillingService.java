@@ -691,13 +691,35 @@ public class BillingService {
 
     private void recalculateNetAmount(Billing billing) {
         BigDecimal net = billing.getTotalAmount()
-                .subtract(billing.getDiscount())
+                .subtract(billing.getDiscount() != null ? billing.getDiscount() : BigDecimal.ZERO)
                 .subtract(billing.getInsuranceAdjustment() != null ? billing.getInsuranceAdjustment() : BigDecimal.ZERO)
-                .add(billing.getTax());
+                .add(billing.getTax() != null ? billing.getTax() : BigDecimal.ZERO);
         if (net.compareTo(BigDecimal.ZERO) < 0) {
             net = BigDecimal.ZERO;
         }
         billing.setNetAmount(net);
+
+        BigDecimal balance = billing.getNetAmount().subtract(billing.getPaidAmount() != null ? billing.getPaidAmount() : BigDecimal.ZERO);
+        if (balance.compareTo(BigDecimal.ZERO) <= 0) {
+            billing.setPaymentStatus(PaymentStatus.PAID);
+            if (billing.getPaidAt() == null) {
+                billing.setPaidAt(LocalDateTime.now());
+            }
+            billing.setPaidAmount(billing.getNetAmount());
+            if (billing.getItems() != null) {
+                billing.getItems().forEach(item -> {
+                    item.setPaymentStatus(PaymentStatus.PAID);
+                    BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+                    item.setPaidAmount(itemTotal);
+                });
+            }
+        } else if (billing.getPaidAmount() != null && billing.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            billing.setPaymentStatus(PaymentStatus.PARTIAL);
+            billing.setPaidAt(null);
+        } else {
+            billing.setPaymentStatus(PaymentStatus.PENDING);
+            billing.setPaidAt(null);
+        }
     }
 
     // ─── DTO Mapping ─────────────────────────────────────────────────────────
