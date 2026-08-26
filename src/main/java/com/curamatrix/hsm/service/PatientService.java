@@ -148,16 +148,49 @@ public class PatientService {
 
         Page<Patient> patientPage;
 
-        if (fromDate != null && toDate != null) {
-            // Date-range mode: first get the patient IDs who visited in range, then filter
-            List<Long> visitedIds = appointmentRepository
-                    .findDistinctPatientIdsByVisitDateRange(tenantId, fromDate, toDate);
-            if (visitedIds.isEmpty()) {
-                return org.springframework.data.domain.Page.empty(pageable);
+        // Resolve authenticated user & verify if they have an active Doctor profile
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        Long doctorId = null;
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            Optional<com.curamatrix.hsm.entity.Doctor> doctorOpt = doctorRepository.findByUserId(user.getId());
+            if (doctorOpt.isPresent()) {
+                doctorId = doctorOpt.get().getId();
             }
-            patientPage = patientRepository.searchWithVisitFilter(q, gender, bloodGroup, tenantId, visitedIds, pageable);
+        }
+
+        if (doctorId != null) {
+            // Find patients who have had appointments with this specific doctor
+            List<Long> doctorPatientIds = appointmentRepository.findDistinctPatientsByDoctor(doctorId, tenantId)
+                    .stream().map(Patient::getId).toList();
+            if (doctorPatientIds.isEmpty()) {
+                return Page.empty(pageable);
+            }
+            if (fromDate != null && toDate != null) {
+                List<Long> visitedIds = appointmentRepository
+                        .findDistinctPatientIdsByVisitDateRange(tenantId, fromDate, toDate);
+                List<Long> finalIds = new java.util.ArrayList<>(visitedIds);
+                finalIds.retainAll(doctorPatientIds);
+                if (finalIds.isEmpty()) {
+                    return Page.empty(pageable);
+                }
+                patientPage = patientRepository.searchWithVisitFilter(q, gender, bloodGroup, tenantId, finalIds, pageable);
+            } else {
+                patientPage = patientRepository.searchWithVisitFilter(q, gender, bloodGroup, tenantId, doctorPatientIds, pageable);
+            }
         } else {
-            patientPage = patientRepository.searchWithFilters(q, gender, bloodGroup, tenantId, pageable);
+            if (fromDate != null && toDate != null) {
+                // Date-range mode: first get the patient IDs who visited in range, then filter
+                List<Long> visitedIds = appointmentRepository
+                        .findDistinctPatientIdsByVisitDateRange(tenantId, fromDate, toDate);
+                if (visitedIds.isEmpty()) {
+                    return org.springframework.data.domain.Page.empty(pageable);
+                }
+                patientPage = patientRepository.searchWithVisitFilter(q, gender, bloodGroup, tenantId, visitedIds, pageable);
+            } else {
+                patientPage = patientRepository.searchWithFilters(q, gender, bloodGroup, tenantId, pageable);
+            }
         }
 
         // Enrich with last visit date in a single batch query

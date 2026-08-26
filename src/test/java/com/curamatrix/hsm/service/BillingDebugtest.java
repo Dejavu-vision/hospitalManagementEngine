@@ -107,12 +107,15 @@ public class BillingDebugtest {
         com.curamatrix.hsm.context.TenantContext.setTenantId(pendingItem.getBilling().getTenantId());
 
         try {
+            System.out.println("BEFORE settlement: status = " + pendingItem.getPaymentStatus() + ", paidAmount = " + pendingItem.getPaidAmount() + ", amount = " + pendingItem.getAmount());
             // Run settlement
-            ipdBillingService.settleChargeItem(patientId, itemId, "CASH", null);
+            ipdBillingService.settleChargeItem(patientId, itemId, "CASH", null, null);
 
             // Verify changes
             BillingItem updatedItem = billingItemRepository.findById(itemId).orElseThrow();
-            org.junit.jupiter.api.Assertions.assertEquals(com.curamatrix.hsm.enums.PaymentStatus.PAID, updatedItem.getPaymentStatus());
+            System.out.println("AFTER settlement: status = " + updatedItem.getPaymentStatus() + ", paidAmount = " + updatedItem.getPaidAmount());
+            org.junit.jupiter.api.Assertions.assertEquals(com.curamatrix.hsm.enums.PaymentStatus.PAID, updatedItem.getPaymentStatus(),
+                "Expected status PAID but was: " + updatedItem.getPaymentStatus());
             org.junit.jupiter.api.Assertions.assertEquals(paymentCountBefore + 1, paymentRepository.count());
             
             List<Payment> newPayments = paymentRepository.findAll();
