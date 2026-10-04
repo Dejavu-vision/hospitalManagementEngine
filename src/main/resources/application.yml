@@ -3,9 +3,9 @@ spring:
     name: hsm
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/hospitalsystems_xv3d}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:}
+    url: ${DB_URL:jdbc:postgresql://dpg-db0v1cou01pc73c2ope0-a.virginia-postgres.render.com/hospitalsystems_xv3d}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:Wmx8tcbbACH2vgxAGcb4meSOirFvvLJA}
     driver-class-name: org.postgresql.Driver
     hikari:
       leak-detection-threshold: 2000
