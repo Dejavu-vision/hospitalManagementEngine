@@ -52,6 +52,7 @@ dependencies {
 	// Flyway database migrations
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.flywaydb:flyway-mysql'
+	flyway 'org.flywaydb:flyway-mysql:11.7.2'
 
 	// .env file support — auto-loads .env into Spring properties
 	implementation 'me.paulschwarz:spring-dotenv:4.0.0'
