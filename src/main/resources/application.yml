@@ -3,24 +3,28 @@ spring:
     name: hsm
 
   datasource:
-    url: ${DB_URL:jdbc:mysql://43.204.168.146:3306/hospitalsystems}
-    username: ${DB_USERNAME:backenduser}
-    password: ${DB_PASSWORD:backenduser}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/hospitalsystems_xv3d}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
     hikari:
       leak-detection-threshold: 2000
 
   jpa:
     hibernate:
-      ddl-auto: none
-    show-sql: true
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+    defer-datasource-initialization: true   # run data.sql AFTER Hibernate builds tables
 
   flyway:
-    enabled: true
-    baseline-on-migrate: true
-    baseline-version: '0'
-    locations: classpath:db/migration
-    validate-on-migrate: false
+    enabled: false
+
+  sql:
+    init:
+      mode: always                          # always run the seed script
+      continue-on-error: true               # ignore "already exists" on re-runs
+      platform: postgres
 
   jackson:
     serialization:
