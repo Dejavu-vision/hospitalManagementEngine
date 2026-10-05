@@ -92,7 +92,12 @@ public class SecurityConfig {
             "https://*.curamatrix.com",
             "https://dnry1vs9w5nkw.cloudfront.net",
             "https://43.204.168.146",
-            "http://43.204.168.146:8080"
+            "http://43.204.168.146:8080",
+            "https://hospitalmanagment.manjuvp284.workers.dev",
+            "https://*.workers.dev",
+            "https://*.pages.dev",
+            "https://hospitalmanagementengine.onrender.com",
+            "https://*.onrender.com"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
