@@ -41,37 +41,38 @@ INSERT INTO tenants (
 
 -- ------------------------------------------------------------
 -- USERS (password hashes are BCrypt)
---   admin123     -> $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
---   doctor123    -> $2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG
---   reception123 -> $2a$10$EkRAGTGYSg7HnP3UQ0aBxO7yQOEKagDnqJXuFP3Tl1E.Vx/vK5jK6
+--   Admin@123    -> $2a$10$vAvowxrjhnEvjx/poO0UaePtPadiW7OnrOfA0AXrdz9OCsOBKO6Wy
+--   admin123     -> $2a$10$EZorI1dSXCpkqqaCQtsIzeLil2.4pLe8G7bx//HtP6nmsCeBYM/S.
+--   doctor123    -> $2a$10$Q6HDpLQmTVu8TxY1d.7tReHxf8x.v2Ct8UDWPVcpkNwKjWY0yyo9y
+--   reception123 -> $2a$10$KXt6I5BF/xZd4OOiVcGyU.BpjXujpjyQqhu636Kxu4wlfy8mwVq.m
 -- ------------------------------------------------------------
 INSERT INTO users (tenant_id, email, password, full_name, phone, is_active, created_at, updated_at)
 SELECT t.id, 'superadmin@curamatrix.com',
-       '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+       '$2a$10$EZorI1dSXCpkqqaCQtsIzeLil2.4pLe8G7bx//HtP6nmsCeBYM/S.',
        'Super Administrator', '9999999999', TRUE, NOW(), NOW()
 FROM tenants t WHERE t.tenant_key = 'default-hospital'
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (email) DO UPDATE SET password = EXCLUDED.password, is_active = TRUE;
 
 INSERT INTO users (tenant_id, email, password, full_name, phone, is_active, created_at, updated_at)
 SELECT t.id, 'admin@curamatrix.com',
-       '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+       '$2a$10$vAvowxrjhnEvjx/poO0UaePtPadiW7OnrOfA0AXrdz9OCsOBKO6Wy',
        'Hospital Admin', '9999999998', TRUE, NOW(), NOW()
 FROM tenants t WHERE t.tenant_key = 'default-hospital'
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (email) DO UPDATE SET password = EXCLUDED.password, is_active = TRUE;
 
 INSERT INTO users (tenant_id, email, password, full_name, phone, is_active, created_at, updated_at)
 SELECT t.id, 'doctor@curamatrix.com',
-       '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG',
+       '$2a$10$Q6HDpLQmTVu8TxY1d.7tReHxf8x.v2Ct8UDWPVcpkNwKjWY0yyo9y',
        'Dr. Rajesh Kumar', '9876543210', TRUE, NOW(), NOW()
 FROM tenants t WHERE t.tenant_key = 'default-hospital'
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (email) DO UPDATE SET password = EXCLUDED.password, is_active = TRUE;
 
 INSERT INTO users (tenant_id, email, password, full_name, phone, is_active, created_at, updated_at)
 SELECT t.id, 'reception@curamatrix.com',
-       '$2a$10$EkRAGTGYSg7HnP3UQ0aBxO7yQOEKagDnqJXuFP3Tl1E.Vx/vK5jK6',
+       '$2a$10$KXt6I5BF/xZd4OOiVcGyU.BpjXujpjyQqhu636Kxu4wlfy8mwVq.m',
        'Neha Gupta', '9876543211', TRUE, NOW(), NOW()
 FROM tenants t WHERE t.tenant_key = 'default-hospital'
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (email) DO UPDATE SET password = EXCLUDED.password, is_active = TRUE;
 
 -- ------------------------------------------------------------
 -- USER <-> ROLE MAPPINGS
