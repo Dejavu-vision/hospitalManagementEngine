@@ -128,19 +128,67 @@ public class AccessControlService {
                                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
                 Long tid = user.getTenantId();
 
-                userPageRepository.deleteByUserIdAndTenantId(userId, tid);
+                Set<String> targetKeys = (pageKeys == null) ? Collections.emptySet() : pageKeys;
 
-                if (pageKeys != null && !pageKeys.isEmpty()) {
-                        List<UiPage> pages = uiPageRepository.findByPageKeyIn(pageKeys);
-                        for (UiPage page : pages) {
-                                UserPage up = UserPage.builder()
-                                                .user(user).page(page).effect(Effect.GRANT).build();
-                                up.setTenantId(tid);
-                                userPageRepository.save(up);
+                if (!targetKeys.isEmpty()) {
+                        List<UiPage> pages = uiPageRepository.findByPageKeyIn(targetKeys);
+                        if (pages.size() != targetKeys.size()) {
+                                Set<String> found = pages.stream().map(UiPage::getPageKey).collect(Collectors.toSet());
+                                Set<String> missing = new HashSet<>(targetKeys);
+                                missing.removeAll(found);
+                                throw new RuntimeException("Unknown pages: " + missing);
                         }
                 }
+
+                List<UserPage> currentOverrides = userPageRepository.findByUserIdAndTenantId(userId, tid);
+
+                // Remove overrides that are no longer in targetKeys
+                List<UserPage> toRemove = currentOverrides.stream()
+                                .filter(up -> !targetKeys.contains(up.getPage().getPageKey()))
+                                .toList();
+
+                if (!toRemove.isEmpty()) {
+                        userPageRepository.deleteAll(toRemove);
+                        userPageRepository.flush();
+                }
+
+                Map<String, UserPage> existingMap = currentOverrides.stream()
+                                .collect(Collectors.toMap(up -> up.getPage().getPageKey(), up -> up, (a, b) -> a));
+
+                List<UserPage> toUpdate = new ArrayList<>();
+                Set<String> toAddKeys = new HashSet<>();
+
+                for (String key : targetKeys) {
+                        UserPage existing = existingMap.get(key);
+                        if (existing != null) {
+                                if (existing.getEffect() != Effect.GRANT) {
+                                        existing.setEffect(Effect.GRANT);
+                                        toUpdate.add(existing);
+                                }
+                        } else {
+                                toAddKeys.add(key);
+                        }
+                }
+
+                if (!toUpdate.isEmpty()) {
+                        userPageRepository.saveAll(toUpdate);
+                }
+
+                if (!toAddKeys.isEmpty()) {
+                        List<UiPage> pagesToAdd = uiPageRepository.findByPageKeyIn(toAddKeys);
+                        List<UserPage> toAdd = pagesToAdd.stream()
+                                        .map(page -> {
+                                                UserPage up = UserPage.builder()
+                                                                .user(user).page(page).effect(Effect.GRANT).build();
+                                                up.setTenantId(tid);
+                                                return up;
+                                        })
+                                        .toList();
+                        userPageRepository.saveAll(toAdd);
+                }
+
                 audit(tid, userId, changedByUserId, "USER_PAGE_SET",
-                                "pages=" + (pageKeys == null ? "[]" : pageKeys));
+                                "pages=" + targetKeys);
         }
 
         // ─── Single page add (GRANT) ───────────────────────────────

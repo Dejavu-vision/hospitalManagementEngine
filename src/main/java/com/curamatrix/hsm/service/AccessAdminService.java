@@ -75,19 +75,45 @@ public class AccessAdminService {
         Role role = roleRepository.findByName(roleName)
                 .orElseThrow(() -> new RuntimeException("Role not found: " + roleName));
 
-        rolePageRepository.deleteByRoleId(role.getId());
+        Set<String> targetKeys = (pageKeys == null) ? Collections.emptySet() : pageKeys;
 
-        if (pageKeys != null && !pageKeys.isEmpty()) {
-            List<UiPage> pages = uiPageRepository.findByPageKeyIn(pageKeys);
-            if (pages.size() != pageKeys.size()) {
+        if (!targetKeys.isEmpty()) {
+            List<UiPage> pages = uiPageRepository.findByPageKeyIn(targetKeys);
+            if (pages.size() != targetKeys.size()) {
                 Set<String> found = pages.stream().map(UiPage::getPageKey).collect(Collectors.toSet());
-                Set<String> missing = new HashSet<>(pageKeys);
+                Set<String> missing = new HashSet<>(targetKeys);
                 missing.removeAll(found);
                 throw new RuntimeException("Unknown pages: " + missing);
             }
-            for (UiPage page : pages) {
-                rolePageRepository.save(RolePage.builder().role(role).page(page).build());
-            }
+        }
+
+        List<RolePage> currentRolePages = rolePageRepository.findByRoleId(role.getId());
+
+        // Remove role pages that are no longer in targetKeys
+        List<RolePage> toRemove = currentRolePages.stream()
+                .filter(rp -> !targetKeys.contains(rp.getPage().getPageKey()))
+                .toList();
+
+        if (!toRemove.isEmpty()) {
+            rolePageRepository.deleteAll(toRemove);
+            rolePageRepository.flush();
+        }
+
+        // Add role pages that are in targetKeys but not in currentRolePages
+        Set<String> currentKeys = currentRolePages.stream()
+                .map(rp -> rp.getPage().getPageKey())
+                .collect(Collectors.toSet());
+
+        Set<String> toAddKeys = targetKeys.stream()
+                .filter(k -> !currentKeys.contains(k))
+                .collect(Collectors.toSet());
+
+        if (!toAddKeys.isEmpty()) {
+            List<UiPage> pagesToAdd = uiPageRepository.findByPageKeyIn(toAddKeys);
+            List<RolePage> toAdd = pagesToAdd.stream()
+                    .map(page -> RolePage.builder().role(role).page(page).build())
+                    .toList();
+            rolePageRepository.saveAll(toAdd);
         }
     }
 }

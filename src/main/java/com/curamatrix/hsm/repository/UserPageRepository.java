@@ -2,7 +2,9 @@ package com.curamatrix.hsm.repository;
 
 import com.curamatrix.hsm.entity.UserPage;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -23,7 +25,9 @@ public interface UserPageRepository extends JpaRepository<UserPage, Long> {
     @Query("SELECT up.page.pageKey FROM UserPage up WHERE up.user.id = :userId AND up.tenantId = :tenantId AND up.page.isActive = true")
     List<String> findActivePageKeysByUserIdAndTenantId(Long userId, Long tenantId);
 
-    void deleteByUserIdAndTenantId(Long userId, Long tenantId);
+    @Modifying
+    @Query("DELETE FROM UserPage up WHERE up.user.id = :userId AND up.tenantId = :tenantId")
+    void deleteByUserIdAndTenantId(@Param("userId") Long userId, @Param("tenantId") Long tenantId);
 
     @Query("SELECT up FROM UserPage up WHERE up.user.id = :userId AND up.page.pageKey = :pageKey AND up.tenantId = :tenantId")
     Optional<UserPage> findByUserIdAndPageKeyAndTenantId(Long userId, String pageKey, Long tenantId);
