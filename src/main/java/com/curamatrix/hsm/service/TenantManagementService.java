@@ -32,6 +32,7 @@ public class TenantManagementService {
     private final PatientRepository patientRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmployeeIdGeneratorService employeeIdGeneratorService;
+    private final AccessControlService accessControlService;
 
     @Transactional
     public TenantResponse registerTenant(TenantRegistrationRequest request) {
@@ -100,6 +101,10 @@ public class TenantManagementService {
         userRepository.save(admin);
         
         log.info("Admin user created for tenant {}: {}", tenant.getTenantKey(), admin.getEmail());
+
+        if (request.getAllowedPageKeys() != null && !request.getAllowedPageKeys().isEmpty()) {
+            accessControlService.setUserPages(admin.getId(), tenant.getId(), request.getAllowedPageKeys(), admin.getId());
+        }
     }
 
     public List<TenantResponse> getAllTenants() {

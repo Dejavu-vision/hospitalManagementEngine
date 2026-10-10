@@ -48,6 +48,8 @@ public class TenantRegistrationRequest {
 
     private String adminPhone;
 
+    private java.util.Set<String> allowedPageKeys;
+
     private java.util.Map<String, Object> settings;
 }
 

@@ -41,12 +41,16 @@ public class AccessBootstrapService {
         upsertPage("ADMIN_USERS", "/admin/users", "User Management");
         upsertPage("ADMIN_ROLES", "/admin/roles", "Role Management");
         upsertPage("ADMIN_PAGES", "/admin/pages", "Page Management");
+        upsertPage("ADMIN_SETTINGS", "/admin/settings", "Hospital Settings");
+        upsertPage("LAB_SERVICES", "/admin/services", "Service Catalog");
         upsertPage("DOCTOR_DASHBOARD", "/doctor/dashboard", "Doctor Dashboard");
         upsertPage("DOCTOR_PRESCRIPTION", "/doctor/prescriptions", "Prescription");
         upsertPage("DOCTOR_PATIENTS", "/doctor/patients", "My Patients");
         upsertPage("RECEPTIONIST_APPOINTMENTS", "/receptionist/appointments", "Appointments");
         upsertPage("RECEPTIONIST_PATIENTS", "/receptionist/patients", "Patient Registration");
         upsertPage("RECEPTIONIST_BILLING", "/receptionist/billing", "Billing");
+        upsertPage("RECEPTIONIST_QUEUE", "/reception/queue", "Queue Management");
+        upsertPage("LAB_DASHBOARD", "/lab-dashboard", "Lab Dashboard");
     }
 
     private void upsertPage(String pageKey, String route, String displayName) {
@@ -64,7 +68,8 @@ public class AccessBootstrapService {
 
         // Admin gets all admin pages
         assignRolePages(RoleName.ROLE_ADMIN, Set.of(
-                "ADMIN_DASHBOARD", "ADMIN_USERS", "ADMIN_ROLES", "ADMIN_PAGES"
+                "ADMIN_DASHBOARD", "ADMIN_USERS", "ADMIN_ROLES", "ADMIN_PAGES",
+                "ADMIN_SETTINGS", "LAB_SERVICES"
         ), pageMap);
 
         // Doctor gets doctor pages
@@ -75,7 +80,12 @@ public class AccessBootstrapService {
         // Receptionist gets receptionist pages
         assignRolePages(RoleName.ROLE_RECEPTIONIST, Set.of(
                 "RECEPTIONIST_APPOINTMENTS",
-                "RECEPTIONIST_PATIENTS", "RECEPTIONIST_BILLING"
+                "RECEPTIONIST_PATIENTS", "RECEPTIONIST_BILLING", "RECEPTIONIST_QUEUE"
+        ), pageMap);
+
+        // Lab staff gets lab dashboard
+        assignRolePages(RoleName.ROLE_LAB_STAFF, Set.of(
+                "LAB_DASHBOARD"
         ), pageMap);
 
         // Super Admin gets everything
