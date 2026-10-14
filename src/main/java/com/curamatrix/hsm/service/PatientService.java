@@ -197,6 +197,8 @@ public class PatientService {
                     return org.springframework.data.domain.Page.empty(pageable);
                 }
                 patientPage = patientRepository.searchWithVisitFilter(q, gender, bloodGroup, tenantId, visitedIds, pageable);
+            } else if (q == null && gender == null && bloodGroup == null) {
+                patientPage = patientRepository.findByTenantId(tenantId, pageable);
             } else {
                 patientPage = patientRepository.searchWithFilters(q, gender, bloodGroup, tenantId, pageable);
             }

@@ -10,11 +10,13 @@ import org.springframework.data.repository.query.Param;
 public interface PatientRepository extends JpaRepository<Patient, Long> {
     
     @Query("SELECT p FROM Patient p WHERE " +
-           "LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "p.phone LIKE CONCAT('%', :search, '%')")
+           "LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) OR " +
+           "p.phone LIKE CONCAT('%', CAST(:search AS string), '%')")
     Page<Patient> searchPatients(@Param("search") String search, Pageable pageable);
     
     long countByTenantId(Long tenantId);
+
+    Page<Patient> findByTenantId(Long tenantId, Pageable pageable);
 
     boolean existsByPatientCode(String patientCode);
 
@@ -24,20 +26,20 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
             String firstName, String lastName, java.time.LocalDate dateOfBirth, Long tenantId);
 
     @Query("SELECT p FROM Patient p WHERE p.tenantId = :tenantId AND (" +
-           "LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
-           "p.phone LIKE CONCAT('%', :q, '%') OR " +
-           "LOWER(p.patientCode) LIKE LOWER(CONCAT('%', :q, '%')))")
+           "LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', CAST(:q AS string), '%')) OR " +
+           "p.phone LIKE CONCAT('%', CAST(:q AS string), '%') OR " +
+           "LOWER(p.patientCode) LIKE LOWER(CONCAT('%', CAST(:q AS string), '%')))")
     Page<Patient> searchByTenant(@Param("q") String query,
                                   @Param("tenantId") Long tenantId,
                                   Pageable pageable);
 
     @Query("SELECT p FROM Patient p WHERE p.tenantId = :tenantId " +
-           "AND (:q IS NULL OR " +
-           "     LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
-           "     p.phone LIKE CONCAT('%', :q, '%') OR " +
-           "     LOWER(p.patientCode) LIKE LOWER(CONCAT('%', :q, '%'))) " +
-           "AND (:gender IS NULL OR p.gender = :gender) " +
-           "AND (:bloodGroup IS NULL OR p.bloodGroup = :bloodGroup)")
+           "AND (CAST(:q AS string) IS NULL OR " +
+           "     LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', CAST(:q AS string), '%')) OR " +
+           "     p.phone LIKE CONCAT('%', CAST(:q AS string), '%') OR " +
+           "     LOWER(p.patientCode) LIKE LOWER(CONCAT('%', CAST(:q AS string), '%'))) " +
+           "AND (CAST(:gender AS string) IS NULL OR p.gender = :gender) " +
+           "AND (CAST(:bloodGroup AS string) IS NULL OR p.bloodGroup = :bloodGroup)")
     Page<Patient> searchWithFilters(@Param("q") String query,
                                      @Param("gender") String gender,
                                      @Param("bloodGroup") String bloodGroup,
@@ -66,12 +68,12 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
      */
     @Query("SELECT p FROM Patient p WHERE p.tenantId = :tenantId " +
            "AND p.id IN :patientIds " +
-           "AND (:q IS NULL OR " +
-           "     LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
-           "     p.phone LIKE CONCAT('%', :q, '%') OR " +
-           "     LOWER(p.patientCode) LIKE LOWER(CONCAT('%', :q, '%'))) " +
-           "AND (:gender IS NULL OR p.gender = :gender) " +
-           "AND (:bloodGroup IS NULL OR p.bloodGroup = :bloodGroup)")
+           "AND (CAST(:q AS string) IS NULL OR " +
+           "     LOWER(CONCAT(p.firstName, ' ', p.lastName)) LIKE LOWER(CONCAT('%', CAST(:q AS string), '%')) OR " +
+           "     p.phone LIKE CONCAT('%', CAST(:q AS string), '%') OR " +
+           "     LOWER(p.patientCode) LIKE LOWER(CONCAT('%', CAST(:q AS string), '%'))) " +
+           "AND (CAST(:gender AS string) IS NULL OR p.gender = :gender) " +
+           "AND (CAST(:bloodGroup AS string) IS NULL OR p.bloodGroup = :bloodGroup)")
     Page<Patient> searchWithVisitFilter(@Param("q") String query,
                                          @Param("gender") String gender,
                                          @Param("bloodGroup") String bloodGroup,
