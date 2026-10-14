@@ -306,7 +306,12 @@ public class IpdAdmissionService {
             List<PaymentStatus> pendingStatuses = List.of(PaymentStatus.PENDING, PaymentStatus.PARTIAL);
 
             // 2. Discharged IPD admissions whose bill is still PENDING or PARTIAL
-            List<Billing> unpaidDischargedBills = billingRepository.findUnpaidDischargedBills(tenantId, pendingStatuses, startDate, endDate);
+            List<Billing> unpaidDischargedBills;
+            if (startDate != null && endDate != null) {
+                unpaidDischargedBills = billingRepository.findUnpaidDischargedBillsByDateRange(tenantId, pendingStatuses, startDate, endDate);
+            } else {
+                unpaidDischargedBills = billingRepository.findUnpaidDischargedBills(tenantId, pendingStatuses);
+            }
             for (Billing b : unpaidDischargedBills) {
                 IpdAdmission adm = b.getIpdAdmission();
                 if (adm != null && !processedPatientIds.contains(adm.getPatient().getId())) {

@@ -54,9 +54,13 @@ public interface BillingRepository extends JpaRepository<Billing, Long> {
     @Query("SELECT b FROM Billing b WHERE b.tenantId = :tenantId AND b.ipdAdmission IS NULL AND b.paymentStatus IN :statuses ORDER BY b.createdAt DESC")
     List<Billing> findPendingOpdBills(@Param("tenantId") Long tenantId, @Param("statuses") List<PaymentStatus> statuses);
 
-    // Discharged IPD admissions with unpaid (PENDING/PARTIAL) bills, optionally filtered by actual discharge date
-    @Query("SELECT b FROM Billing b WHERE b.tenantId = :tenantId AND b.ipdAdmission IS NOT NULL AND b.ipdAdmission.status = 'DISCHARGED' AND b.paymentStatus IN :statuses AND (:startDate IS NULL OR b.ipdAdmission.actualDischargeTime >= :startDate) AND (:endDate IS NULL OR b.ipdAdmission.actualDischargeTime <= :endDate) ORDER BY b.ipdAdmission.actualDischargeTime DESC")
-    List<Billing> findUnpaidDischargedBills(@Param("tenantId") Long tenantId, @Param("statuses") List<PaymentStatus> statuses, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+    // Discharged IPD admissions with unpaid (PENDING/PARTIAL) bills without date range (default Pending tab)
+    @Query("SELECT b FROM Billing b WHERE b.tenantId = :tenantId AND b.ipdAdmission IS NOT NULL AND b.ipdAdmission.status = 'DISCHARGED' AND b.paymentStatus IN :statuses ORDER BY b.ipdAdmission.actualDischargeTime DESC")
+    List<Billing> findUnpaidDischargedBills(@Param("tenantId") Long tenantId, @Param("statuses") List<PaymentStatus> statuses);
+
+    // Discharged IPD admissions with unpaid (PENDING/PARTIAL) bills filtered by actual discharge date range
+    @Query("SELECT b FROM Billing b WHERE b.tenantId = :tenantId AND b.ipdAdmission IS NOT NULL AND b.ipdAdmission.status = 'DISCHARGED' AND b.paymentStatus IN :statuses AND b.ipdAdmission.actualDischargeTime >= :startDate AND b.ipdAdmission.actualDischargeTime <= :endDate ORDER BY b.ipdAdmission.actualDischargeTime DESC")
+    List<Billing> findUnpaidDischargedBillsByDateRange(@Param("tenantId") Long tenantId, @Param("statuses") List<PaymentStatus> statuses, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     // Paid bills without date filter (returns all paid, used as fallback)
     List<Billing> findAllByTenantIdAndPaymentStatusInOrderByPaidAtDesc(Long tenantId, List<PaymentStatus> statuses);
