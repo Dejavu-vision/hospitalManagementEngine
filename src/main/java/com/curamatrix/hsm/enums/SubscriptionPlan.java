@@ -6,7 +6,9 @@ import lombok.Getter;
 public enum SubscriptionPlan {
     BASIC(99, 10, 1000, 5, 1000),
     STANDARD(499, 50, 10000, 50, 10000),
-    PREMIUM(1999, -1, -1, 500, -1); // -1 means unlimited
+    PROFESSIONAL(999, 100, 50000, 100, 25000),
+    PREMIUM(1999, -1, -1, 500, -1), // -1 means unlimited
+    ENTERPRISE(1999, -1, -1, 500, -1);
 
     private final int monthlyPrice;
     private final int maxUsers;

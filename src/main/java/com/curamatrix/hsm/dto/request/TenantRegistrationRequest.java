@@ -51,5 +51,7 @@ public class TenantRegistrationRequest {
     private java.util.Set<String> allowedPageKeys;
 
     private java.util.Map<String, Object> settings;
+
+    private Boolean isActive;
 }
 

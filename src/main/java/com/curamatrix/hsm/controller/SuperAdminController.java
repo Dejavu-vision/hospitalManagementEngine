@@ -1,6 +1,7 @@
 package com.curamatrix.hsm.controller;
 
 import com.curamatrix.hsm.dto.request.TenantRegistrationRequest;
+import com.curamatrix.hsm.dto.request.TenantRenewalRequest;
 import com.curamatrix.hsm.dto.request.AdminPasswordResetRequest;
 import com.curamatrix.hsm.dto.response.TenantResponse;
 import com.curamatrix.hsm.service.TenantManagementService;
@@ -93,5 +94,15 @@ public class SuperAdminController {
         log.info("Resetting admin password for tenant: {}", id);
         tenantManagementService.resetTenantAdminPassword(id, request);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/renew")
+    @Operation(summary = "Renew Subscription", description = "Renew or extend subscription plan for a tenant hospital")
+    public ResponseEntity<TenantResponse> renewTenantSubscription(
+            @PathVariable Long id,
+            @Valid @RequestBody TenantRenewalRequest request) {
+        log.info("Renewing subscription for tenant: {}", id);
+        TenantResponse response = tenantManagementService.renewSubscription(id, request);
+        return ResponseEntity.ok(response);
     }
 }

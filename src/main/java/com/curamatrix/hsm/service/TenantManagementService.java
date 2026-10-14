@@ -1,6 +1,7 @@
 package com.curamatrix.hsm.service;
 
 import com.curamatrix.hsm.dto.request.TenantRegistrationRequest;
+import com.curamatrix.hsm.dto.request.TenantRenewalRequest;
 import com.curamatrix.hsm.dto.request.AdminPasswordResetRequest;
 import com.curamatrix.hsm.dto.response.TenantResponse;
 import com.curamatrix.hsm.entity.Role;
@@ -14,6 +15,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -124,10 +128,20 @@ public class TenantManagementService {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tenant not found with id: " + id));
 
+        if (request.getSubscriptionStart() != null && request.getSubscriptionEnd() != null) {
+            if (request.getSubscriptionEnd().isBefore(request.getSubscriptionStart())) {
+                throw new RuntimeException("Subscription end date cannot be before subscription start date.");
+            }
+        }
+
         tenant.setHospitalName(request.getHospitalName());
         tenant.setSubscriptionPlan(request.getSubscriptionPlan());
-        tenant.setSubscriptionStart(request.getSubscriptionStart());
-        tenant.setSubscriptionEnd(request.getSubscriptionEnd());
+        if (request.getSubscriptionStart() != null) {
+            tenant.setSubscriptionStart(request.getSubscriptionStart());
+        }
+        if (request.getSubscriptionEnd() != null) {
+            tenant.setSubscriptionEnd(request.getSubscriptionEnd());
+        }
         tenant.setContactEmail(request.getContactEmail());
         tenant.setContactPhone(request.getContactPhone());
         tenant.setAddress(request.getAddress());
@@ -137,6 +151,13 @@ public class TenantManagementService {
         SubscriptionPlan plan = SubscriptionPlan.valueOf(request.getSubscriptionPlan());
         tenant.setMaxUsers(plan.getMaxUsers());
         tenant.setMaxPatients(plan.getMaxPatients());
+
+        if (request.getIsActive() != null) {
+            tenant.setIsActive(request.getIsActive());
+        } else if (tenant.getSubscriptionEnd() != null && tenant.getSubscriptionEnd().isAfter(LocalDate.now())) {
+            // Automatically reactivate expired/inactive hospital when subscription end date is extended into the future
+            tenant.setIsActive(true);
+        }
 
         if (request.getSettings() != null) {
             tenant.setSettings(request.getSettings());
@@ -204,6 +225,115 @@ public class TenantManagementService {
         }
         return page.map(this::mapToResponse);
     }
+
+    @Transactional
+    public TenantResponse renewSubscription(Long tenantId, TenantRenewalRequest request) {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("Tenant not found with id: " + tenantId));
+
+        String currentPlanStr = tenant.getSubscriptionPlan();
+        String newPlanStr = (request.getSubscriptionPlan() != null && !request.getSubscriptionPlan().isBlank())
+                ? request.getSubscriptionPlan().toUpperCase().trim()
+                : currentPlanStr;
+
+        SubscriptionPlan newPlan;
+        try {
+            newPlan = SubscriptionPlan.valueOf(newPlanStr);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid subscription plan: " + newPlanStr);
+        }
+
+        LocalDate prevStart = tenant.getSubscriptionStart();
+        LocalDate prevEnd = tenant.getSubscriptionEnd();
+        LocalDate today = LocalDate.now();
+
+        LocalDate newStart;
+        LocalDate newEnd;
+
+        if (request.getSubscriptionEnd() != null) {
+            if (!request.getSubscriptionEnd().isAfter(today)) {
+                throw new RuntimeException("Subscription end date must be in the future.");
+            }
+            newEnd = request.getSubscriptionEnd();
+            newStart = request.getSubscriptionStart() != null ? request.getSubscriptionStart()
+                    : (prevStart != null ? prevStart : today);
+        } else {
+            int months = (request.getExtensionMonths() != null && request.getExtensionMonths() > 0)
+                    ? request.getExtensionMonths()
+                    : 12;
+
+            if (request.getSubscriptionStart() != null) {
+                newStart = request.getSubscriptionStart();
+                newEnd = newStart.plusMonths(months);
+            } else if (prevEnd != null && prevEnd.isAfter(today)) {
+                // Subscription is active -> extend from existing end date
+                newStart = prevStart != null ? prevStart : today;
+                newEnd = prevEnd.plusMonths(months);
+            } else {
+                // Subscription is expired or not set -> start from today
+                newStart = today;
+                newEnd = today.plusMonths(months);
+            }
+        }
+
+        if (!newEnd.isAfter(newStart)) {
+            throw new RuntimeException("Subscription end date must be after subscription start date.");
+        }
+
+        tenant.setSubscriptionPlan(newPlan.name());
+        tenant.setSubscriptionStart(newStart);
+        tenant.setSubscriptionEnd(newEnd);
+        tenant.setMaxUsers(newPlan.getMaxUsers());
+        tenant.setMaxPatients(newPlan.getMaxPatients());
+
+        if (Boolean.TRUE.equals(request.getAutoActivate()) || request.getAutoActivate() == null) {
+            tenant.setIsActive(true);
+        }
+
+        // Store renewal history in settings JSON
+        Map<String, Object> settings = tenant.getSettings();
+        if (settings == null) {
+            settings = new HashMap<>();
+        }
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> renewalHistory = (List<Map<String, Object>>) settings.get("renewalHistory");
+        if (renewalHistory == null) {
+            renewalHistory = new ArrayList<>();
+        } else {
+            renewalHistory = new ArrayList<>(renewalHistory);
+        }
+
+        Map<String, Object> record = new HashMap<>();
+        record.put("renewedAt", LocalDateTime.now().toString());
+        record.put("previousPlan", currentPlanStr);
+        record.put("newPlan", newPlan.name());
+        record.put("previousStart", prevStart != null ? prevStart.toString() : null);
+        record.put("previousEnd", prevEnd != null ? prevEnd.toString() : null);
+        record.put("newStart", newStart.toString());
+        record.put("newEnd", newEnd.toString());
+        record.put("extensionMonths", request.getExtensionMonths());
+        if (request.getAmountPaid() != null) {
+            record.put("amountPaid", request.getAmountPaid().toString());
+        }
+        if (request.getPaymentReference() != null && !request.getPaymentReference().isBlank()) {
+            record.put("paymentReference", request.getPaymentReference().trim());
+        }
+        if (request.getNotes() != null && !request.getNotes().isBlank()) {
+            record.put("notes", request.getNotes().trim());
+        }
+
+        renewalHistory.add(record);
+        settings.put("renewalHistory", renewalHistory);
+        tenant.setSettings(settings);
+
+        tenant = tenantRepository.save(tenant);
+        log.info("Tenant {} (ID: {}) subscription renewed to plan {} valid until {}",
+                tenant.getTenantKey(), tenant.getId(), tenant.getSubscriptionPlan(), tenant.getSubscriptionEnd());
+
+        return mapToResponse(tenant);
+    }
+
+
 
 
     @Transactional
