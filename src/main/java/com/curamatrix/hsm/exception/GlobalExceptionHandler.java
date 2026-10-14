@@ -125,11 +125,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleRuntime(RuntimeException ex,
                                                              HttpServletRequest request) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
-        String msg = ex.getMessage() == null ? "Unexpected error" : ex.getMessage();
+        Throwable root = ex;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String msg = (root.getMessage() != null && !root.getMessage().isBlank()) ? root.getMessage() : ex.getMessage();
+        if (msg == null) msg = "Unexpected error: " + ex.getClass().getSimpleName();
         if (msg.toLowerCase().contains("already exists")) {
             status = HttpStatus.CONFLICT;
         }
-        log.warn("RuntimeException on {}: {}", request.getRequestURI(), msg);
+        log.warn("RuntimeException on {}: {}", request.getRequestURI(), msg, ex);
         return build(status, msg, request.getRequestURI());
     }
 

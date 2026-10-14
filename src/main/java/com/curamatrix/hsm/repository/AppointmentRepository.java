@@ -24,6 +24,8 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     
     Page<Appointment> findByPatientId(Long patientId, Pageable pageable);
     
+    List<Appointment> findByPatientIdAndAppointmentDate(Long patientId, LocalDate appointmentDate);
+    
     @Query("SELECT a FROM Appointment a WHERE a.doctor.id = :doctorId AND a.appointmentDate = :date " +
            "AND a.appointmentTime = :time AND a.status != 'CANCELLED'")
     Optional<Appointment> findByDoctorAndDateAndTime(@Param("doctorId") Long doctorId, 

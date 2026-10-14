@@ -62,15 +62,16 @@ public class DoctorAvailabilityService {
     @Transactional(readOnly = true)
     public DoctorAvailabilityResponse getAvailability(Long doctorId, LocalDate date) {
         Long tenantId = TenantContext.getTenantId();
-        Optional<DoctorAvailability> record = availabilityRepository
-                .findByDoctorIdAndAvailabilityDateAndTenantId(doctorId, date, tenantId);
         Doctor doctor = doctorRepository.findById(doctorId)
+                .or(() -> doctorRepository.findByUserId(doctorId))
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", doctorId));
+        Optional<DoctorAvailability> record = availabilityRepository
+                .findByDoctorIdAndAvailabilityDateAndTenantId(doctor.getId(), date, tenantId);
         // Default: present and AVAILABLE when no record exists
         return record.map(r -> toResponse(r, doctor))
                 .orElseGet(() -> DoctorAvailabilityResponse.builder()
                         .userId(doctor.getUser().getId())
-                        .doctorId(doctorId)
+                        .doctorId(doctor.getId())
                         .doctorName(doctor.getUser().getFullName())
                         .departmentName(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
                         .date(date)
@@ -107,9 +108,10 @@ public class DoctorAvailabilityService {
     public DoctorAvailabilityResponse upsertAvailability(Long doctorId, DoctorAvailabilityRequest request) {
         Long tenantId = TenantContext.getTenantId();
         Doctor doctor = doctorRepository.findById(doctorId)
+                .or(() -> doctorRepository.findByUserId(doctorId))
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", doctorId));
         DoctorAvailability record = availabilityRepository
-                .findByDoctorIdAndAvailabilityDateAndTenantId(doctorId, request.getDate(), tenantId)
+                .findByDoctorIdAndAvailabilityDateAndTenantId(doctor.getId(), request.getDate(), tenantId)
                 .orElseGet(() -> DoctorAvailability.builder()
                         .doctor(doctor).availabilityDate(request.getDate()).build());
         record.setIsPresent(request.getIsPresent());
@@ -127,9 +129,10 @@ public class DoctorAvailabilityService {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
         Doctor doctor = doctorRepository.findById(doctorId)
+                .or(() -> doctorRepository.findByUserId(doctorId))
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", doctorId));
         DoctorAvailability record = availabilityRepository
-                .findByDoctorIdAndAvailabilityDateAndTenantId(doctorId, today, tenantId)
+                .findByDoctorIdAndAvailabilityDateAndTenantId(doctor.getId(), today, tenantId)
                 .orElseGet(() -> DoctorAvailability.builder()
                         .doctor(doctor).availabilityDate(today).isPresent(true).build());
 

@@ -88,10 +88,18 @@ public class PatientService {
         // the warning if they confirm it is a different person.
 
         // Generate human-readable patient code before saving
-        // Format: P{YY}{4-digit-sequence} e.g. P260001 — short, readable, fits on token slips
+        // Format: P{YY}T{tenantId}{4-digit-sequence} or P{YY}{4-digit-sequence} guaranteed unique globally
         String yy = String.valueOf(java.time.Year.now().getValue()).substring(2); // "26"
         long count = patientRepository.countByTenantId(effectiveTenantId != null ? effectiveTenantId : 0L) + 1;
-        String patientCode = "P" + yy + String.format("%04d", count);
+        String prefix = (effectiveTenantId != null && effectiveTenantId > 1)
+                ? String.format("P%sT%d-", yy, effectiveTenantId)
+                : ("P" + yy);
+        String patientCode = prefix + String.format("%04d", count);
+        long offset = 1;
+        while (patientRepository.existsByPatientCode(patientCode)) {
+            patientCode = prefix + String.format("%04d", count + offset);
+            offset++;
+        }
 
         Patient patient = Patient.builder()
                 .firstName(request.getFirstName())
@@ -135,10 +143,11 @@ public class PatientService {
             patient.getInsurancePolicies().add(policy);
         }
 
-        patient = patientRepository.save(patient);
+        patient.setTenantId(effectiveTenantId);
+        patient = patientRepository.saveAndFlush(patient);
         log.info("Patient registered: {} {} [{}]", patient.getFirstName(), patient.getLastName(), patient.getPatientCode());
 
-        return mapToResponse(patient);
+        return mapToResponse(patient, true);
     }
 
     public Page<PatientResponse> searchPatients(String search, String gender, String bloodGroup,
@@ -565,6 +574,10 @@ public class PatientService {
     }
 
     private PatientResponse mapToResponse(Patient patient) {
+        return mapToResponse(patient, false);
+    }
+
+    private PatientResponse mapToResponse(Patient patient, boolean isNewPatient) {
         PatientResponse resp = PatientResponse.builder()
                 .id(patient.getId())
                 .patientCode(patient.getPatientCode())
@@ -587,43 +600,52 @@ public class PatientService {
                 .insuranceProvider(patient.getInsuranceProvider())
                 .insurancePolicyNumber(patient.getInsurancePolicyNumber())
                 .insurancePolicies(
-                    patient.getInsurancePolicies().stream().map(ip -> InsurancePolicyResponse.builder()
-                        .id(ip.getId())
-                        .payerId(ip.getPayer() != null ? ip.getPayer().getId() : null)
-                        .insurerName(ip.getPayer() != null ? ip.getPayer().getInsurerName() : null)
-                        .tpaName(ip.getPayer() != null ? ip.getPayer().getTpaName() : null)
-                        .policyNumber(ip.getPolicyNumber())
-                        .memberId(ip.getMemberId())
-                        .sumInsured(ip.getSumInsured())
-                        .roomRentLimit(ip.getRoomRentLimit())
-                        .copayPct(ip.getCopayPct())
-                        .validFrom(ip.getValidFrom())
-                        .validTo(ip.getValidTo())
-                        .policyType(ip.getPolicyType())
-                        .build()
-                    ).toList()
+                    patient.getInsurancePolicies() != null
+                        ? patient.getInsurancePolicies().stream().map(ip -> InsurancePolicyResponse.builder()
+                            .id(ip.getId())
+                            .payerId(ip.getPayer() != null ? ip.getPayer().getId() : null)
+                            .insurerName(ip.getPayer() != null ? ip.getPayer().getInsurerName() : null)
+                            .tpaName(ip.getPayer() != null ? ip.getPayer().getTpaName() : null)
+                            .policyNumber(ip.getPolicyNumber())
+                            .memberId(ip.getMemberId())
+                            .sumInsured(ip.getSumInsured())
+                            .roomRentLimit(ip.getRoomRentLimit())
+                            .copayPct(ip.getCopayPct())
+                            .validFrom(ip.getValidFrom())
+                            .validTo(ip.getValidTo())
+                            .policyType(ip.getPolicyType())
+                            .build()
+                        ).toList()
+                        : java.util.Collections.emptyList()
                 )
                 .build();
-                
+
+        if (isNewPatient || patient.getId() == null) {
+            resp.setFinancialStatus(com.curamatrix.hsm.enums.FinancialStatus.REGISTERED_UNPAID.name());
+            resp.setCurrentOutstanding(java.math.BigDecimal.ZERO);
+            return resp;
+        }
+
         // Inject active appointment info for today's visits (Booked, Checked-In, or In-Progress)
         try {
             LocalDate today = LocalDate.now();
-            appointmentRepository.findByFilters(
-                today, null, patient.getId(), null, null, org.springframework.data.domain.PageRequest.of(0, 10))
-            .getContent().stream()
-            .filter(a -> a.getStatus() == AppointmentStatus.BOOKED || 
-                         a.getStatus() == AppointmentStatus.CHECKED_IN || 
-                         a.getStatus() == AppointmentStatus.IN_PROGRESS)
-            .findFirst()
-            .ifPresent(appt -> {
-                resp.setActiveAppointmentId(appt.getId());
-                resp.setActiveAppointmentStatus(appt.getStatus().name());
-                resp.setActiveTokenNumber(appt.getTokenNumber());
-                if (appt.getDoctor() != null) {
-                    resp.setActiveAppointmentDoctorId(appt.getDoctor().getId());
-                    resp.setActiveAppointmentDoctorName(appt.getDoctor().getUser().getFullName());
-                }
-            });
+            java.util.List<com.curamatrix.hsm.entity.Appointment> todayAppts = appointmentRepository.findByPatientIdAndAppointmentDate(patient.getId(), today);
+            if (todayAppts != null) {
+                todayAppts.stream()
+                    .filter(a -> a.getStatus() == AppointmentStatus.BOOKED || 
+                                 a.getStatus() == AppointmentStatus.CHECKED_IN || 
+                                 a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                    .findFirst()
+                    .ifPresent(appt -> {
+                        resp.setActiveAppointmentId(appt.getId());
+                        resp.setActiveAppointmentStatus(appt.getStatus().name());
+                        resp.setActiveTokenNumber(appt.getTokenNumber());
+                        if (appt.getDoctor() != null && appt.getDoctor().getUser() != null) {
+                            resp.setActiveAppointmentDoctorId(appt.getDoctor().getId());
+                            resp.setActiveAppointmentDoctorName(appt.getDoctor().getUser().getFullName());
+                        }
+                    });
+            }
         } catch (Exception e) {
             log.warn("Could not fetch active appointment for patient: {}", e.getMessage());
         }
@@ -631,24 +653,30 @@ public class PatientService {
         // Add financial status — compute live from billings for accuracy
         try {
             Long tenantId = com.curamatrix.hsm.context.TenantContext.getTenantId();
-            java.util.List<com.curamatrix.hsm.entity.Billing> bills = billingRepository.findAllByPatientIdAndTenantId(patient.getId(), tenantId);
-            java.math.BigDecimal liveOutstanding = java.math.BigDecimal.ZERO;
-            for (com.curamatrix.hsm.entity.Billing bill : bills) {
-                if (bill.getPaymentStatus() == com.curamatrix.hsm.enums.PaymentStatus.CANCELLED) continue;
-                if (bill.getPaymentStatus() == com.curamatrix.hsm.enums.PaymentStatus.PAID) continue;
-                // For PENDING or PARTIAL bills, compute actual remaining
-                java.math.BigDecimal net = bill.getNetAmount() != null ? bill.getNetAmount() : java.math.BigDecimal.ZERO;
-                java.math.BigDecimal paid = bill.getPaidAmount() != null ? bill.getPaidAmount() : java.math.BigDecimal.ZERO;
-                java.math.BigDecimal balance = net.subtract(paid);
-                if (balance.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                    liveOutstanding = liveOutstanding.add(balance);
+            if (tenantId == null) tenantId = patient.getTenantId();
+            if (tenantId != null) {
+                java.util.List<com.curamatrix.hsm.entity.Billing> bills = billingRepository.findAllByPatientIdAndTenantId(patient.getId(), tenantId);
+                java.math.BigDecimal liveOutstanding = java.math.BigDecimal.ZERO;
+                for (com.curamatrix.hsm.entity.Billing bill : bills) {
+                    if (bill.getPaymentStatus() == com.curamatrix.hsm.enums.PaymentStatus.CANCELLED) continue;
+                    if (bill.getPaymentStatus() == com.curamatrix.hsm.enums.PaymentStatus.PAID) continue;
+                    // For PENDING or PARTIAL bills, compute actual remaining
+                    java.math.BigDecimal net = bill.getNetAmount() != null ? bill.getNetAmount() : java.math.BigDecimal.ZERO;
+                    java.math.BigDecimal paid = bill.getPaidAmount() != null ? bill.getPaidAmount() : java.math.BigDecimal.ZERO;
+                    java.math.BigDecimal balance = net.subtract(paid);
+                    if (balance.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                        liveOutstanding = liveOutstanding.add(balance);
+                    }
                 }
-            }
-            resp.setCurrentOutstanding(liveOutstanding);
-            if (liveOutstanding.compareTo(java.math.BigDecimal.ZERO) <= 0) {
-                resp.setFinancialStatus(com.curamatrix.hsm.enums.FinancialStatus.FULLY_PAID.name());
+                resp.setCurrentOutstanding(liveOutstanding);
+                if (liveOutstanding.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+                    resp.setFinancialStatus(com.curamatrix.hsm.enums.FinancialStatus.FULLY_PAID.name());
+                } else {
+                    resp.setFinancialStatus(com.curamatrix.hsm.enums.FinancialStatus.REGISTERED_UNPAID.name());
+                }
             } else {
                 resp.setFinancialStatus(com.curamatrix.hsm.enums.FinancialStatus.REGISTERED_UNPAID.name());
+                resp.setCurrentOutstanding(java.math.BigDecimal.ZERO);
             }
         } catch (Exception e) {
             log.warn("Could not compute financial status for patient: {}", e.getMessage());

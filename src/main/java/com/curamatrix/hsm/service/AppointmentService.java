@@ -59,19 +59,21 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponse bookAppointment(AppointmentRequest request) {
-        // Validate slot availability
+        Patient patient = patientRepository.findById(request.getPatientId())
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", request.getPatientId()));
+        Doctor doctor = doctorRepository.findById(request.getDoctorId())
+                .or(() -> doctorRepository.findByUserId(request.getDoctorId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", request.getDoctorId()));
+
+        // Validate slot availability using resolved doctor id
         appointmentRepository.findByDoctorAndDateAndTime(
-                request.getDoctorId(), request.getAppointmentDate(), request.getAppointmentTime())
+                doctor.getId(), request.getAppointmentDate(), request.getAppointmentTime())
                 .ifPresent(a -> {
                     throw new DuplicateResourceException(
                             "Time slot already booked for this doctor on " +
                             request.getAppointmentDate() + " at " + request.getAppointmentTime());
                 });
 
-        Patient patient = patientRepository.findById(request.getPatientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", request.getPatientId()));
-        Doctor doctor = doctorRepository.findById(request.getDoctorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", request.getDoctorId()));
         User bookedBy = getCurrentUser();
 
         Appointment appointment = Appointment.builder()
@@ -107,11 +109,28 @@ public class AppointmentService {
         Patient patient = patientRepository.findById(request.getPatientId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", request.getPatientId()));
 
-        // ── Auto-assign doctor when doctorId is null ──────────────────────────
+        // ── Resolve doctor by Doctor ID or User ID, with fallback to auto-assign ──
         Doctor doctor;
         if (request.getDoctorId() != null) {
             doctor = doctorRepository.findById(request.getDoctorId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", request.getDoctorId()));
+                    .or(() -> doctorRepository.findByUserId(request.getDoctorId()))
+                    .orElse(null);
+
+            // If not found by ID or User ID, attempt fallback to department doctors
+            if (doctor == null && request.getDepartmentId() != null) {
+                List<Doctor> candidates = doctorRepository.findPresentDoctorsByDepartmentAndTenant(
+                        request.getDepartmentId(), tenantId);
+                if (!candidates.isEmpty()) {
+                    doctor = candidates.stream()
+                            .min(Comparator.comparingLong(d ->
+                                    appointmentRepository.countActiveByDoctorAndDate(d.getId(), today, tenantId)))
+                            .orElse(candidates.get(0));
+                }
+            }
+
+            if (doctor == null) {
+                throw new ResourceNotFoundException("Doctor", "id", request.getDoctorId());
+            }
         } else {
             if (request.getDepartmentId() == null) {
                 throw new IllegalArgumentException("Either doctorId or departmentId must be provided");
@@ -128,6 +147,7 @@ public class AppointmentService {
                     .orElse(candidates.get(0));
         }
 
+        final Doctor finalDoctor = doctor;
         User bookedBy = getCurrentUser();
 
         // ── Encode counter into notes ─────────────────────────────────────────
@@ -155,7 +175,7 @@ public class AppointmentService {
                         WalkInTokenSequence newSeq = WalkInTokenSequence.builder()
                                 .appointmentDate(today).lastToken(0).build();
                         newSeq.setCounter(0);
-                        newSeq.setDoctorId(doctor.getId());
+                        newSeq.setDoctorId(finalDoctor.getId());
                         return newSeq;
                     });
 
@@ -213,11 +233,12 @@ public class AppointmentService {
 
     public SlotResponse getAvailableSlots(Long doctorId, LocalDate date) {
         Doctor doctor = doctorRepository.findById(doctorId)
+                .or(() -> doctorRepository.findByUserId(doctorId))
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", doctorId));
 
         List<String> allSlots = generateTimeSlots();
         List<Appointment> bookedAppointments = appointmentRepository.findByDoctorIdAndAppointmentDate(
-                doctorId, date, Pageable.unpaged()).getContent();
+                doctor.getId(), date, Pageable.unpaged()).getContent();
 
         List<String> bookedSlots = bookedAppointments.stream()
                 .filter(a -> a.getAppointmentTime() != null)
@@ -409,6 +430,7 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
         Doctor newDoctor = doctorRepository.findById(newDoctorId)
+                .or(() -> doctorRepository.findByUserId(newDoctorId))
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", newDoctorId));
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();

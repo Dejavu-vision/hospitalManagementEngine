@@ -3,28 +3,31 @@ spring:
     name: hsm
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://dpg-db0v1cou01pc73c2ope0-a.virginia-postgres.render.com/hospitalsystems_xv3d}
+    url: ${DB_URL:jdbc:postgresql://dpg-db0v1cou01pc73c2ope0-a.virginia-postgres.render.com/hospitalsystems_xv3d?sslmode=require&tcpKeepAlive=true}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:Wmx8tcbbACH2vgxAGcb4meSOirFvvLJA}
     driver-class-name: org.postgresql.Driver
     hikari:
-      leak-detection-threshold: 2000
+      connection-timeout: 60000
+      maximum-pool-size: 5
+      minimum-idle: 1
+      max-lifetime: 1800000
+      keepalive-time: 30000
+      leak-detection-threshold: 0
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     show-sql: false
-    defer-datasource-initialization: true   # run data.sql AFTER Hibernate builds tables
+    defer-datasource-initialization: false
 
   flyway:
     enabled: false
 
   sql:
     init:
-      mode: always                          # always run the seed script
-      continue-on-error: true               # ignore "already exists" on re-runs
-      platform: postgres
+      mode: never
 
   jackson:
     serialization:

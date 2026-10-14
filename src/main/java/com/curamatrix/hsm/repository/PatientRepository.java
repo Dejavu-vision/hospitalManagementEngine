@@ -16,6 +16,8 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
     
     long countByTenantId(Long tenantId);
 
+    boolean existsByPatientCode(String patientCode);
+
     java.util.Optional<Patient> findByIdAndTenantId(Long id, Long tenantId);
 
     boolean existsByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndDateOfBirthAndTenantId(

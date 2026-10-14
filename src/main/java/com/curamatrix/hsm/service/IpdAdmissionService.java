@@ -58,6 +58,7 @@ public class IpdAdmissionService {
         Patient patient = patientRepository.findById(request.getPatientId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", request.getPatientId()));
         Doctor doctor = doctorRepository.findById(request.getPrimaryDoctorId())
+                .or(() -> doctorRepository.findByUserId(request.getPrimaryDoctorId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", request.getPrimaryDoctorId()));
 
         Appointment opd = null;
