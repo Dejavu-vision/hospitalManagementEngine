@@ -67,8 +67,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     // All appointments for a tenant on a given date (for queue dashboard)
     // Uses JOIN FETCH to avoid N+1 lazy loading of patient, doctor, user, department
-    // DISTINCT prevents duplicate rows from JOIN FETCH with multiple associations
-    @Query("SELECT DISTINCT a FROM Appointment a " +
+    @Query("SELECT a FROM Appointment a " +
            "JOIN FETCH a.patient " +
            "JOIN FETCH a.doctor d " +
            "JOIN FETCH d.user " +
@@ -85,7 +84,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
                                          @Param("tenantId") Long tenantId);
 
     // Patients in CHECKED_IN status with their check-in time (for wait-time alerts)
-    @Query("SELECT DISTINCT a FROM Appointment a " +
+    @Query("SELECT a FROM Appointment a " +
            "JOIN FETCH a.patient " +
            "JOIN FETCH a.doctor d " +
            "JOIN FETCH d.user " +
@@ -103,7 +102,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
                                               @Param("tenantId") Long tenantId);
 
     // Tenant-scoped today queue per doctor — all statuses (for full day history in queue table)
-    @Query("SELECT DISTINCT a FROM Appointment a " +
+    @Query("SELECT a FROM Appointment a " +
            "JOIN FETCH a.patient " +
            "JOIN FETCH a.doctor d " +
            "JOIN FETCH d.user " +
@@ -196,7 +195,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Appointment> findAllByPatientIdAndTenantId(@Param("patientId") Long patientId,
                                                     @Param("tenantId") Long tenantId);
 
-    @Query("SELECT DISTINCT a FROM Appointment a " +
+    @Query("SELECT a FROM Appointment a " +
            "JOIN FETCH a.patient " +
            "JOIN FETCH a.doctor d " +
            "JOIN FETCH d.user " +
@@ -213,7 +212,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
                                              @Param("toDate") LocalDate toDate,
                                              @Param("tenantId") Long tenantId);
 
-    @Query("SELECT DISTINCT a FROM Appointment a " +
+    @Query("SELECT a FROM Appointment a " +
            "JOIN FETCH a.patient " +
            "JOIN FETCH a.doctor d " +
            "JOIN FETCH d.user " +

@@ -85,7 +85,12 @@ public class QueueService {
                 .forEach(row -> counts.put((AppointmentStatus) row[0], (Long) row[1]));
 
         List<Appointment> checkedIn = appointmentRepository
-                .findCheckedInByDateAndTenant(today, tenantId);
+                .findCheckedInByDateAndTenant(today, tenantId)
+                .stream()
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toMap(Appointment::getId, a -> a, (a, b) -> a, java.util.LinkedHashMap::new),
+                        map -> new ArrayList<>(map.values())
+                ));
         LocalDateTime alertThreshold = LocalDateTime.now().minusMinutes(WAIT_ALERT_MINUTES);
         List<QueueEntryResponse> alerts = checkedIn.stream()
                 .filter(a -> a.getCheckedInAt() != null && a.getCheckedInAt().isBefore(alertThreshold))
@@ -257,9 +262,14 @@ public class QueueService {
         List<QueueEntryResponse> heldPatients = new ArrayList<>();
         String waitingQueueLabel = "Waiting Queue";
         if (queueDoctorId != null) {
-            List<Appointment> docQueue = (fromDate != null || toDate != null)
+            List<Appointment> docQueue = ((fromDate != null || toDate != null)
                     ? appointmentRepository.findQueueByDoctorAndDateRangeAndTenant(queueDoctorId, effectiveFrom, effectiveTo, tenantId)
-                    : appointmentRepository.findTodayQueueByDoctorAndTenant(queueDoctorId, today, tenantId);
+                    : appointmentRepository.findTodayQueueByDoctorAndTenant(queueDoctorId, today, tenantId))
+                    .stream()
+                    .collect(Collectors.collectingAndThen(
+                            Collectors.toMap(Appointment::getId, a -> a, (a, b) -> a, java.util.LinkedHashMap::new),
+                            map -> new ArrayList<>(map.values())
+                    ));
             Doctor queueDoc = docQueue.isEmpty() ? null : docQueue.get(0).getDoctor();
             if (queueDoc != null && queueDoc.getDepartment() != null) {
                 waitingQueueLabel = "Waiting Queue — " + queueDoc.getDepartment().getName();
