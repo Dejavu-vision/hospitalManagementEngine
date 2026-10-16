@@ -307,10 +307,9 @@ public class PatientService {
                 .orElse(null);
 
         // Fetch existing appointments for this patient today
-        List<Appointment> existingToday = appointmentRepository.findByFilters(
-                java.time.LocalDate.now(), null, id, null, null,
-                org.springframework.data.domain.PageRequest.of(0, 20)
-        ).getContent();
+        List<Appointment> existingToday = appointmentRepository.findByPatientIdAndAppointmentDate(
+                id, java.time.LocalDate.now()
+        );
 
         Long activeAppointmentId = null;
 
@@ -416,10 +415,9 @@ public class PatientService {
         patient = patientRepository.save(patient);
 
         // Also complete any IN_PROGRESS appointments for this patient
-        // We use the existing filter query pattern
-        List<Appointment> inProgressAppts = appointmentRepository.findByFilters(
-                null, null, id, AppointmentStatus.IN_PROGRESS, null, org.springframework.data.domain.PageRequest.of(0, 10)
-        ).getContent();
+        List<Appointment> inProgressAppts = appointmentRepository.findByPatientIdAndStatus(
+                id, AppointmentStatus.IN_PROGRESS
+        );
 
         for (Appointment appt : inProgressAppts) {
             appt.setStatus(AppointmentStatus.COMPLETED);

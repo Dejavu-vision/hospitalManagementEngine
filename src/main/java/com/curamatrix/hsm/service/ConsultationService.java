@@ -432,13 +432,12 @@ public class ConsultationService {
 
         try {
             LocalDate today = LocalDate.now();
-            appointmentRepository.findByFilters(
-                today, null, p.getId(), null, null, org.springframework.data.domain.PageRequest.of(0, 10))
-            .getContent().stream()
-            .filter(a -> a.getStatus() == AppointmentStatus.BOOKED || 
-                         a.getStatus() == AppointmentStatus.CHECKED_IN || 
-                         a.getStatus() == AppointmentStatus.IN_PROGRESS)
-            .findFirst()
+            List<Appointment> todayAppts = appointmentRepository.findByPatientIdAndAppointmentDate(p.getId(), today);
+            todayAppts.stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.BOOKED || 
+                             a.getStatus() == AppointmentStatus.CHECKED_IN || 
+                             a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                .findFirst()
             .ifPresent(appt -> {
                 resp.setActiveAppointmentId(appt.getId());
                 resp.setActiveAppointmentStatus(appt.getStatus().name());

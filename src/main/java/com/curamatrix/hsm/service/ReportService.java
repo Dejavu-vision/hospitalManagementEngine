@@ -73,7 +73,7 @@ public class ReportService {
         LocalDate current = startDate;
         while (!current.isAfter(endDate)) {
             appointments.addAll(
-                appointmentRepository.findByFilters(current, null, null, null, null, unpaged).getContent()
+                appointmentRepository.findByAppointmentDate(current, unpaged).getContent()
             );
             current = current.plusDays(1);
         }

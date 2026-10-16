@@ -3,18 +3,21 @@ package com.curamatrix.hsm.repository;
 import com.curamatrix.hsm.entity.Appointment;
 import com.curamatrix.hsm.enums.AppointmentStatus;
 import com.curamatrix.hsm.enums.AppointmentType;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
+public interface AppointmentRepository extends JpaRepository<Appointment, Long>, JpaSpecificationExecutor<Appointment> {
     
     Page<Appointment> findByAppointmentDate(LocalDate date, Pageable pageable);
     
@@ -25,6 +28,8 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     Page<Appointment> findByPatientId(Long patientId, Pageable pageable);
     
     List<Appointment> findByPatientIdAndAppointmentDate(Long patientId, LocalDate appointmentDate);
+
+    List<Appointment> findByPatientIdAndStatus(Long patientId, AppointmentStatus status);
     
     @Query("SELECT a FROM Appointment a WHERE a.doctor.id = :doctorId AND a.appointmentDate = :date " +
            "AND a.appointmentTime = :time AND a.status != 'CANCELLED'")
@@ -52,18 +57,32 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
                                @Param("date") LocalDate date, 
                                @Param("tenantId") Long tenantId);
     
-    @Query("SELECT a FROM Appointment a WHERE " +
-           "(:date IS NULL OR a.appointmentDate = :date) AND " +
-           "(:doctorId IS NULL OR a.doctor.id = :doctorId) AND " +
-           "(:patientId IS NULL OR a.patient.id = :patientId) AND " +
-           "(:status IS NULL OR a.status = :status) AND " +
-           "(:type IS NULL OR a.type = :type)")
-    Page<Appointment> findByFilters(@Param("date") LocalDate date,
-                                    @Param("doctorId") Long doctorId,
-                                    @Param("patientId") Long patientId,
-                                    @Param("status") AppointmentStatus status,
-                                    @Param("type") AppointmentType type,
-                                    Pageable pageable);
+    default Page<Appointment> findByFilters(LocalDate date,
+                                            Long doctorId,
+                                            Long patientId,
+                                            AppointmentStatus status,
+                                            AppointmentType type,
+                                            Pageable pageable) {
+        return findAll((root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (date != null) {
+                predicates.add(cb.equal(root.get("appointmentDate"), date));
+            }
+            if (doctorId != null) {
+                predicates.add(cb.equal(root.get("doctor").get("id"), doctorId));
+            }
+            if (patientId != null) {
+                predicates.add(cb.equal(root.get("patient").get("id"), patientId));
+            }
+            if (status != null) {
+                predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (type != null) {
+                predicates.add(cb.equal(root.get("type"), type));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        }, pageable);
+    }
 
     // All appointments for a tenant on a given date (for queue dashboard)
     // Uses JOIN FETCH to avoid N+1 lazy loading of patient, doctor, user, department
