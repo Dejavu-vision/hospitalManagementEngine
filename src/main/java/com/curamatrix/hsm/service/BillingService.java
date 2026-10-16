@@ -97,11 +97,11 @@ public class BillingService {
             desc = "Consultation - " + appointment.getDoctor().getUser().getFullName();
         } else {
             // Fall back to catalog (department rate or generic CONSULT)
-            try {
-                HospitalService consultService = catalogResolver.resolveConsultation(departmentId, tenantId);
-                fee = consultService.getPrice();
-                desc = consultService.getServiceName();
-            } catch (Exception e) {
+            Optional<HospitalService> consultOpt = catalogResolver.resolveConsultation(departmentId, tenantId);
+            if (consultOpt.isPresent()) {
+                fee = consultOpt.get().getPrice();
+                desc = consultOpt.get().getServiceName();
+            } else {
                 // No catalog entry and no doctor fee — charge ₹0
                 fee = BigDecimal.ZERO;
                 desc = "Consultation - " + appointment.getDoctor().getUser().getFullName();
@@ -185,10 +185,7 @@ public class BillingService {
                 .insuranceCoverage(com.curamatrix.hsm.enums.InsuranceCoverage.NOT_COVERED)
                 .build();
 
-        PaymentMethod paymentMethod = null;
-        if (paymentMethodStr != null) {
-            paymentMethod = PaymentMethod.valueOf(paymentMethodStr.toUpperCase());
-        }
+        PaymentMethod paymentMethod = parsePaymentMethod(paymentMethodStr);
 
         BigDecimal netAmount = amount.subtract(insuranceAdjustment);
         if (netAmount.compareTo(BigDecimal.ZERO) < 0) netAmount = BigDecimal.ZERO;
@@ -296,7 +293,7 @@ public class BillingService {
             throw new RuntimeException("Cannot collect payment on a cancelled invoice");
         }
 
-        PaymentMethod paymentMethod = PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase());
+        PaymentMethod paymentMethod = parsePaymentMethod(request.getPaymentMethod());
         BigDecimal newPaidAmount = billing.getPaidAmount().add(request.getAmount());
         BigDecimal balance = billing.getNetAmount().subtract(newPaidAmount);
 
@@ -833,5 +830,17 @@ public class BillingService {
                 .serviceCatalogItemId(item.getHospitalService() != null ? item.getHospitalService().getId() : null)
                 .createdAt(item.getCreatedAt())
                 .build();
+    }
+
+    private PaymentMethod parsePaymentMethod(String method) {
+        if (method == null || method.isBlank()) return PaymentMethod.CASH;
+        try {
+            return PaymentMethod.valueOf(method.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            if ("NET_BANKING".equalsIgnoreCase(method) || "NETBANKING".equalsIgnoreCase(method)) {
+                return PaymentMethod.NETBANKING;
+            }
+            return PaymentMethod.CASH;
+        }
     }
 }

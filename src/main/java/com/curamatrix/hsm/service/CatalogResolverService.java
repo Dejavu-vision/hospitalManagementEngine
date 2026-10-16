@@ -8,7 +8,6 @@ import com.curamatrix.hsm.repository.HospitalServiceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,7 +16,6 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional(readOnly = true)
 public class CatalogResolverService {
 
     private final HospitalServiceRepository hospitalServiceRepository;
@@ -82,9 +80,9 @@ public class CatalogResolverService {
 
     /**
      * Resolves CONSULTATION fee: first by department, then fallback to generic "CONSULT" code.
-     * Throws if neither exists.
+     * Non-throwing: returns Optional.empty() if not configured to avoid poisoning outer transactions.
      */
-    public HospitalService resolveConsultation(Long departmentId, Long tenantId) {
+    public Optional<HospitalService> resolveConsultation(Long departmentId, Long tenantId) {
         // 1st: Look for CONSULTATION service linked to the department
         if (departmentId != null) {
             Optional<HospitalService> deptService = hospitalServiceRepository
@@ -94,7 +92,7 @@ public class CatalogResolverService {
                     .findFirst();
             if (deptService.isPresent()) {
                 log.debug("Resolved consultation fee from department {} for tenant {}", departmentId, tenantId);
-                return deptService.get();
+                return deptService;
             }
         }
 
@@ -103,13 +101,11 @@ public class CatalogResolverService {
                 .findByServiceCodeAndTenantIdAndActiveTrue("CONSULT", tenantId);
         if (generic.isPresent()) {
             log.debug("Resolved generic CONSULT fee for tenant {}", tenantId);
-            return generic.get();
+            return generic;
         }
 
-        log.error("No consultation fee configured for department {} or generic CONSULT for tenant {}", departmentId, tenantId);
-        throw new ResourceNotFoundException(
-                "Consultation fee service is not configured for this department or as generic 'CONSULT'. " +
-                "Please add it in the Service Catalog.");
+        log.debug("No consultation fee configured for department {} or generic CONSULT for tenant {} - defaulting to empty", departmentId, tenantId);
+        return Optional.empty();
     }
 
     /**
