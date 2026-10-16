@@ -125,6 +125,7 @@ public class DoctorAvailabilityService {
     }
 
     /** Update real-time status (used by receptionist or doctor during the day) */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public DoctorAvailabilityResponse updateStatus(Long doctorId, DoctorStatusUpdateRequest request) {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
@@ -133,8 +134,12 @@ public class DoctorAvailabilityService {
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", doctorId));
         DoctorAvailability record = availabilityRepository
                 .findByDoctorIdAndAvailabilityDateAndTenantId(doctor.getId(), today, tenantId)
-                .orElseGet(() -> DoctorAvailability.builder()
-                        .doctor(doctor).availabilityDate(today).isPresent(true).build());
+                .orElseGet(() -> {
+                    DoctorAvailability newRec = DoctorAvailability.builder()
+                            .doctor(doctor).availabilityDate(today).isPresent(true).build();
+                    newRec.setTenantId(tenantId);
+                    return newRec;
+                });
 
         DoctorStatus oldStatus = record.getStatus();
         DoctorStatus newStatus = request.getStatus();
@@ -159,6 +164,7 @@ public class DoctorAvailabilityService {
                 .newStatus(newStatus)
                 .changedBy(currentUser)
                 .build();
+        logRecord.setTenantId(tenantId);
         doctorStatusLogRepository.save(logRecord);
 
         // 2. Offline / Away / Emergency / Procedure mid-queue logic
@@ -180,6 +186,7 @@ public class DoctorAvailabilityService {
                             .newStatus(AppointmentStatus.CHECKED_IN)
                             .changedBy(currentUser)
                             .build();
+                    apptStatusLog.setTenantId(tenantId);
                     appointmentStatusLogRepository.save(apptStatusLog);
                 }
                 appointmentRepository.save(appt);
@@ -188,7 +195,7 @@ public class DoctorAvailabilityService {
             // When returning to AVAILABLE, clear the reassignment flag for remaining active appointments
             List<Appointment> activeAppts = appointmentRepository.findActiveByDoctorAndDateAndTenant(doctorId, today, tenantId);
             for (Appointment appt : activeAppts) {
-                if (appt.getReassignNeeded()) {
+                if (Boolean.TRUE.equals(appt.getReassignNeeded())) {
                     appt.setReassignNeeded(false);
                     appointmentRepository.save(appt);
                 }

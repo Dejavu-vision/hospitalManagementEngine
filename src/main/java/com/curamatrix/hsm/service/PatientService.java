@@ -295,68 +295,113 @@ public class PatientService {
         patient = patientRepository.save(patient);
         log.info("Patient checked in: {}", id);
 
-        // Auto-create an IN_PROGRESS appointment
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
-        
-        com.curamatrix.hsm.entity.Doctor doctor = doctorRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new com.curamatrix.hsm.exception.InvalidStateTransitionException(
-                        "Check-in failed: Your user account is not linked to a Doctor profile. " +
-                        "Only full Doctors can execute direct check-ins."
-                ));
 
-        // Cancel any existing BOOKED/CHECKED_IN appointments for this patient today
-        // to avoid duplicate rows in the queue (one waiting + one in consult)
+        Long tenantId = patient.getTenantId() != null ? patient.getTenantId() : TenantContext.getTenantId();
+
+        // Check if user is linked to a doctor profile
+        com.curamatrix.hsm.entity.Doctor doctor = doctorRepository.findByUserId(user.getId())
+                .or(() -> doctorRepository.findById(user.getId()))
+                .orElse(null);
+
+        // Fetch existing appointments for this patient today
         List<Appointment> existingToday = appointmentRepository.findByFilters(
                 java.time.LocalDate.now(), null, id, null, null,
                 org.springframework.data.domain.PageRequest.of(0, 20)
         ).getContent();
-        for (Appointment existing : existingToday) {
-            if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.BOOKED
-                    || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.CHECKED_IN) {
-                existing.setStatus(com.curamatrix.hsm.enums.AppointmentStatus.CANCELLED);
-                appointmentRepository.save(existing);
-                log.info("Cancelled pre-existing BOOKED/CHECKED_IN appointment {} for patient {} on direct check-in",
-                        existing.getId(), id);
+
+        Long activeAppointmentId = null;
+
+        if (doctor != null) {
+            Appointment targetAppt = null;
+            // 1. If patient already has a BOOKED or CHECKED_IN appointment with this doctor, transition it to IN_PROGRESS
+            for (Appointment existing : existingToday) {
+                if (existing.getDoctor() != null && existing.getDoctor().getId().equals(doctor.getId())
+                        && (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.BOOKED
+                            || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.CHECKED_IN)) {
+                    existing.setStatus(com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS);
+                    existing.setConsultationStart(java.time.LocalDateTime.now());
+                    existing.setReassignNeeded(false);
+                    targetAppt = appointmentRepository.save(existing);
+                    log.info("Advanced existing appointment {} to IN_PROGRESS for patient {}", targetAppt.getId(), id);
+                    break;
+                } else if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS
+                        && existing.getDoctor() != null && existing.getDoctor().getId().equals(doctor.getId())) {
+                    targetAppt = existing;
+                    break;
+                }
             }
-        }
 
-        // Assign the next walk-in token number for this doctor today
-        Integer maxToken = appointmentRepository.findMaxTokenNumber(doctor.getId(), java.time.LocalDate.now());
-        int nextToken = (maxToken == null ? 0 : maxToken) + 1;
+            // 2. If no existing appointment with this doctor, create an IN_PROGRESS walk-in appointment
+            if (targetAppt == null) {
+                for (Appointment existing : existingToday) {
+                    if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.BOOKED
+                            || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.CHECKED_IN) {
+                        existing.setStatus(com.curamatrix.hsm.enums.AppointmentStatus.CANCELLED);
+                        appointmentRepository.save(existing);
+                        log.info("Cancelled pre-existing appointment {} for patient {} on direct check-in", existing.getId(), id);
+                    }
+                }
 
-        Appointment appt = Appointment.builder()
-                .patient(patient)
-                .doctor(doctor)
-                .bookedBy(user)
-                .appointmentDate(java.time.LocalDate.now())
-                .appointmentTime(java.time.LocalTime.now())
-                .type(com.curamatrix.hsm.enums.AppointmentType.WALK_IN)
-                .status(com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS)
-                .tokenNumber(nextToken)
-                .consultationStart(java.time.LocalDateTime.now())
-                .build();
-        
-        appt = appointmentRepository.save(appt);
-        Long activeAppointmentId = appt.getId();
-        try {
-            com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest statusReq = 
-                    new com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest();
-            statusReq.setStatus(com.curamatrix.hsm.enums.DoctorStatus.AVAILABLE);
-            doctorAvailabilityService.updateStatus(doctor.getId(), statusReq);
-        } catch (Exception e) {
-            log.warn("Could not update doctor status to IN_CONSULTATION on patient checkin: {}", e.getMessage());
+                Integer maxToken = appointmentRepository.findMaxTokenNumber(doctor.getId(), java.time.LocalDate.now(), tenantId);
+                if (maxToken == null) {
+                    maxToken = appointmentRepository.findMaxTokenNumber(doctor.getId(), java.time.LocalDate.now());
+                }
+                int nextToken = (maxToken == null ? 0 : maxToken) + 1;
+
+                Appointment newAppt = Appointment.builder()
+                        .patient(patient)
+                        .doctor(doctor)
+                        .bookedBy(user)
+                        .appointmentDate(java.time.LocalDate.now())
+                        .appointmentTime(java.time.LocalTime.now())
+                        .type(com.curamatrix.hsm.enums.AppointmentType.WALK_IN)
+                        .status(com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS)
+                        .tokenNumber(nextToken)
+                        .consultationStart(java.time.LocalDateTime.now())
+                        .reassignNeeded(false)
+                        .build();
+                newAppt.setTenantId(tenantId);
+                targetAppt = appointmentRepository.save(newAppt);
+                log.info("Created new IN_PROGRESS appointment {} for patient {}", targetAppt.getId(), id);
+            }
+
+            activeAppointmentId = targetAppt.getId();
+
+            try {
+                com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest statusReq = 
+                        new com.curamatrix.hsm.dto.request.DoctorStatusUpdateRequest();
+                statusReq.setStatus(com.curamatrix.hsm.enums.DoctorStatus.AVAILABLE);
+                doctorAvailabilityService.updateStatus(doctor.getId(), statusReq);
+            } catch (Exception e) {
+                log.warn("Could not update doctor status on patient checkin: {}", e.getMessage());
+            }
+
+            try {
+                queueEventService.broadcastQueueUpdate(tenantId, doctor.getId());
+            } catch (Exception e) {
+                log.warn("SSE broadcast failed after check-in for patient {}: {}", id, e.getMessage());
+            }
+        } else {
+            // Receptionist or Admin check-in: mark first BOOKED appointment as CHECKED_IN
+            for (Appointment existing : existingToday) {
+                if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.BOOKED) {
+                    existing.setStatus(com.curamatrix.hsm.enums.AppointmentStatus.CHECKED_IN);
+                    existing.setCheckedInAt(java.time.LocalDateTime.now());
+                    appointmentRepository.save(existing);
+                    activeAppointmentId = existing.getId();
+                    break;
+                } else if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.CHECKED_IN) {
+                    activeAppointmentId = existing.getId();
+                    break;
+                }
+            }
         }
 
         PatientResponse resp = mapToResponse(patient);
         resp.setActiveAppointmentId(activeAppointmentId);
-        // Best-effort SSE broadcast — must not roll back the clinical operation
-        try {
-            queueEventService.broadcastQueueUpdate(TenantContext.getTenantId(), doctor.getId());
-        } catch (Exception e) {
-            log.warn("SSE broadcast failed after check-in for patient {}: {}", id, e.getMessage());
-        }
         return resp;
     }
 
