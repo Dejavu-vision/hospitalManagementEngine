@@ -16,7 +16,7 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
      * Only returns active medicines.
      */
     @Query(value = """
-        SELECT DISTINCT m FROM Medicine m
+        SELECT m FROM Medicine m
         WHERE m.isActive = true
         AND (
             LOWER(m.name) LIKE LOWER(CONCAT('%', :query, '%'))
