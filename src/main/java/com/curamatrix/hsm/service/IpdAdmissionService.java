@@ -247,7 +247,9 @@ public class IpdAdmissionService {
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getActiveAdmissions(String status, String fromDate, String toDate) {
         Long tenantId = TenantContext.getTenantId();
-        boolean isPaidTab = "PAID".equalsIgnoreCase(status);
+        String tabStatus = (status != null && !status.trim().isEmpty()) ? status.trim().toUpperCase() : "ALL";
+        boolean isAllTab = "ALL".equals(tabStatus);
+        boolean isPaidTab = "PAID".equals(tabStatus);
 
         // Parse date range if provided
         LocalDateTime startDate = fromDate != null && !fromDate.isEmpty()
@@ -260,12 +262,13 @@ public class IpdAdmissionService {
 
         if (isPaidTab) {
             // ── PAID TAB: Discharged IPD + Paid OPD bills ──────────────────
-            // Default date range to today if none given (prevents loading all historical data)
-            LocalDateTime effStart = startDate != null ? startDate : LocalDate.now().atStartOfDay();
-            LocalDateTime effEnd   = endDate   != null ? endDate   : LocalDate.now().atTime(23, 59, 59);
-
-            // Fetch all paid bills in the date range
-            List<Billing> paidBills = billingRepository.findPaidBillsByDateRange(tenantId, effStart, effEnd);
+            List<Billing> paidBills;
+            if (startDate != null && endDate != null) {
+                paidBills = billingRepository.findPaidBillsByDateRange(tenantId, startDate, endDate);
+            } else {
+                paidBills = billingRepository.findAllByTenantIdAndPaymentStatusInOrderByPaidAtDesc(
+                        tenantId, List.of(PaymentStatus.PAID));
+            }
             List<Billing> paidOpdBills = new ArrayList<>();
 
             for (Billing b : paidBills) {
@@ -285,6 +288,54 @@ public class IpdAdmissionService {
                     .collect(Collectors.groupingBy(b -> b.getPatient().getId()));
             for (Map.Entry<Long, List<Billing>> entry : billsByPatient.entrySet()) {
                 resultList.add(buildOpdRow(entry.getValue(), true));
+            }
+
+        } else if (isAllTab) {
+            // ── ALL TAB: Active IPD + Discharged IPD (all) + OPD (all) ──────
+            // 1. Active IPD
+            List<IpdAdmission> active;
+            if (startDate != null && endDate != null) {
+                active = admissionRepository.findAdmittedByTenantIdAndDateRange(tenantId, startDate, endDate);
+            } else {
+                active = admissionRepository.findByStatusAndTenantId(AdmissionStatus.ADMITTED, tenantId);
+            }
+            for (IpdAdmission adm : active) {
+                processedPatientIds.add(adm.getPatient().getId());
+                resultList.add(buildAdmissionRow(adm, null, tenantId, false));
+            }
+
+            // 2. Discharged IPD (both paid and unpaid)
+            List<Billing> allDischargedBills;
+            if (startDate != null && endDate != null) {
+                allDischargedBills = billingRepository.findUnpaidDischargedBillsByDateRange(tenantId, 
+                        List.of(PaymentStatus.PENDING, PaymentStatus.PARTIAL, PaymentStatus.PAID), startDate, endDate);
+            } else {
+                allDischargedBills = billingRepository.findUnpaidDischargedBills(tenantId, 
+                        List.of(PaymentStatus.PENDING, PaymentStatus.PARTIAL, PaymentStatus.PAID));
+            }
+            for (Billing b : allDischargedBills) {
+                IpdAdmission adm = b.getIpdAdmission();
+                if (adm != null && !processedPatientIds.contains(adm.getPatient().getId())) {
+                    processedPatientIds.add(adm.getPatient().getId());
+                    boolean paid = b.getPaymentStatus() == PaymentStatus.PAID;
+                    resultList.add(buildAdmissionRow(adm, b, tenantId, paid));
+                }
+            }
+
+            // 3. All OPD bills
+            List<Billing> allOpdBills;
+            if (startDate != null && endDate != null) {
+                allOpdBills = billingRepository.findOpdBillsByStatusAndDateRange(tenantId, 
+                        List.of(PaymentStatus.PENDING, PaymentStatus.PARTIAL, PaymentStatus.PAID), startDate, endDate);
+            } else {
+                allOpdBills = billingRepository.findPendingOpdBills(tenantId, 
+                        List.of(PaymentStatus.PENDING, PaymentStatus.PARTIAL, PaymentStatus.PAID));
+            }
+            Map<Long, List<Billing>> billsByPatient = allOpdBills.stream()
+                    .filter(b -> b.getPatient() != null && !processedPatientIds.contains(b.getPatient().getId()))
+                    .collect(Collectors.groupingBy(b -> b.getPatient().getId()));
+            for (Map.Entry<Long, List<Billing>> entry : billsByPatient.entrySet()) {
+                resultList.add(buildOpdRow(entry.getValue(), false));
             }
 
         } else {
@@ -374,6 +425,7 @@ public class IpdAdmissionService {
         }
 
         Billing finalBill = bill != null ? bill : billingRepository.findByIpdAdmissionId(adm.getId()).orElse(null);
+        row.put("invoiceNumber", finalBill != null ? finalBill.getInvoiceNumber() : null);
         row.put("runningBillTotal", finalBill != null ? finalBill.getNetAmount() : BigDecimal.ZERO);
         row.put("paidAmount", finalBill != null ? finalBill.getPaidAmount() : BigDecimal.ZERO);
         
@@ -419,10 +471,25 @@ public class IpdAdmissionService {
             }
         }
 
+        String invNos = bills.stream()
+                .map(Billing::getInvoiceNumber)
+                .filter(Objects::nonNull)
+                .collect(Collectors.joining(", "));
+
+        String paymentStatus;
+        if (totalPaid.compareTo(BigDecimal.ZERO) > 0 && totalPaid.compareTo(totalNet) >= 0 && totalNet.compareTo(BigDecimal.ZERO) > 0) {
+            paymentStatus = "PAID";
+        } else if (totalPaid.compareTo(BigDecimal.ZERO) > 0 && totalPaid.compareTo(totalNet) < 0) {
+            paymentStatus = "PARTIAL";
+        } else {
+            paymentStatus = isPaid ? "PAID" : "PENDING";
+        }
+
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", null);
         row.put("patientId", p.getId());
         row.put("admissionNumber", "OPD");
+        row.put("invoiceNumber", invNos);
         row.put("patientName", p.getFirstName() + " " + p.getLastName());
         row.put("patientCode", p.getPatientCode());
         row.put("primaryDoctorName", docName);
@@ -433,7 +500,7 @@ public class IpdAdmissionService {
         row.put("daysAdmitted", 0);
         row.put("runningBillTotal", totalNet);
         row.put("paidAmount", totalPaid);
-        row.put("paymentStatus", isPaid ? "PAID" : "PENDING");
+        row.put("paymentStatus", paymentStatus);
         row.put("actualDischargeTime", settledAt != null ? settledAt.toString() : null);
         return row;
     }
