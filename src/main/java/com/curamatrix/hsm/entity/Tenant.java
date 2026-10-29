@@ -60,8 +60,11 @@ public class Tenant {
     @Column(columnDefinition = "TEXT")
     private String address;
 
-    @Column(length = 500)
-    private String logo; // URL to hospital logo
+    @Column(columnDefinition = "TEXT")
+    private String logo; // URL or Base64 data URL to hospital logo
+
+    @Column(columnDefinition = "TEXT")
+    private String signature; // URL or Base64 data URL to hospital authorized signature/stamp
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "JSON")

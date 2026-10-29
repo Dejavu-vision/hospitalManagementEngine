@@ -72,6 +72,7 @@ public class TenantManagementService {
                 .contactPhone(request.getContactPhone())
                 .address(request.getAddress())
                 .logo(request.getLogo())
+                .signature(request.getSignature())
                 .settings(request.getSettings() != null ? request.getSettings() : new HashMap<>())
                 .build();
 
@@ -146,6 +147,7 @@ public class TenantManagementService {
         tenant.setContactPhone(request.getContactPhone());
         tenant.setAddress(request.getAddress());
         tenant.setLogo(request.getLogo());
+        tenant.setSignature(request.getSignature());
 
         // Update limits based on plan
         SubscriptionPlan plan = SubscriptionPlan.valueOf(request.getSubscriptionPlan());
@@ -373,6 +375,7 @@ public class TenantManagementService {
                 .contactPhone(tenant.getContactPhone())
                 .address(tenant.getAddress())
                 .logo(tenant.getLogo())
+                .signature(tenant.getSignature())
                 .settings(tenant.getSettings())
                 .createdAt(tenant.getCreatedAt())
                 .currentUsers((int) userCount)

@@ -24,9 +24,15 @@ public class LoginResponse {
     private Long tenantId;
     private String tenantKey;
     private String hospitalName;
+    private String logo;
+    private String signature;
+    private String address;
+    private String contactPhone;
+    private String contactEmail;
     private String subscriptionPlan;
     private String subscriptionExpiry;
     private String wakeWord;
+    private java.util.Map<String, Object> settings;
 
     // Simplified: only page keys (no permissions)
     private List<String> pageKeys;

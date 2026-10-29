@@ -38,8 +38,32 @@ public class SchemaConstraintMigration implements CommandLineRunner {
         // Ensure billing discount breakdown columns exist (idempotent — safe to run every startup)
         ensureBillingDiscountColumns();
 
+        // Ensure tenant branding columns (signature and TEXT logo)
+        ensureTenantBrandingColumns();
+
         // Drop legacy tenant_id column from role_pages if it exists
         dropTenantIdFromRolePages();
+    }
+
+    private void ensureTenantBrandingColumns() {
+        try {
+            jdbc.execute("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS signature TEXT");
+            log.info("SchemaConstraintMigration: ensured tenants.signature column exists");
+        } catch (Exception e) {
+            log.warn("SchemaConstraintMigration: could not add column tenants.signature: {}", e.getMessage());
+        }
+
+        try {
+            jdbc.execute("ALTER TABLE tenants ALTER COLUMN logo TYPE TEXT");
+            log.info("SchemaConstraintMigration: ensured tenants.logo is TEXT");
+        } catch (Exception e) {
+            try {
+                jdbc.execute("ALTER TABLE tenants MODIFY COLUMN logo TEXT");
+                log.info("SchemaConstraintMigration: modified tenants.logo to TEXT (MySQL syntax)");
+            } catch (Exception ex) {
+                log.debug("SchemaConstraintMigration: logo column alter skipped: {}", ex.getMessage());
+            }
+        }
     }
 
     private void dropTenantIdFromRolePages() {

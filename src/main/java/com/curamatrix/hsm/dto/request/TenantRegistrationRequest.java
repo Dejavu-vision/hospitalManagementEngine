@@ -34,6 +34,7 @@ public class TenantRegistrationRequest {
     private String contactPhone;
     private String address;
     private String logo;
+    private String signature;
 
     // Admin user details (created automatically)
     @NotBlank(message = "Admin full name is required")

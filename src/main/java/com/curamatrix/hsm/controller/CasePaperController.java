@@ -63,7 +63,11 @@ public class CasePaperController {
             hospitalMap = new HashMap<>();
             hospitalMap.put("name", tenant.getHospitalName());
             hospitalMap.put("logo", tenant.getLogo());
+            hospitalMap.put("signature", tenant.getSignature());
             hospitalMap.put("address", tenant.getAddress());
+            hospitalMap.put("phone", tenant.getContactPhone());
+            hospitalMap.put("email", tenant.getContactEmail());
+            hospitalMap.put("settings", tenant.getSettings());
         }
 
         Map<String, Object> patientDto = new HashMap<>();

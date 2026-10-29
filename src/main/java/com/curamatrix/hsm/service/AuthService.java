@@ -186,9 +186,15 @@ public class AuthService {
                 .tenantId(tenant.getId())
                 .tenantKey(tenant.getTenantKey())
                 .hospitalName(tenant.getHospitalName())
+                .logo(tenant.getLogo())
+                .signature(tenant.getSignature())
+                .address(tenant.getAddress())
+                .contactPhone(tenant.getContactPhone())
+                .contactEmail(tenant.getContactEmail())
                 .subscriptionPlan(tenant.getSubscriptionPlan())
                 .subscriptionExpiry(tenant.getSubscriptionEnd().toString())
                 .wakeWord(tenant.getWakeWord())
+                .settings(tenant.getSettings())
                 .pageKeys(pageKeys)
                 .build();
     }

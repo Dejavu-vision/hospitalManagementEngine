@@ -15,7 +15,14 @@ import java.util.List;
 @AllArgsConstructor
 public class PrintPreviewResponse {
     private String hospitalName;
+    private String hospitalLogo;
+    private String hospitalSignature;
+    private String hospitalAddress;
+    private String hospitalPhone;
+    private String hospitalEmail;
     private String doctorName;
+    private String doctorRegNo;
+    private String doctorSignature;
     private String doctorSpecialization;
     private String patientName;
     private String patientCode;

@@ -35,6 +35,7 @@ public class ConsultationService {
     private final UserRepository userRepository;
     private final MedicineRepository medicineRepository;
     private final DoctorAvailabilityService doctorAvailabilityService;
+    private final TenantRepository tenantRepository;
 
     /**
      * Confirms patient arrival: validates CHECKED_IN status, transitions to IN_PROGRESS,
@@ -221,9 +222,24 @@ public class ConsultationService {
                 .map(this::mapToPrescriptionResponse)
                 .collect(Collectors.toList());
 
+        Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
+        String hName = tenant != null && tenant.getHospitalName() != null ? tenant.getHospitalName() : getTenantHospitalName();
+        String hLogo = tenant != null ? tenant.getLogo() : null;
+        String hSig = tenant != null ? tenant.getSignature() : null;
+        String hAddr = tenant != null ? tenant.getAddress() : null;
+        String hPhone = tenant != null ? tenant.getContactPhone() : null;
+        String hEmail = tenant != null ? tenant.getContactEmail() : null;
+        String docLicense = doctor.getLicenseNumber();
+
         return PrintPreviewResponse.builder()
-                .hospitalName(getTenantHospitalName())
+                .hospitalName(hName)
+                .hospitalLogo(hLogo)
+                .hospitalSignature(hSig)
+                .hospitalAddress(hAddr)
+                .hospitalPhone(hPhone)
+                .hospitalEmail(hEmail)
                 .doctorName(doctor.getUser().getFullName())
+                .doctorRegNo(docLicense)
                 .doctorSpecialization(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
                 .patientName(patient.getFirstName() + " " + patient.getLastName())
                 .patientCode(patient.getPatientCode())
@@ -326,7 +342,13 @@ public class ConsultationService {
      * is not directly accessible from TenantContext.
      */
     private String getTenantHospitalName() {
-        // The tenant key from context serves as the hospital identifier
+        Long tenantId = TenantContext.getTenantId();
+        if (tenantId != null) {
+            java.util.Optional<Tenant> opt = tenantRepository.findById(tenantId);
+            if (opt.isPresent() && opt.get().getHospitalName() != null) {
+                return opt.get().getHospitalName();
+            }
+        }
         String tenantKey = TenantContext.getTenantKey();
         return tenantKey != null ? tenantKey : "Hospital";
     }
