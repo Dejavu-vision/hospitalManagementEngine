@@ -1,0 +1,1 @@
+import{C as e,_ as t,b as n,t as r,v as i}from"./SuperAdminApp-D3pkz2wV.js";var a=e(n(),1),o=i(),s=t();(0,o.createRoot)(document.getElementById(`root`)).render((0,s.jsx)(a.StrictMode,{children:(0,s.jsx)(r,{})}));
