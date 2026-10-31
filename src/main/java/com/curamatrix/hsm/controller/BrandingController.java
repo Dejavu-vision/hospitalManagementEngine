@@ -24,17 +24,26 @@ public class BrandingController {
     private final TenantRepository tenantRepository;
 
     @GetMapping("/public/branding")
-    @Operation(summary = "Get Public Hospital Branding", description = "Returns dynamic logo, signature, name, theme settings for a hospital by tenant key")
+    @Operation(summary = "Get Public Hospital Branding", description = "Returns dynamic logo, signature, name, theme settings for a hospital by tenant key or ID")
     public ResponseEntity<Map<String, Object>> getPublicBranding(
             @RequestParam(required = false) String tenantKey,
-            @RequestHeader(value = "X-Tenant-Key", required = false) String headerTenantKey) {
+            @RequestParam(required = false) Long tenantId,
+            @RequestHeader(value = "X-Tenant-Key", required = false) String headerTenantKey,
+            @RequestHeader(value = "X-Tenant-Id", required = false) Long headerTenantId) {
 
+        Long effectiveId = tenantId != null ? tenantId : headerTenantId;
         String key = tenantKey != null && !tenantKey.isBlank() ? tenantKey.trim() : headerTenantKey;
-        Optional<Tenant> tenantOpt;
+        Optional<Tenant> tenantOpt = Optional.empty();
 
-        if (key != null && !key.isBlank()) {
+        if (effectiveId != null) {
+            tenantOpt = tenantRepository.findById(effectiveId);
+        }
+
+        if (tenantOpt.isEmpty() && key != null && !key.isBlank()) {
             tenantOpt = tenantRepository.findByTenantKey(key);
-        } else {
+        }
+
+        if (tenantOpt.isEmpty()) {
             // Default to first active tenant or default-hospital
             tenantOpt = tenantRepository.findByTenantKey("default-hospital");
             if (tenantOpt.isEmpty()) {
@@ -49,16 +58,31 @@ public class BrandingController {
 
     @GetMapping("/tenants/current/branding")
     @Operation(summary = "Get Current Hospital Branding", description = "Returns dynamic branding for currently authenticated tenant")
-    public ResponseEntity<Map<String, Object>> getCurrentBranding() {
+    public ResponseEntity<Map<String, Object>> getCurrentBranding(
+            @RequestHeader(value = "X-Tenant-Key", required = false) String headerTenantKey,
+            @RequestHeader(value = "X-Tenant-Id", required = false) Long headerTenantId) {
+
         Long tenantId = TenantContext.getTenantId();
-        if (tenantId == null) {
-            return getPublicBranding(null, null);
+        if (tenantId == null && headerTenantId != null) {
+            tenantId = headerTenantId;
         }
 
-        return tenantRepository.findById(tenantId)
-                .map(this::buildBrandingMap)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.ok(buildFallbackBranding(null)));
+        if (tenantId != null) {
+            return tenantRepository.findById(tenantId)
+                    .map(this::buildBrandingMap)
+                    .map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.ok(buildFallbackBranding(null)));
+        }
+
+        String key = TenantContext.getTenantKey() != null ? TenantContext.getTenantKey() : headerTenantKey;
+        if (key != null && !key.isBlank()) {
+            return tenantRepository.findByTenantKey(key)
+                    .map(this::buildBrandingMap)
+                    .map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.ok(buildFallbackBranding(key)));
+        }
+
+        return getPublicBranding(null, null, null, null);
     }
 
     private Map<String, Object> buildBrandingMap(Tenant tenant) {

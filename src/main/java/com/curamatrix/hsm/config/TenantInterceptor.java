@@ -37,7 +37,13 @@ public class TenantInterceptor implements HandlerInterceptor {
         if (token != null) {
             try {
                 Claims claims = extractClaims(token);
-                Long tenantId = claims.get("tenantId", Long.class);
+                Object rawTenantId = claims.get("tenantId");
+                Long tenantId = null;
+                if (rawTenantId instanceof Number number) {
+                    tenantId = number.longValue();
+                } else if (rawTenantId != null) {
+                    tenantId = Long.parseLong(rawTenantId.toString());
+                }
                 String tenantKey = claims.get("tenantKey", String.class);
 
                 if (tenantId != null) {
