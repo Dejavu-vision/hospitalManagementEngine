@@ -1,0 +1,1 @@
+import{ft as e,i as t,it as n,lt as r,rt as i,st as a,t as o}from"./SuperAdminApp-BNl_xrkW.js";var s=e(r(),1),c=a(),l=i();(0,c.createRoot)(document.getElementById(`root`)).render((0,l.jsx)(s.StrictMode,{children:(0,l.jsx)(n,{store:t,children:(0,l.jsx)(o,{})})}));
