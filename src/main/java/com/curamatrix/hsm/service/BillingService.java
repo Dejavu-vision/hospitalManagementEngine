@@ -569,8 +569,8 @@ public class BillingService {
         long partialCount = billingRepository.countByTenantIdAndPaymentStatus(tenantId, PaymentStatus.PARTIAL);
         long cancelledCount = billingRepository.countByTenantIdAndPaymentStatus(tenantId, PaymentStatus.CANCELLED);
 
-        BigDecimal totalRevenue = billingRepository.sumNetAmountByTenantIdAndPaymentStatus(tenantId, PaymentStatus.PAID);
-        BigDecimal pendingAmount = billingRepository.sumNetAmountByTenantIdAndPaymentStatus(tenantId, PaymentStatus.PENDING);
+        BigDecimal totalRevenue = billingRepository.sumTotalPaidRevenueByTenantId(tenantId);
+        BigDecimal pendingAmount = billingRepository.sumPendingBalanceByTenantId(tenantId);
 
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();

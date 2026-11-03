@@ -36,6 +36,12 @@ public interface BillingRepository extends JpaRepository<Billing, Long> {
     @Query("SELECT COALESCE(SUM(b.netAmount), 0) FROM Billing b WHERE b.tenantId = :tenantId AND b.paymentStatus = :status")
     BigDecimal sumNetAmountByTenantIdAndPaymentStatus(@Param("tenantId") Long tenantId, @Param("status") PaymentStatus status);
 
+    @Query("SELECT COALESCE(SUM(b.netAmount - b.paidAmount), 0) FROM Billing b WHERE b.tenantId = :tenantId AND b.paymentStatus IN ('PENDING', 'PARTIAL')")
+    BigDecimal sumPendingBalanceByTenantId(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT COALESCE(SUM(b.paidAmount), 0) FROM Billing b WHERE b.tenantId = :tenantId")
+    BigDecimal sumTotalPaidRevenueByTenantId(@Param("tenantId") Long tenantId);
+
     @Query("SELECT COALESCE(SUM(b.paidAmount), 0) FROM Billing b WHERE b.tenantId = :tenantId AND b.paidAt >= :startOfDay AND b.paidAt < :endOfDay")
     BigDecimal sumPaidAmountToday(@Param("tenantId") Long tenantId, @Param("startOfDay") LocalDateTime startOfDay, @Param("endOfDay") LocalDateTime endOfDay);
 

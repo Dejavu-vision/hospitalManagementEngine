@@ -425,9 +425,15 @@ public class IpdAdmissionService {
         }
 
         Billing finalBill = bill != null ? bill : billingRepository.findByIpdAdmissionId(adm.getId()).orElse(null);
+        BigDecimal netAmount = finalBill != null && finalBill.getNetAmount() != null ? finalBill.getNetAmount() : BigDecimal.ZERO;
+        BigDecimal paidAmount = finalBill != null && finalBill.getPaidAmount() != null ? finalBill.getPaidAmount() : BigDecimal.ZERO;
+        BigDecimal balanceAmount = netAmount.subtract(paidAmount).max(BigDecimal.ZERO);
+
+        row.put("invoiceId", finalBill != null ? finalBill.getId() : null);
         row.put("invoiceNumber", finalBill != null ? finalBill.getInvoiceNumber() : null);
-        row.put("runningBillTotal", finalBill != null ? finalBill.getNetAmount() : BigDecimal.ZERO);
-        row.put("paidAmount", finalBill != null ? finalBill.getPaidAmount() : BigDecimal.ZERO);
+        row.put("runningBillTotal", netAmount);
+        row.put("paidAmount", paidAmount);
+        row.put("balanceAmount", balanceAmount);
         
         boolean requireApproval = true;
         Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
@@ -455,6 +461,7 @@ public class IpdAdmissionService {
         BigDecimal totalPaid = bills.stream()
                 .map(b -> b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalBalance = totalNet.subtract(totalPaid).max(BigDecimal.ZERO);
 
         // Settlement date: latest paidAt among paid bills
         LocalDateTime settledAt = bills.stream()
@@ -476,6 +483,8 @@ public class IpdAdmissionService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.joining(", "));
 
+        Long primaryInvoiceId = bills.isEmpty() ? null : bills.get(0).getId();
+
         String paymentStatus;
         if (totalPaid.compareTo(BigDecimal.ZERO) > 0 && totalPaid.compareTo(totalNet) >= 0 && totalNet.compareTo(BigDecimal.ZERO) > 0) {
             paymentStatus = "PAID";
@@ -487,6 +496,7 @@ public class IpdAdmissionService {
 
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", null);
+        row.put("invoiceId", primaryInvoiceId);
         row.put("patientId", p.getId());
         row.put("admissionNumber", "OPD");
         row.put("invoiceNumber", invNos);
@@ -500,6 +510,7 @@ public class IpdAdmissionService {
         row.put("daysAdmitted", 0);
         row.put("runningBillTotal", totalNet);
         row.put("paidAmount", totalPaid);
+        row.put("balanceAmount", totalBalance);
         row.put("paymentStatus", paymentStatus);
         row.put("actualDischargeTime", settledAt != null ? settledAt.toString() : null);
         return row;
