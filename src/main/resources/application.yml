@@ -3,9 +3,9 @@ spring:
     name: hsm
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://dpg-dbq51ron74is739oc4m0-a:5432/curamatrix_db?sslmode=require}
-    username: ${DB_USERNAME:curamatrix_db_user}
-    password: ${DB_PASSWORD:ut7UPowmHClmLvbPnjuRUbJ7z0nYMJzF}
+    url: jdbc:postgresql://dpg-dbq51ron74is739oc4m0-a.virginia-postgres.render.com:5432/curamatrix_db?sslmode=require
+    username: curamatrix_db_user
+    password: ut7UPowmHClmLvbPnjuRUbJ7z0nYMJzF
     driver-class-name: org.postgresql.Driver
     hikari:
       connection-timeout: 60000
@@ -19,6 +19,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     show-sql: false
     defer-datasource-initialization: false
 
