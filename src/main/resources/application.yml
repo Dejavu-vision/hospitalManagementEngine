@@ -21,14 +21,14 @@ spring:
       ddl-auto: update
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     show-sql: false
-    defer-datasource-initialization: false
+    defer-datasource-initialization: true
 
   flyway:
     enabled: false
 
   sql:
     init:
-      mode: never
+      mode: always
 
   jackson:
     serialization:
