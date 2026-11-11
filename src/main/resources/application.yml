@@ -14,11 +14,11 @@ spring:
       max-lifetime: 1800000
       keepalive-time: 30000
       leak-detection-threshold: 0
+      initialization-fail-timeout: -1
 
   jpa:
     hibernate:
       ddl-auto: update
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     show-sql: false
     defer-datasource-initialization: false
 
