@@ -3,9 +3,9 @@ spring:
     name: hsm
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://ep-plain-lake-bdaohtrt-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require}
-    username: ${DB_USERNAME:neondb_owner}
-    password: ${DB_PASSWORD:npg_7fGhjAiqb2Hd}
+    url: ${DB_URL:jdbc:postgresql://dpg-dbq51ron74is739oc4m0-a:5432/curamatrix_db?sslmode=require}
+    username: ${DB_USERNAME:curamatrix_db_user}
+    password: ${DB_PASSWORD:ut7UPowmHClmLvbPnjuRUbJ7z0nYMJzF}
     driver-class-name: org.postgresql.Driver
     hikari:
       connection-timeout: 60000
