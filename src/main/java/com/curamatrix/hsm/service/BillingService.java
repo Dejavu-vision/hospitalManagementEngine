@@ -18,6 +18,7 @@ import com.curamatrix.hsm.repository.HospitalServiceRepository;
 import com.curamatrix.hsm.repository.DepartmentRepository;
 import com.curamatrix.hsm.repository.InsurancePolicyRepository;
 import com.curamatrix.hsm.repository.PatientRegistrationRepository;
+import com.curamatrix.hsm.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -46,6 +47,7 @@ public class BillingService {
     private final InsurancePolicyRepository insurancePolicyRepository;
     private final PatientFinancialAccountService accountService;
     private final CatalogResolverService catalogResolver;
+    private final PatientRepository patientRepository;
 
     // ─── Registration Validation ─────────────────────────────────────────────
 
@@ -279,6 +281,33 @@ public class BillingService {
         return billings.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    // ─── Create New Invoice for Patient ──────────────────────────────────────
+
+    @Transactional
+    public BillingResponse createPatientInvoice(Long patientId, Long tenantId) {
+        Patient patient = patientRepository.findByIdAndTenantId(patientId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", patientId));
+
+        Billing billing = Billing.builder()
+                .patient(patient)
+                .invoiceNumber("INV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                .totalAmount(BigDecimal.ZERO)
+                .discount(BigDecimal.ZERO)
+                .tax(BigDecimal.ZERO)
+                .insuranceAdjustment(BigDecimal.ZERO)
+                .netAmount(BigDecimal.ZERO)
+                .paidAmount(BigDecimal.ZERO)
+                .paymentStatus(PaymentStatus.PENDING)
+                .items(new ArrayList<>())
+                .build();
+        billing.setTenantId(tenantId);
+
+        Billing saved = billingRepository.save(billing);
+        accountService.recalculateAccountStatus(patient, tenantId);
+        log.info("Created new invoice {} for patient {}", saved.getInvoiceNumber(), patientId);
+        return mapToResponse(saved);
+    }
+
     // ─── NEW: Collect Payment ────────────────────────────────────────────────
 
     @Transactional
@@ -421,8 +450,8 @@ public class BillingService {
         Billing billing = billingRepository.findByIdAndTenantId(billingId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Billing", "id", billingId));
 
-        if (billing.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new RuntimeException("Cannot add items to a fully paid invoice");
+        if (billing.getPaymentStatus() == PaymentStatus.CANCELLED) {
+            throw new RuntimeException("Cannot add items to a cancelled invoice");
         }
 
         BillingItemType itemType = BillingItemType.valueOf(request.getItemType().toUpperCase());
@@ -458,7 +487,8 @@ public class BillingService {
             } else {
                 newItem.setPaymentStatus(PaymentStatus.PENDING);
             }
-            billing.setPaidAmount(billing.getPaidAmount().add(actualPaid));
+            BigDecimal currentPaid = billing.getPaidAmount() != null ? billing.getPaidAmount() : BigDecimal.ZERO;
+            billing.setPaidAmount(currentPaid.add(actualPaid));
             if (request.getPaymentMethod() != null) {
                 try {
                     billing.setPaymentMethod(PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase()));
@@ -471,12 +501,17 @@ public class BillingService {
             newItem.setPaidAmount(BigDecimal.ZERO);
         }
 
+        if (billing.getItems() == null) {
+            billing.setItems(new ArrayList<>());
+        }
         billing.getItems().add(newItem);
-        billing.setTotalAmount(billing.getTotalAmount().add(itemTotal));
+        BigDecimal currentTotal = billing.getTotalAmount() != null ? billing.getTotalAmount() : BigDecimal.ZERO;
+        billing.setTotalAmount(currentTotal.add(itemTotal));
         recalculateNetAmount(billing);
 
         if (payNow) {
-            BigDecimal balance = billing.getNetAmount().subtract(billing.getPaidAmount());
+            BigDecimal currentPaid = billing.getPaidAmount() != null ? billing.getPaidAmount() : BigDecimal.ZERO;
+            BigDecimal balance = billing.getNetAmount().subtract(currentPaid);
             if (balance.compareTo(BigDecimal.ZERO) <= 0) {
                 billing.setPaymentStatus(PaymentStatus.PAID);
                 billing.setPaidAt(LocalDateTime.now());
@@ -508,8 +543,8 @@ public class BillingService {
         Billing billing = billingRepository.findByIdAndTenantId(billingId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Billing", "id", billingId));
 
-        if (billing.getPaymentStatus() == PaymentStatus.PAID || billing.getPaymentStatus() == PaymentStatus.CANCELLED) {
-            throw new RuntimeException("Cannot update item amount on a fully paid or cancelled invoice");
+        if (billing.getPaymentStatus() == PaymentStatus.CANCELLED) {
+            throw new RuntimeException("Cannot update item amount on a cancelled invoice");
         }
 
         BillingItem item = billing.getItems().stream()
@@ -722,12 +757,16 @@ public class BillingService {
     // ─── DTO Mapping ─────────────────────────────────────────────────────────
 
     public BillingResponse mapToResponse(Billing billing) {
-        BigDecimal balance = billing.getNetAmount().subtract(billing.getPaidAmount());
+        BigDecimal net = billing.getNetAmount() != null ? billing.getNetAmount() : BigDecimal.ZERO;
+        BigDecimal paid = billing.getPaidAmount() != null ? billing.getPaidAmount() : BigDecimal.ZERO;
+        BigDecimal balance = net.subtract(paid);
         if (balance.compareTo(BigDecimal.ZERO) < 0) balance = BigDecimal.ZERO;
 
-        List<BillingItemResponse> itemResponses = billing.getItems().stream()
-                .map(this::mapItemToResponse)
-                .collect(Collectors.toList());
+        List<BillingItemResponse> itemResponses = billing.getItems() != null
+                ? billing.getItems().stream()
+                    .map(this::mapItemToResponse)
+                    .collect(Collectors.toList())
+                : new ArrayList<>();
 
         Patient patient = billing.getPatient();
 

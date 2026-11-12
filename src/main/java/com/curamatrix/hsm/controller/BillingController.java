@@ -54,6 +54,11 @@ public class BillingController {
         return ResponseEntity.ok(billingService.getPatientInvoices(patientId, TenantContext.getTenantId()));
     }
 
+    @PostMapping("/invoices/patient/{patientId}")
+    public ResponseEntity<BillingResponse> createPatientInvoice(@PathVariable Long patientId) {
+        return ResponseEntity.ok(billingService.createPatientInvoice(patientId, TenantContext.getTenantId()));
+    }
+
     // ─── Payment Collection ──────────────────────────────────────────────────
 
     @PostMapping("/invoices/{id}/collect-payment")
