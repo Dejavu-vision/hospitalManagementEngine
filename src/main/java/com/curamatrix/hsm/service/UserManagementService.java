@@ -148,6 +148,15 @@ public class UserManagementService {
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
             user.setFullName(request.getFullName());
         }
+        if (request.getEmail() != null && !request.getEmail().isBlank()) {
+            String newEmail = request.getEmail().trim().toLowerCase();
+            if (!newEmail.equals(user.getEmail())) {
+                userRepository.findByEmail(newEmail).ifPresent(existing -> {
+                    throw new DuplicateResourceException("User", "email", newEmail);
+                });
+                user.setEmail(newEmail);
+            }
+        }
         if (request.getPhone() != null) {
             user.setPhone(request.getPhone());
         }

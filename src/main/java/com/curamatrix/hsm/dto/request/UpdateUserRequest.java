@@ -5,6 +5,7 @@ import lombok.Data;
 
 @Data
 public class UpdateUserRequest {
+    private String email;     // optional — only updated if non-null and non-blank
     private String fullName;
     private String phone;
     private String password;  // optional — only set if non-null
