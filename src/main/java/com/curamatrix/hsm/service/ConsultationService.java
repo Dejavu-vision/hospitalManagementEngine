@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -231,6 +232,13 @@ public class ConsultationService {
         String hEmail = tenant != null ? tenant.getContactEmail() : null;
         String docLicense = doctor.getLicenseNumber();
 
+        Integer age = patient.getDateOfBirth() != null ? Period.between(patient.getDateOfBirth(), LocalDate.now()).getYears() : null;
+        String gender = patient.getGender() != null ? patient.getGender().name() : null;
+        String deptName = doctor.getDepartment() != null ? doctor.getDepartment().getName() : null;
+        String visitType = appointment.getType() != null ? appointment.getType().name() : "OPD";
+        LocalDate consultDate = appointment.getAppointmentDate() != null ? appointment.getAppointmentDate() : LocalDate.now();
+        String casePaperNum = "CP-" + consultDate.getYear() + "-" + patient.getId();
+
         return PrintPreviewResponse.builder()
                 .hospitalName(hName)
                 .hospitalLogo(hLogo)
@@ -240,10 +248,24 @@ public class ConsultationService {
                 .hospitalEmail(hEmail)
                 .doctorName(doctor.getUser().getFullName())
                 .doctorRegNo(docLicense)
-                .doctorSpecialization(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
+                .doctorSpecialization(deptName)
+                .departmentName(deptName)
                 .patientName(patient.getFirstName() + " " + patient.getLastName())
                 .patientCode(patient.getPatientCode())
-                .consultationDate(appointment.getAppointmentDate())
+                .patientAge(age)
+                .patientGender(gender)
+                .patientPhone(patient.getPhone())
+                .patientAddress(patient.getAddress())
+                .patientBloodGroup(patient.getBloodGroup() != null ? patient.getBloodGroup().name() : null)
+                .emergencyContactName(patient.getEmergencyContactName())
+                .emergencyContactPhone(patient.getEmergencyContactPhone())
+                .allergies(patient.getAllergies())
+                .medicalHistory(patient.getMedicalHistory())
+                .tokenNumber(appointment.getTokenNumber())
+                .visitType(visitType)
+                .casePaperNumber(casePaperNum)
+                .validTill(consultDate.plusDays(30))
+                .consultationDate(consultDate)
                 .temperature(diagnosis.getTemperature())
                 .bloodPressure(diagnosis.getBloodPressure())
                 .weight(diagnosis.getWeight())
