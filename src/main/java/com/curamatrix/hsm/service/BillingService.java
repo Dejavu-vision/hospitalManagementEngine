@@ -408,6 +408,33 @@ public class BillingService {
     }
 
     @Transactional
+    public BillingResponse cancelInvoice(Long billingId, String reason, Long tenantId) {
+        Billing billing = billingRepository.findByIdAndTenantId(billingId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Billing", "id", billingId));
+
+        if (billing.getPaymentStatus() == PaymentStatus.CANCELLED) {
+            return mapToResponse(billing);
+        }
+
+        if (billing.getPaidAmount() != null && billing.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            throw new RuntimeException("Cannot cancel an invoice with payments already collected");
+        }
+
+        billing.setPaymentStatus(PaymentStatus.CANCELLED);
+        String cancellationReason = (reason != null && !reason.isBlank()) ? reason : "Cancelled by user";
+        billing.setRemarks((billing.getRemarks() != null ? billing.getRemarks() + "\n" : "") + cancellationReason);
+
+        if (billing.getItems() != null) {
+            billing.getItems().forEach(it -> it.setPaymentStatus(PaymentStatus.CANCELLED));
+        }
+
+        Billing saved = billingRepository.save(billing);
+        accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
+        log.info("Invoice {} cancelled: {}", billingId, cancellationReason);
+        return mapToResponse(saved);
+    }
+
+    @Transactional
     public BillingResponse applyDiscount(Long billingId, BigDecimal discount, Long tenantId) {
         return applyDiscount(billingId, discount, tenantId, null);
     }

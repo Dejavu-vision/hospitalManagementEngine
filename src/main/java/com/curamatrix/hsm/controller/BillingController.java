@@ -59,6 +59,14 @@ public class BillingController {
         return ResponseEntity.ok(billingService.createPatientInvoice(patientId, TenantContext.getTenantId()));
     }
 
+    @PostMapping("/invoices/{id}/cancel")
+    public ResponseEntity<BillingResponse> cancelInvoice(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body) {
+        String reason = body != null ? body.get("reason") : null;
+        return ResponseEntity.ok(billingService.cancelInvoice(id, reason, TenantContext.getTenantId()));
+    }
+
     // ─── Payment Collection ──────────────────────────────────────────────────
 
     @PostMapping("/invoices/{id}/collect-payment")
