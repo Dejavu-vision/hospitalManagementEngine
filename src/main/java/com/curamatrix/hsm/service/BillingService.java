@@ -423,6 +423,10 @@ public class BillingService {
             return mapToResponse(billing);
         }
 
+        if (billing.getIpdAdmission() != null || (billing.getInvoiceNumber() != null && billing.getInvoiceNumber().startsWith("IPD"))) {
+            throw new RuntimeException("IPD admission invoices cannot be cancelled. Settle or discharge the admission instead.");
+        }
+
         if (billing.getPaidAmount() != null && billing.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
             throw new RuntimeException("Cannot cancel an invoice with payments already collected");
         }
@@ -438,6 +442,49 @@ public class BillingService {
         Billing saved = billingRepository.save(billing);
         accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
         log.info("Invoice {} cancelled: {}", billingId, cancellationReason);
+        return mapToResponse(saved);
+    }
+
+    @Transactional
+    public BillingResponse revertCancelInvoice(Long billingId, Long tenantId) {
+        Billing billing = billingRepository.findByIdAndTenantId(billingId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Billing", "id", billingId));
+
+        if (billing.getPaymentStatus() != PaymentStatus.CANCELLED) {
+            return mapToResponse(billing);
+        }
+
+        BigDecimal net = billing.getNetAmount() != null ? billing.getNetAmount() : BigDecimal.ZERO;
+        BigDecimal paid = billing.getPaidAmount() != null ? billing.getPaidAmount() : BigDecimal.ZERO;
+        BigDecimal balance = net.subtract(paid);
+
+        if (balance.compareTo(BigDecimal.ZERO) <= 0 && net.compareTo(BigDecimal.ZERO) > 0) {
+            billing.setPaymentStatus(PaymentStatus.PAID);
+        } else if (paid.compareTo(BigDecimal.ZERO) > 0) {
+            billing.setPaymentStatus(PaymentStatus.PARTIAL);
+        } else {
+            billing.setPaymentStatus(PaymentStatus.PENDING);
+        }
+
+        if (billing.getItems() != null) {
+            billing.getItems().forEach(it -> {
+                if (it.getPaidAmount() != null && it.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal itemTotal = it.getAmount().multiply(BigDecimal.valueOf(it.getQuantity()));
+                    if (it.getPaidAmount().compareTo(itemTotal) >= 0) {
+                        it.setPaymentStatus(PaymentStatus.PAID);
+                    } else {
+                        it.setPaymentStatus(PaymentStatus.PARTIAL);
+                    }
+                } else {
+                    it.setPaymentStatus(PaymentStatus.PENDING);
+                }
+            });
+        }
+
+        billing.setRemarks((billing.getRemarks() != null ? billing.getRemarks() + "\n" : "") + "Cancellation reverted");
+        Billing saved = billingRepository.save(billing);
+        accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
+        log.info("Invoice {} cancellation reverted", billingId);
         return mapToResponse(saved);
     }
 

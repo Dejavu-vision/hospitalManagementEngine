@@ -67,6 +67,11 @@ public class BillingController {
         return ResponseEntity.ok(billingService.cancelInvoice(id, reason, TenantContext.getTenantId()));
     }
 
+    @PostMapping("/invoices/{id}/revert-cancel")
+    public ResponseEntity<BillingResponse> revertCancelInvoice(@PathVariable Long id) {
+        return ResponseEntity.ok(billingService.revertCancelInvoice(id, TenantContext.getTenantId()));
+    }
+
     // ─── Payment Collection ──────────────────────────────────────────────────
 
     @PostMapping("/invoices/{id}/collect-payment")
