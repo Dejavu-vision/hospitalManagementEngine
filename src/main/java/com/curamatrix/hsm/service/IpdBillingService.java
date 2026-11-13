@@ -68,7 +68,10 @@ public class IpdBillingService {
 
     private List<Billing> getAllPendingBills(Long patientId, Long tenantId) {
         return billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId).stream()
-                .filter(b -> b.getPaymentStatus() == PaymentStatus.PENDING || b.getPaymentStatus() == PaymentStatus.PARTIAL)
+                .filter(b -> b.getPaymentStatus() != PaymentStatus.CANCELLED)
+                .filter(b -> b.getPaymentStatus() == PaymentStatus.PENDING 
+                          || b.getPaymentStatus() == PaymentStatus.PARTIAL 
+                          || (b.getNetAmount() != null && b.getPaidAmount() != null && b.getNetAmount().compareTo(b.getPaidAmount()) > 0))
                 .collect(Collectors.toList());
     }
 
@@ -729,13 +732,9 @@ public class IpdBillingService {
             }
         }
 
-        // Apply payment to the primary bill
         Billing primaryBill = getPrimaryBill(patientId, tenantId, admission);
-        if (req.getAmount() != null && req.getAmount().compareTo(BigDecimal.ZERO) > 0) {
-            primaryBill.setPaidAmount(primaryBill.getPaidAmount().add(req.getAmount()));
-        }
-        if (req.getRefundAmount() != null && req.getRefundAmount().compareTo(BigDecimal.ZERO) > 0) {
-            primaryBill.setPaidAmount(primaryBill.getPaidAmount().subtract(req.getRefundAmount()));
+        if (primaryBill != null && !pendingBills.contains(primaryBill) && primaryBill.getPaymentStatus() != PaymentStatus.CANCELLED) {
+            pendingBills.add(primaryBill);
         }
 
         Long collectedById = getCurrentUserId();
@@ -748,20 +747,88 @@ public class IpdBillingService {
             }
         }
 
-        if (req.getAmount() != null && req.getAmount().compareTo(BigDecimal.ZERO) > 0) {
-            Payment payment = Payment.builder()
+        BigDecimal remainingPayment = req.getAmount() != null && req.getAmount().compareTo(BigDecimal.ZERO) > 0 
+                ? req.getAmount() 
+                : BigDecimal.ZERO;
+        boolean isFullSettlement = req.getAmount() != null && req.getAmount().compareTo(BigDecimal.ZERO) > 0;
+
+        BigDecimal totalCharges = BigDecimal.ZERO;
+        BigDecimal totalPaid = BigDecimal.ZERO;
+
+        // Finalize and distribute payments across all pending bills
+        for (Billing bill : pendingBills) {
+            BigDecimal billNet = bill.getNetAmount() != null ? bill.getNetAmount() : (bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO);
+            BigDecimal currentPaid = bill.getPaidAmount() != null ? bill.getPaidAmount() : BigDecimal.ZERO;
+            BigDecimal billDue = billNet.subtract(currentPaid);
+            if (billDue.compareTo(BigDecimal.ZERO) < 0) {
+                billDue = BigDecimal.ZERO;
+            }
+
+            BigDecimal paymentForBill = BigDecimal.ZERO;
+            if (remainingPayment.compareTo(BigDecimal.ZERO) > 0) {
+                paymentForBill = remainingPayment.min(billDue);
+                remainingPayment = remainingPayment.subtract(paymentForBill);
+            }
+
+            BigDecimal finalBillPaid = currentPaid.add(paymentForBill);
+            if (isFullSettlement && finalBillPaid.compareTo(billNet) < 0) {
+                // In full settlement mode, ensure bill's paidAmount matches net
+                finalBillPaid = billNet;
+            }
+            bill.setPaidAmount(finalBillPaid);
+
+            if (paymentForBill.compareTo(BigDecimal.ZERO) > 0) {
+                Payment payment = Payment.builder()
+                        .patient(bill.getPatient())
+                        .billing(bill)
+                        .amount(paymentForBill)
+                        .method(pm)
+                        .referenceNumber(req.getTransactionRef())
+                        .collectedById(collectedById)
+                        .build();
+                payment.setTenantId(tenantId);
+                paymentRepository.save(payment);
+            }
+
+            // Mark all items as PAID
+            if (bill.getItems() != null) {
+                for (BillingItem item : bill.getItems()) {
+                    if (item.getPaymentStatus() != PaymentStatus.PAID) {
+                        BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+                        item.setPaymentStatus(PaymentStatus.PAID);
+                        item.setPaidAmount(itemTotal);
+                        billingItemRepository.save(item);
+                    }
+                }
+            }
+
+            bill.setPaymentStatus(PaymentStatus.PAID);
+            bill.setPaidAt(LocalDateTime.now());
+            bill.setPaymentMethod(pm);
+            billingRepository.save(bill);
+
+            totalCharges = totalCharges.add(bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO);
+            totalPaid = totalPaid.add(bill.getPaidAmount() != null ? bill.getPaidAmount() : BigDecimal.ZERO);
+        }
+
+        // If any remaining surplus remains, credit it to primary bill
+        if (remainingPayment.compareTo(BigDecimal.ZERO) > 0 && primaryBill != null) {
+            primaryBill.setPaidAmount(primaryBill.getPaidAmount().add(remainingPayment));
+            Payment surplusPayment = Payment.builder()
                     .patient(primaryBill.getPatient())
                     .billing(primaryBill)
-                    .amount(req.getAmount())
+                    .amount(remainingPayment)
                     .method(pm)
                     .referenceNumber(req.getTransactionRef())
                     .collectedById(collectedById)
                     .build();
-            payment.setTenantId(tenantId);
-            paymentRepository.save(payment);
+            surplusPayment.setTenantId(tenantId);
+            paymentRepository.save(surplusPayment);
+            billingRepository.save(primaryBill);
         }
 
-        if (req.getRefundAmount() != null && req.getRefundAmount().compareTo(BigDecimal.ZERO) > 0) {
+        if (req.getRefundAmount() != null && req.getRefundAmount().compareTo(BigDecimal.ZERO) > 0 && primaryBill != null) {
+            primaryBill.setPaidAmount(primaryBill.getPaidAmount().subtract(req.getRefundAmount()));
             Payment refund = Payment.builder()
                     .patient(primaryBill.getPatient())
                     .billing(primaryBill)
@@ -772,27 +839,7 @@ public class IpdBillingService {
                     .build();
             refund.setTenantId(tenantId);
             paymentRepository.save(refund);
-        }
-
-        BigDecimal totalCharges = BigDecimal.ZERO;
-        BigDecimal totalPaid = BigDecimal.ZERO;
-        
-        // Finalize all bills
-        for (Billing bill : pendingBills) {
-            for (BillingItem item : bill.getItems()) {
-                if (item.getPaymentStatus() != PaymentStatus.PAID) {
-                    BigDecimal itemTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
-                    item.setPaymentStatus(PaymentStatus.PAID);
-                    item.setPaidAmount(itemTotal);
-                    billingItemRepository.save(item);
-                }
-            }
-            bill.setPaymentStatus(PaymentStatus.PAID);
-            bill.setPaidAt(LocalDateTime.now());
-            bill.setPaymentMethod(pm);
-            billingRepository.save(bill);
-            totalCharges = totalCharges.add(bill.getTotalAmount());
-            totalPaid = totalPaid.add(bill.getPaidAmount());
+            billingRepository.save(primaryBill);
         }
 
         String bedNumber = null;
