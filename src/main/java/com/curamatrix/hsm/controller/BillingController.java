@@ -101,6 +101,13 @@ public class BillingController {
         return ResponseEntity.ok(billingService.updateBillingItemAmount(id, itemId, request, TenantContext.getTenantId()));
     }
 
+    @DeleteMapping("/invoices/{id}/items/{itemId}")
+    public ResponseEntity<BillingResponse> deleteBillingItem(
+            @PathVariable Long id,
+            @PathVariable Long itemId) {
+        return ResponseEntity.ok(billingService.deleteBillingItem(id, itemId, TenantContext.getTenantId()));
+    }
+
     // ─── Discount ────────────────────────────────────────────────────────────
 
     @PatchMapping("/invoices/{id}/discount")

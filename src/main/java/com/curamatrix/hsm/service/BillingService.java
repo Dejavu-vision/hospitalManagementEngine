@@ -8,15 +8,19 @@ import com.curamatrix.hsm.dto.response.BillingSummaryResponse;
 import com.curamatrix.hsm.dto.response.DiscountBreakdownDTO;
 import com.curamatrix.hsm.dto.response.InsuranceSplitResponse;
 import com.curamatrix.hsm.entity.*;
+import com.curamatrix.hsm.enums.AdmissionStatus;
 import com.curamatrix.hsm.enums.BillingItemType;
 import com.curamatrix.hsm.enums.PaymentMethod;
 import com.curamatrix.hsm.enums.PaymentStatus;
 import com.curamatrix.hsm.exception.ResourceNotFoundException;
+import com.curamatrix.hsm.repository.BedAllocationRepository;
+import com.curamatrix.hsm.repository.BillingItemRepository;
 import com.curamatrix.hsm.repository.BillingRepository;
 import com.curamatrix.hsm.repository.BillInsuranceSplitRepository;
-import com.curamatrix.hsm.repository.HospitalServiceRepository;
 import com.curamatrix.hsm.repository.DepartmentRepository;
+import com.curamatrix.hsm.repository.HospitalServiceRepository;
 import com.curamatrix.hsm.repository.InsurancePolicyRepository;
+import com.curamatrix.hsm.repository.IpdAdmissionRepository;
 import com.curamatrix.hsm.repository.PatientRegistrationRepository;
 import com.curamatrix.hsm.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +44,7 @@ import java.util.stream.Collectors;
 public class BillingService {
 
     private final BillingRepository billingRepository;
+    private final BillingItemRepository billingItemRepository;
     private final BillInsuranceSplitRepository splitRepository;
     private final HospitalServiceRepository hospitalServiceRepository;
     private final DepartmentRepository departmentRepository;
@@ -48,6 +53,8 @@ public class BillingService {
     private final PatientFinancialAccountService accountService;
     private final CatalogResolverService catalogResolver;
     private final PatientRepository patientRepository;
+    private final BedAllocationRepository allocationRepository;
+    private final IpdAdmissionRepository admissionRepository;
 
     // ─── Registration Validation ─────────────────────────────────────────────
 
@@ -621,6 +628,50 @@ public class BillingService {
         return mapToResponse(billing);
     }
 
+    @Transactional
+    public BillingResponse deleteBillingItem(Long billingId, Long itemId, Long tenantId) {
+        Billing billing = billingRepository.findByIdAndTenantId(billingId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Billing", "id", billingId));
+
+        if (billing.getPaymentStatus() == PaymentStatus.CANCELLED) {
+            throw new RuntimeException("Cannot delete item on a cancelled invoice");
+        }
+
+        BillingItem item = billing.getItems().stream()
+                .filter(i -> i.getId().equals(itemId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
+
+        if (item.getPaidAmount() != null && item.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            throw new RuntimeException("Cannot delete an item that already has payments recorded");
+        }
+
+        BigDecimal oldTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+        billing.getItems().remove(item);
+        billingItemRepository.delete(item);
+
+        BigDecimal currentTotal = billing.getTotalAmount() != null ? billing.getTotalAmount() : BigDecimal.ZERO;
+        billing.setTotalAmount(currentTotal.subtract(oldTotal).max(BigDecimal.ZERO));
+
+        recalculateNetAmount(billing);
+
+        BigDecimal balance = billing.getNetAmount().subtract(billing.getPaidAmount());
+        if (balance.compareTo(BigDecimal.ZERO) <= 0 && billing.getNetAmount().compareTo(BigDecimal.ZERO) > 0) {
+            billing.setPaymentStatus(PaymentStatus.PAID);
+            billing.setPaidAt(LocalDateTime.now());
+        } else if (billing.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            billing.setPaymentStatus(PaymentStatus.PARTIAL);
+        } else {
+            billing.setPaymentStatus(PaymentStatus.PENDING);
+        }
+
+        billing = billingRepository.save(billing);
+        accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
+
+        log.info("Item {} removed from billing {}", itemId, billingId);
+        return mapToResponse(billing);
+    }
+
     // ─── NEW: Dashboard Summary ──────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -857,6 +908,30 @@ public class BillingService {
                 .discountApprovedBy(billing.getDiscountApprovedBy())
                 .discountFeedback(billing.getDiscountFeedback())
                 .build();
+
+        // Attach IPD Admission details if present
+        IpdAdmission admission = billing.getIpdAdmission();
+        if (admission == null && patient != null) {
+            List<IpdAdmission> admissions = admissionRepository.findByPatientIdAndTenantId(patient.getId(), billing.getTenantId());
+            admission = admissions.stream()
+                    .filter(a -> a.getStatus() == AdmissionStatus.ADMITTED)
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (admission != null) {
+            resp.setIpdAdmissionId(admission.getId());
+            resp.setAdmissionNumber(admission.getAdmissionNumber());
+            resp.setAdmissionStatus(admission.getStatus() != null ? admission.getStatus().name() : null);
+
+            Optional<BedAllocation> alloc = allocationRepository.findByAdmissionIdAndIsCurrentTrueAndTenantId(admission.getId(), billing.getTenantId());
+            if (alloc.isPresent() && alloc.get().getBed() != null) {
+                Bed bed = alloc.get().getBed();
+                resp.setBedNumber(bed.getBedNumber());
+                if (bed.getRoom() != null && bed.getRoom().getWard() != null) {
+                    resp.setWardName(bed.getRoom().getWard().getName());
+                }
+            }
+        }
 
         // Attach insurance split if present
         splitRepository.findByBillingId(billing.getId()).ifPresent(split -> {

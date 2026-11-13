@@ -21,6 +21,11 @@ public class BillingResponse {
     private String patientCode;
 
     private Long appointmentId;
+    private Long ipdAdmissionId;
+    private String admissionNumber;
+    private String admissionStatus;
+    private String bedNumber;
+    private String wardName;
 
     private BigDecimal totalAmount;
     private BigDecimal discount;

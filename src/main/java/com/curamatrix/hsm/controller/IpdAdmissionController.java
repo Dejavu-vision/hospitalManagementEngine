@@ -49,7 +49,7 @@ public class IpdAdmissionController {
     }
 
     @PostMapping("/{id}/discharge")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN', 'RECEPTIONIST')")
     @Operation(summary = "Initiate clinical discharge, freeing the bed and locking the episode")
     public ResponseEntity<AdmissionResponse> dischargePatient(
             @PathVariable Long id,
