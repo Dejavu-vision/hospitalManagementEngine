@@ -258,7 +258,7 @@ public class IpdAdmissionService {
                 ? LocalDate.parse(toDate).atTime(23, 59, 59) : null;
 
         List<Map<String, Object>> resultList = new ArrayList<>();
-        Set<Long> processedPatientIds = new HashSet<>();
+        Set<Long> processedAdmissionIds = new HashSet<>();
 
         if (isPaidTab) {
             // ── PAID TAB: Discharged IPD + Paid OPD bills ──────────────────
@@ -274,8 +274,8 @@ public class IpdAdmissionService {
             for (Billing b : paidBills) {
                 if (b.getIpdAdmission() != null) {
                     IpdAdmission adm = b.getIpdAdmission();
-                    if (!processedPatientIds.contains(adm.getPatient().getId())) {
-                        processedPatientIds.add(adm.getPatient().getId());
+                    if (!processedAdmissionIds.contains(adm.getId())) {
+                        processedAdmissionIds.add(adm.getId());
                         resultList.add(buildAdmissionRow(adm, b, tenantId, true));
                     }
                 } else if (b.getPatient() != null) {
@@ -284,7 +284,7 @@ public class IpdAdmissionService {
             }
 
             Map<Long, List<Billing>> billsByPatient = paidOpdBills.stream()
-                    .filter(b -> !processedPatientIds.contains(b.getPatient().getId()))
+                    .filter(b -> b.getPatient() != null)
                     .collect(Collectors.groupingBy(b -> b.getPatient().getId()));
             for (Map.Entry<Long, List<Billing>> entry : billsByPatient.entrySet()) {
                 resultList.add(buildOpdRow(entry.getValue(), true));
@@ -300,7 +300,7 @@ public class IpdAdmissionService {
                 active = admissionRepository.findByStatusAndTenantId(AdmissionStatus.ADMITTED, tenantId);
             }
             for (IpdAdmission adm : active) {
-                processedPatientIds.add(adm.getPatient().getId());
+                processedAdmissionIds.add(adm.getId());
                 resultList.add(buildAdmissionRow(adm, null, tenantId, false));
             }
 
@@ -315,14 +315,14 @@ public class IpdAdmissionService {
             }
             for (Billing b : allDischargedBills) {
                 IpdAdmission adm = b.getIpdAdmission();
-                if (adm != null && !processedPatientIds.contains(adm.getPatient().getId())) {
-                    processedPatientIds.add(adm.getPatient().getId());
+                if (adm != null && !processedAdmissionIds.contains(adm.getId())) {
+                    processedAdmissionIds.add(adm.getId());
                     boolean paid = b.getPaymentStatus() == PaymentStatus.PAID;
                     resultList.add(buildAdmissionRow(adm, b, tenantId, paid));
                 }
             }
 
-            // 3. All OPD bills
+            // 3. All OPD bills (never exclude patient OPD bills when admitted)
             List<Billing> allOpdBills;
             if (startDate != null && endDate != null) {
                 allOpdBills = billingRepository.findOpdBillsByStatusAndDateRange(tenantId, 
@@ -332,7 +332,7 @@ public class IpdAdmissionService {
                         List.of(PaymentStatus.PENDING, PaymentStatus.PARTIAL, PaymentStatus.PAID));
             }
             Map<Long, List<Billing>> billsByPatient = allOpdBills.stream()
-                    .filter(b -> b.getPatient() != null && !processedPatientIds.contains(b.getPatient().getId()))
+                    .filter(b -> b.getPatient() != null)
                     .collect(Collectors.groupingBy(b -> b.getPatient().getId()));
             for (Map.Entry<Long, List<Billing>> entry : billsByPatient.entrySet()) {
                 resultList.add(buildOpdRow(entry.getValue(), false));
@@ -350,7 +350,7 @@ public class IpdAdmissionService {
             }
 
             for (IpdAdmission adm : active) {
-                processedPatientIds.add(adm.getPatient().getId());
+                processedAdmissionIds.add(adm.getId());
                 resultList.add(buildAdmissionRow(adm, null, tenantId, false));
             }
 
@@ -365,13 +365,13 @@ public class IpdAdmissionService {
             }
             for (Billing b : unpaidDischargedBills) {
                 IpdAdmission adm = b.getIpdAdmission();
-                if (adm != null && !processedPatientIds.contains(adm.getPatient().getId())) {
-                    processedPatientIds.add(adm.getPatient().getId());
+                if (adm != null && !processedAdmissionIds.contains(adm.getId())) {
+                    processedAdmissionIds.add(adm.getId());
                     resultList.add(buildAdmissionRow(adm, b, tenantId, false));
                 }
             }
 
-            // 3. Pending OPD bills
+            // 3. Pending OPD bills (never exclude patient OPD bills when admitted)
             List<Billing> opdBills;
             if (startDate != null && endDate != null) {
                 opdBills = billingRepository.findOpdBillsByStatusAndDateRange(tenantId, pendingStatuses, startDate, endDate);
@@ -380,7 +380,7 @@ public class IpdAdmissionService {
             }
 
             Map<Long, List<Billing>> billsByPatient = opdBills.stream()
-                    .filter(b -> b.getPatient() != null && !processedPatientIds.contains(b.getPatient().getId()))
+                    .filter(b -> b.getPatient() != null)
                     .collect(Collectors.groupingBy(b -> b.getPatient().getId()));
             for (Map.Entry<Long, List<Billing>> entry : billsByPatient.entrySet()) {
                 resultList.add(buildOpdRow(entry.getValue(), false));
@@ -425,6 +425,20 @@ public class IpdAdmissionService {
         }
 
         Billing finalBill = bill != null ? bill : billingRepository.findByIpdAdmissionId(adm.getId()).orElse(null);
+        if (finalBill == null && adm.getPatient() != null) {
+            finalBill = Billing.builder()
+                    .ipdAdmission(adm)
+                    .patient(adm.getPatient())
+                    .invoiceNumber("IPD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                    .totalAmount(BigDecimal.ZERO)
+                    .netAmount(BigDecimal.ZERO)
+                    .paidAmount(BigDecimal.ZERO)
+                    .paymentStatus(PaymentStatus.PENDING)
+                    .items(new ArrayList<>())
+                    .build();
+            finalBill.setTenantId(tenantId);
+            finalBill = billingRepository.save(finalBill);
+        }
         BigDecimal netAmount = finalBill != null && finalBill.getNetAmount() != null ? finalBill.getNetAmount() : BigDecimal.ZERO;
         BigDecimal paidAmount = finalBill != null && finalBill.getPaidAmount() != null ? finalBill.getPaidAmount() : BigDecimal.ZERO;
         BigDecimal balanceAmount = netAmount.subtract(paidAmount).max(BigDecimal.ZERO);

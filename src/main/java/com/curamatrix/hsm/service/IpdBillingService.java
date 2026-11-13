@@ -74,9 +74,14 @@ public class IpdBillingService {
 
     private List<Billing> getRelevantBillsForSummary(Long patientId, Long tenantId, IpdAdmission admission) {
         if (admission != null) {
-            return billingRepository.findByIpdAdmissionId(admission.getId()).stream()
+            List<Billing> bills = new ArrayList<>(billingRepository.findByIpdAdmissionId(admission.getId()).stream()
                     .filter(b -> b.getPaymentStatus() != PaymentStatus.CANCELLED)
+                    .collect(Collectors.toList()));
+            List<Billing> opdBills = billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId).stream()
+                    .filter(b -> b.getIpdAdmission() == null && b.getPaymentStatus() != PaymentStatus.CANCELLED)
                     .collect(Collectors.toList());
+            bills.addAll(opdBills);
+            return bills;
         }
         List<Billing> allBills = billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId);
         return allBills.stream()
