@@ -295,9 +295,17 @@ public class BillingService {
         Patient patient = patientRepository.findByIdAndTenantId(patientId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", patientId));
 
+        List<IpdAdmission> admissions = admissionRepository.findByPatientIdAndTenantId(patientId, tenantId);
+        IpdAdmission activeAdmission = admissions.stream()
+                .filter(a -> a.getStatus() == AdmissionStatus.ADMITTED)
+                .findFirst()
+                .orElse(null);
+
+        String prefix = (activeAdmission != null) ? "IPD-" : "INV-";
         Billing billing = Billing.builder()
                 .patient(patient)
-                .invoiceNumber("INV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                .ipdAdmission(activeAdmission)
+                .invoiceNumber(prefix + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                 .totalAmount(BigDecimal.ZERO)
                 .discount(BigDecimal.ZERO)
                 .tax(BigDecimal.ZERO)
