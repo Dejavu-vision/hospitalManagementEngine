@@ -387,7 +387,132 @@ public class IpdAdmissionService {
             }
         }
 
-        return resultList;
+        return consolidateByPatient(resultList, isPaidTab, isAllTab);
+    }
+
+    private List<Map<String, Object>> consolidateByPatient(List<Map<String, Object>> rawList, boolean isPaidTab, boolean isAllTab) {
+        Map<Long, Map<String, Object>> patientMap = new LinkedHashMap<>();
+
+        for (Map<String, Object> row : rawList) {
+            Long patientId = (Long) row.get("patientId");
+            if (patientId == null) continue;
+
+            boolean isIpd = !"OPD".equals(row.get("admissionNumber"));
+
+            if (!patientMap.containsKey(patientId)) {
+                Map<String, Object> consolidated = new LinkedHashMap<>(row);
+                consolidated.put("hasIpd", isIpd);
+                consolidated.put("hasOpd", !isIpd);
+
+                BigDecimal total = (BigDecimal) row.get("runningBillTotal");
+                BigDecimal paid = (BigDecimal) row.get("paidAmount");
+                BigDecimal bal = (BigDecimal) row.get("balanceAmount");
+
+                if (isIpd) {
+                    consolidated.put("ipdTotal", total != null ? total : BigDecimal.ZERO);
+                    consolidated.put("ipdPaid", paid != null ? paid : BigDecimal.ZERO);
+                    consolidated.put("ipdBalance", bal != null ? bal : BigDecimal.ZERO);
+                    consolidated.put("opdTotal", BigDecimal.ZERO);
+                    consolidated.put("opdPaid", BigDecimal.ZERO);
+                    consolidated.put("opdBalance", BigDecimal.ZERO);
+                } else {
+                    consolidated.put("opdTotal", total != null ? total : BigDecimal.ZERO);
+                    consolidated.put("opdPaid", paid != null ? paid : BigDecimal.ZERO);
+                    consolidated.put("opdBalance", bal != null ? bal : BigDecimal.ZERO);
+                    consolidated.put("ipdTotal", BigDecimal.ZERO);
+                    consolidated.put("ipdPaid", BigDecimal.ZERO);
+                    consolidated.put("ipdBalance", BigDecimal.ZERO);
+                }
+                patientMap.put(patientId, consolidated);
+            } else {
+                Map<String, Object> existing = patientMap.get(patientId);
+
+                BigDecimal curTotal = (BigDecimal) existing.get("runningBillTotal");
+                BigDecimal addTotal = (BigDecimal) row.get("runningBillTotal");
+                BigDecimal newTotal = (curTotal != null ? curTotal : BigDecimal.ZERO)
+                        .add(addTotal != null ? addTotal : BigDecimal.ZERO);
+
+                BigDecimal curPaid = (BigDecimal) existing.get("paidAmount");
+                BigDecimal addPaid = (BigDecimal) row.get("paidAmount");
+                BigDecimal newPaid = (curPaid != null ? curPaid : BigDecimal.ZERO)
+                        .add(addPaid != null ? addPaid : BigDecimal.ZERO);
+
+                BigDecimal newBal = newTotal.subtract(newPaid).max(BigDecimal.ZERO);
+
+                existing.put("runningBillTotal", newTotal);
+                existing.put("paidAmount", newPaid);
+                existing.put("balanceAmount", newBal);
+
+                if (isIpd) {
+                    existing.put("hasIpd", true);
+                    BigDecimal curIpdTotal = (BigDecimal) existing.getOrDefault("ipdTotal", BigDecimal.ZERO);
+                    BigDecimal curIpdPaid = (BigDecimal) existing.getOrDefault("ipdPaid", BigDecimal.ZERO);
+                    BigDecimal curIpdBal = (BigDecimal) existing.getOrDefault("ipdBalance", BigDecimal.ZERO);
+                    existing.put("ipdTotal", (curIpdTotal != null ? curIpdTotal : BigDecimal.ZERO).add(addTotal != null ? addTotal : BigDecimal.ZERO));
+                    existing.put("ipdPaid", (curIpdPaid != null ? curIpdPaid : BigDecimal.ZERO).add(addPaid != null ? addPaid : BigDecimal.ZERO));
+                    BigDecimal addBal = (BigDecimal) row.get("balanceAmount");
+                    existing.put("ipdBalance", (curIpdBal != null ? curIpdBal : BigDecimal.ZERO).add(addBal != null ? addBal : BigDecimal.ZERO));
+
+                    if (row.get("admissionNumber") != null && !"OPD".equals(row.get("admissionNumber"))) {
+                        existing.put("admissionNumber", row.get("admissionNumber"));
+                    }
+                    if (row.get("bedNumber") != null && !"OPD".equals(row.get("bedNumber"))) {
+                        existing.put("bedNumber", row.get("bedNumber"));
+                    }
+                    if (row.get("wardName") != null && !"Outpatient".equals(row.get("wardName"))) {
+                        existing.put("wardName", row.get("wardName"));
+                    }
+                    if (row.get("primaryDoctorName") != null && !"OPD Consultant".equals(row.get("primaryDoctorName"))) {
+                        existing.put("primaryDoctorName", row.get("primaryDoctorName"));
+                    }
+                    if (row.get("invoiceId") != null && addBal != null && addBal.compareTo(BigDecimal.ZERO) > 0) {
+                        existing.put("invoiceId", row.get("invoiceId"));
+                    }
+                } else {
+                    existing.put("hasOpd", true);
+                    BigDecimal curOpdTotal = (BigDecimal) existing.getOrDefault("opdTotal", BigDecimal.ZERO);
+                    BigDecimal curOpdPaid = (BigDecimal) existing.getOrDefault("opdPaid", BigDecimal.ZERO);
+                    BigDecimal curOpdBal = (BigDecimal) existing.getOrDefault("opdBalance", BigDecimal.ZERO);
+                    existing.put("opdTotal", (curOpdTotal != null ? curOpdTotal : BigDecimal.ZERO).add(addTotal != null ? addTotal : BigDecimal.ZERO));
+                    existing.put("opdPaid", (curOpdPaid != null ? curOpdPaid : BigDecimal.ZERO).add(addPaid != null ? addPaid : BigDecimal.ZERO));
+                    BigDecimal addBal = (BigDecimal) row.get("balanceAmount");
+                    existing.put("opdBalance", (curOpdBal != null ? curOpdBal : BigDecimal.ZERO).add(addBal != null ? addBal : BigDecimal.ZERO));
+
+                    if (existing.get("invoiceId") == null && row.get("invoiceId") != null) {
+                        existing.put("invoiceId", row.get("invoiceId"));
+                    }
+                }
+
+                // Update payment status
+                if (newPaid.compareTo(BigDecimal.ZERO) > 0 && newPaid.compareTo(newTotal) >= 0 && newTotal.compareTo(BigDecimal.ZERO) > 0) {
+                    existing.put("paymentStatus", "PAID");
+                } else if (newPaid.compareTo(BigDecimal.ZERO) > 0 && newPaid.compareTo(newTotal) < 0) {
+                    existing.put("paymentStatus", "PARTIAL");
+                } else {
+                    existing.put("paymentStatus", "PENDING");
+                }
+            }
+        }
+
+        List<Map<String, Object>> consolidatedList = new ArrayList<>();
+        for (Map<String, Object> patientRow : patientMap.values()) {
+            BigDecimal bal = (BigDecimal) patientRow.get("balanceAmount");
+            BigDecimal total = (BigDecimal) patientRow.get("runningBillTotal");
+
+            if (isPaidTab) {
+                if (bal != null && bal.compareTo(BigDecimal.ZERO) <= 0 && total != null && total.compareTo(BigDecimal.ZERO) > 0) {
+                    consolidatedList.add(patientRow);
+                }
+            } else if (!isAllTab) { // PENDING
+                if (bal != null && bal.compareTo(BigDecimal.ZERO) > 0) {
+                    consolidatedList.add(patientRow);
+                }
+            } else {
+                consolidatedList.add(patientRow);
+            }
+        }
+
+        return consolidatedList;
     }
 
     private Map<String, Object> buildAdmissionRow(IpdAdmission adm, Billing bill, Long tenantId, boolean isPaid) {
