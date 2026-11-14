@@ -738,10 +738,6 @@ public class BillingService {
             throw new RuntimeException("Cannot delete items from a paid invoice");
         }
 
-        if (billing.getPaidAmount() != null && billing.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
-            throw new RuntimeException("Cannot delete items from an invoice with payments already collected");
-        }
-
         BillingItem item = billing.getItems().stream()
                 .filter(i -> i.getId().equals(itemId))
                 .findFirst()
@@ -752,11 +748,17 @@ public class BillingService {
         }
 
         BigDecimal oldTotal = item.getAmount().multiply(BigDecimal.valueOf(item.getQuantity()));
+        BigDecimal currentTotal = billing.getTotalAmount() != null ? billing.getTotalAmount() : BigDecimal.ZERO;
+        BigDecimal newTotal = currentTotal.subtract(oldTotal);
+        BigDecimal paid = billing.getPaidAmount() != null ? billing.getPaidAmount() : BigDecimal.ZERO;
+        if (newTotal.compareTo(paid) < 0) {
+            throw new RuntimeException("Cannot delete item because collected payments exceed the remaining bill total");
+        }
+
         billing.getItems().remove(item);
         billingItemRepository.delete(item);
 
-        BigDecimal currentTotal = billing.getTotalAmount() != null ? billing.getTotalAmount() : BigDecimal.ZERO;
-        billing.setTotalAmount(currentTotal.subtract(oldTotal).max(BigDecimal.ZERO));
+        billing.setTotalAmount(newTotal.max(BigDecimal.ZERO));
 
         recalculateNetAmount(billing);
 
