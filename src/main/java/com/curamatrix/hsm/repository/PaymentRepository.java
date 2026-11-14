@@ -10,4 +10,5 @@ import java.util.List;
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Payment> findAllByPatientIdAndTenantId(Long patientId, Long tenantId);
     List<Payment> findByBillingItemId(Long billingItemId);
+    List<Payment> findAllByBillingIdAndTenantIdOrderByCreatedAtDesc(Long billingId, Long tenantId);
 }

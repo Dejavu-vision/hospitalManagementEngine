@@ -39,6 +39,7 @@ public class BillingResponse {
     private String paymentMethod;
 
     private List<BillingItemResponse> items;
+    private List<PaymentRecordResponse> paymentRecords;
 
     private LocalDateTime createdAt;
     private LocalDateTime paidAt;

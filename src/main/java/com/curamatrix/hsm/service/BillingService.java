@@ -23,6 +23,8 @@ import com.curamatrix.hsm.repository.InsurancePolicyRepository;
 import com.curamatrix.hsm.repository.IpdAdmissionRepository;
 import com.curamatrix.hsm.repository.PatientRegistrationRepository;
 import com.curamatrix.hsm.repository.PatientRepository;
+import com.curamatrix.hsm.repository.PaymentRepository;
+import com.curamatrix.hsm.dto.response.PaymentRecordResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -55,6 +57,7 @@ public class BillingService {
     private final PatientRepository patientRepository;
     private final BedAllocationRepository allocationRepository;
     private final IpdAdmissionRepository admissionRepository;
+    private final PaymentRepository paymentRepository;
 
     // ─── Registration Validation ─────────────────────────────────────────────
 
@@ -392,6 +395,22 @@ public class BillingService {
         }
 
         billing = billingRepository.save(billing);
+
+        try {
+            Payment payment = Payment.builder()
+                    .patient(billing.getPatient())
+                    .billing(billing)
+                    .amount(request.getAmount())
+                    .method(paymentMethod)
+                    .referenceNumber(request.getRemarks())
+                    .receiptNumber("REC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                    .build();
+            payment.setTenantId(tenantId);
+            paymentRepository.save(payment);
+        } catch (Exception e) {
+            log.error("Failed to persist payment record for billing {}: {}", billingId, e.getMessage());
+        }
+
         log.info("Payment collected for billing {}: amount={}, method={}, status={}",
                 billingId, request.getAmount(), paymentMethod, billing.getPaymentStatus());
 
@@ -1036,6 +1055,37 @@ public class BillingService {
                     .calculatedAt(split.getCalculatedAt())
                     .build());
         });
+
+        // Attach payment records for receipt and audit history
+        List<PaymentRecordResponse> paymentRecords = new ArrayList<>();
+        if (billing.getId() != null) {
+            try {
+                List<Payment> payments = paymentRepository.findAllByBillingIdAndTenantIdOrderByCreatedAtDesc(billing.getId(), billing.getTenantId());
+                if (payments != null && !payments.isEmpty()) {
+                    paymentRecords = payments.stream().map(p -> PaymentRecordResponse.builder()
+                            .id(p.getId())
+                            .receiptNumber(p.getReceiptNumber() != null ? p.getReceiptNumber() : "REC-" + p.getId())
+                            .amount(p.getAmount())
+                            .paymentMethod(p.getMethod() != null ? p.getMethod().name() : (billing.getPaymentMethod() != null ? billing.getPaymentMethod().name() : "CASH"))
+                            .referenceNumber(p.getReferenceNumber())
+                            .paymentDate(p.getCreatedAt() != null ? p.getCreatedAt() : billing.getPaidAt())
+                            .build()).collect(Collectors.toList());
+                }
+            } catch (Exception e) {
+                log.warn("Could not load payment records for billing {}: {}", billing.getId(), e.getMessage());
+            }
+        }
+        if (paymentRecords.isEmpty() && billing.getPaidAmount() != null && billing.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            paymentRecords.add(PaymentRecordResponse.builder()
+                    .id(billing.getId())
+                    .receiptNumber("REC-" + (billing.getInvoiceNumber() != null ? billing.getInvoiceNumber().replace("INV-", "").replace("IPD-", "").replace("OPD-", "") : billing.getId()))
+                    .amount(billing.getPaidAmount())
+                    .paymentMethod(billing.getPaymentMethod() != null ? billing.getPaymentMethod().name() : "CASH")
+                    .referenceNumber(billing.getRemarks())
+                    .paymentDate(billing.getPaidAt() != null ? billing.getPaidAt() : billing.getCreatedAt())
+                    .build());
+        }
+        resp.setPaymentRecords(paymentRecords);
 
         return resp;
     }
