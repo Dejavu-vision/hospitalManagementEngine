@@ -403,6 +403,10 @@ public class IpdBillingService {
         Long tenantId = TenantContext.getTenantId();
 
         IpdAdmission admission = getActiveAdmission(patientId, tenantId);
+        if (admission != null && admission.getStatus() == AdmissionStatus.DISCHARGED) {
+            throw new RuntimeException("Cannot remove charges for a discharged patient");
+        }
+
         List<Billing> allBills = billingRepository.findAllByPatientIdAndTenantId(patientId, tenantId);
 
         // Find the bill containing this item
@@ -411,10 +415,26 @@ public class IpdBillingService {
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
 
+        if (bill.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new RuntimeException("Cannot remove charge: this bill is already paid");
+        }
+
+        if (bill.getPaidAmount() != null && bill.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            throw new RuntimeException("Cannot remove charge: this bill already has payments recorded");
+        }
+
+        if (bill.getRemarks() != null && bill.getRemarks().startsWith("FROZEN")) {
+            throw new RuntimeException("Cannot remove charge: the bill is frozen. Unfreeze it first before modifying charges.");
+        }
+
         BillingItem toRemove = bill.getItems().stream()
                 .filter(i -> i.getId().equals(itemId))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("BillingItem", "id", itemId));
+
+        if (toRemove.getPaidAmount() != null && toRemove.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            throw new RuntimeException("Cannot remove charge: payments have already been collected for this item");
+        }
 
 
 

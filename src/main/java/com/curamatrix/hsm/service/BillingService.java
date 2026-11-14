@@ -405,6 +405,11 @@ public class BillingService {
             return;
         }
 
+        if (billing.getPaidAmount() != null && billing.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            log.warn("Cannot cancel billing {} because payment of {} has already been collected", billingId, billing.getPaidAmount());
+            throw new RuntimeException("Cannot cancel registration bill because payment of ₹" + billing.getPaidAmount() + " was already collected");
+        }
+
         billing.setPaymentStatus(PaymentStatus.CANCELLED);
         billing.setRemarks((billing.getRemarks() != null ? billing.getRemarks() + "\n" : "") + "Cancelled due to case paper cancellation");
         billingRepository.save(billing);
@@ -416,6 +421,11 @@ public class BillingService {
 
     @Transactional
     public BillingResponse cancelInvoice(Long billingId, String reason, Long tenantId) {
+        return cancelInvoice(billingId, reason, "SYSTEM", tenantId);
+    }
+
+    @Transactional
+    public BillingResponse cancelInvoice(Long billingId, String reason, String cancelledBy, Long tenantId) {
         Billing billing = billingRepository.findByIdAndTenantId(billingId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Billing", "id", billingId));
 
@@ -433,7 +443,11 @@ public class BillingService {
 
         billing.setPaymentStatus(PaymentStatus.CANCELLED);
         String cancellationReason = (reason != null && !reason.isBlank()) ? reason : "Cancelled by user";
-        billing.setRemarks((billing.getRemarks() != null ? billing.getRemarks() + "\n" : "") + cancellationReason);
+        String auditRemark = String.format("Cancelled by %s on %s. Reason: %s",
+                (cancelledBy != null && !cancelledBy.isBlank()) ? cancelledBy : "SYSTEM",
+                LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("dd-MMM-yyyy HH:mm:ss")),
+                cancellationReason);
+        billing.setRemarks((billing.getRemarks() != null ? billing.getRemarks() + "\n" : "") + auditRemark);
 
         if (billing.getItems() != null) {
             billing.getItems().forEach(it -> it.setPaymentStatus(PaymentStatus.CANCELLED));
@@ -441,7 +455,7 @@ public class BillingService {
 
         Billing saved = billingRepository.save(billing);
         accountService.recalculateAccountStatus(billing.getPatient(), tenantId);
-        log.info("Invoice {} cancelled: {}", billingId, cancellationReason);
+        log.info("Invoice {} cancelled by {}: {}", billingId, cancelledBy, cancellationReason);
         return mapToResponse(saved);
     }
 
@@ -628,6 +642,10 @@ public class BillingService {
             throw new RuntimeException("Cannot update item amount on a cancelled invoice");
         }
 
+        if (billing.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new RuntimeException("Cannot update item amount on a paid invoice");
+        }
+
         BillingItem item = billing.getItems().stream()
                 .filter(i -> i.getId().equals(itemId))
                 .findFirst()
@@ -682,6 +700,14 @@ public class BillingService {
 
         if (billing.getPaymentStatus() == PaymentStatus.CANCELLED) {
             throw new RuntimeException("Cannot delete item on a cancelled invoice");
+        }
+
+        if (billing.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new RuntimeException("Cannot delete items from a paid invoice");
+        }
+
+        if (billing.getPaidAmount() != null && billing.getPaidAmount().compareTo(BigDecimal.ZERO) > 0) {
+            throw new RuntimeException("Cannot delete items from an invoice with payments already collected");
         }
 
         BillingItem item = billing.getItems().stream()

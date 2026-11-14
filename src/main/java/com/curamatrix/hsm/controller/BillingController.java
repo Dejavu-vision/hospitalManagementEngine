@@ -62,9 +62,11 @@ public class BillingController {
     @PostMapping("/invoices/{id}/cancel")
     public ResponseEntity<BillingResponse> cancelInvoice(
             @PathVariable Long id,
-            @RequestBody(required = false) Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body,
+            java.security.Principal principal) {
         String reason = body != null ? body.get("reason") : null;
-        return ResponseEntity.ok(billingService.cancelInvoice(id, reason, TenantContext.getTenantId()));
+        String cancelledBy = principal != null ? principal.getName() : "Unknown User";
+        return ResponseEntity.ok(billingService.cancelInvoice(id, reason, cancelledBy, TenantContext.getTenantId()));
     }
 
     @PostMapping("/invoices/{id}/revert-cancel")
