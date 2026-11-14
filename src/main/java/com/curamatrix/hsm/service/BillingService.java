@@ -330,7 +330,13 @@ public class BillingService {
         }
 
         PaymentMethod paymentMethod = parsePaymentMethod(request.getPaymentMethod());
-        BigDecimal newPaidAmount = billing.getPaidAmount().add(request.getAmount());
+        BigDecimal currentPaid = billing.getPaidAmount() != null ? billing.getPaidAmount() : BigDecimal.ZERO;
+        BigDecimal currentBalance = billing.getNetAmount().subtract(currentPaid);
+        if (request.getAmount().compareTo(currentBalance) > 0) {
+            throw new RuntimeException("Payment amount of ₹" + request.getAmount() + " exceeds the outstanding balance of ₹" + currentBalance);
+        }
+
+        BigDecimal newPaidAmount = currentPaid.add(request.getAmount());
         BigDecimal balance = billing.getNetAmount().subtract(newPaidAmount);
 
         billing.setPaymentMethod(paymentMethod);
@@ -516,12 +522,19 @@ public class BillingService {
             throw new RuntimeException("Cannot apply discount to a fully paid invoice");
         }
 
-        BigDecimal currentDiscount = billing.getDiscount() != null ? billing.getDiscount() : BigDecimal.ZERO;
-        if (discount.compareTo(BigDecimal.ZERO) == 0) {
-            billing.setDiscount(BigDecimal.ZERO);
-        } else {
-            billing.setDiscount(currentDiscount.add(discount));
+        if (discount != null && discount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Discount amount cannot be negative");
         }
+
+        BigDecimal currentDiscount = billing.getDiscount() != null ? billing.getDiscount() : BigDecimal.ZERO;
+        BigDecimal newDiscount = (discount == null || discount.compareTo(BigDecimal.ZERO) == 0) ? BigDecimal.ZERO : currentDiscount.add(discount);
+        BigDecimal maxAllowedDiscount = (billing.getTotalAmount() != null ? billing.getTotalAmount() : BigDecimal.ZERO)
+                .subtract(billing.getPaidAmount() != null ? billing.getPaidAmount() : BigDecimal.ZERO);
+        if (newDiscount.compareTo(maxAllowedDiscount) > 0) {
+            throw new RuntimeException("Discount cannot reduce the bill below the already collected payment of ₹" + billing.getPaidAmount());
+        }
+
+        billing.setDiscount(newDiscount);
 
         // Track who applied the discount
         if (appliedBy != null && !appliedBy.isBlank()) {

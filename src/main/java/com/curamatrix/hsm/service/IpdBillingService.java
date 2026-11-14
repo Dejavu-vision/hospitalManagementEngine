@@ -1309,12 +1309,19 @@ public class IpdBillingService {
         Billing bill = getPrimaryBill(patientId, tenantId, admission);
 
 
+        if (bill.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new IllegalStateException("Cannot apply section discount to a fully paid bill");
+        }
+
         if (bill.getRemarks() != null && bill.getRemarks().startsWith("FROZEN")) {
             throw new InvalidStateTransitionException("Billing", "FROZEN", "APPLY_SECTION_DISCOUNT");
         }
 
         String section = req.getSection().toUpperCase();
         BigDecimal discount = req.getDiscount() != null ? req.getDiscount() : BigDecimal.ZERO;
+        if (discount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Discount cannot be negative");
+        }
 
         // Calculate gross charges for this section
         BigDecimal sectionGross = BigDecimal.ZERO;
