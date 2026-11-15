@@ -59,7 +59,7 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponse bookAppointment(AppointmentRequest request) {
-        Patient patient = patientRepository.findById(request.getPatientId())
+        Patient patient = patientRepository.findByIdAndTenantId(request.getPatientId(), TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", request.getPatientId()));
         Doctor doctor = doctorRepository.findById(request.getDoctorId())
                 .or(() -> doctorRepository.findByUserId(request.getDoctorId()))
@@ -106,7 +106,7 @@ public class AppointmentService {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
 
-        Patient patient = patientRepository.findById(request.getPatientId())
+        Patient patient = patientRepository.findByIdAndTenantId(request.getPatientId(), TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", request.getPatientId()));
 
         // ── Resolve doctor by Doctor ID or User ID, with fallback to auto-assign ──
