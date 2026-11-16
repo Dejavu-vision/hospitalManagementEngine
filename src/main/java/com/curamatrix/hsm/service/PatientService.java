@@ -518,14 +518,35 @@ public class PatientService {
                         .build();
             }
 
-            // Last visit date
+            // Last visit date & follow-up context
             LocalDate lastVisitDate = null;
+            Long lastDoctorId = null;
+            String lastDoctorName = null;
+            Long lastDeptId = null;
+            String lastDeptName = null;
+            Long daysSinceLastVisit = null;
+            Boolean withinFollowUpWindow = null;
             try {
                 List<com.curamatrix.hsm.entity.Appointment> recent =
                         appointmentRepository.findTopByPatientIdAndTenantIdOrderByAppointmentDateDesc(
                                 p.getId(), tenantId, PageRequest.of(0, 1));
                 if (!recent.isEmpty()) {
-                    lastVisitDate = recent.get(0).getAppointmentDate();
+                    com.curamatrix.hsm.entity.Appointment appt = recent.get(0);
+                    lastVisitDate = appt.getAppointmentDate();
+                    if (lastVisitDate != null) {
+                        daysSinceLastVisit = java.time.temporal.ChronoUnit.DAYS.between(lastVisitDate, now.toLocalDate());
+                        withinFollowUpWindow = daysSinceLastVisit <= 14;
+                    }
+                    if (appt.getDoctor() != null) {
+                        lastDoctorId = appt.getDoctor().getId();
+                        if (appt.getDoctor().getUser() != null) {
+                            lastDoctorName = appt.getDoctor().getUser().getFullName();
+                        }
+                    }
+                    if (appt.getDepartment() != null) {
+                        lastDeptId = appt.getDepartment().getId();
+                        lastDeptName = appt.getDepartment().getName();
+                    }
                 }
             } catch (Exception e) {
                 log.warn("Could not fetch last visit for patient {}: {}", p.getId(), e.getMessage());
@@ -561,6 +582,12 @@ public class PatientService {
                     .dateOfBirth(p.getDateOfBirth() != null ? p.getDateOfBirth().toString() : null)
                     .gender(p.getGender() != null ? p.getGender().name() : null)
                     .lastVisitDate(lastVisitDate)
+                    .lastDoctorId(lastDoctorId)
+                    .lastDoctorName(lastDoctorName)
+                    .lastDepartmentId(lastDeptId)
+                    .lastDepartmentName(lastDeptName)
+                    .daysSinceLastVisit(daysSinceLastVisit)
+                    .withinFollowUpWindow(withinFollowUpWindow)
                     .casePaper(casePaper)
                     .financialStatus(liveOutstanding.compareTo(java.math.BigDecimal.ZERO) <= 0 ? com.curamatrix.hsm.enums.FinancialStatus.FULLY_PAID.name() : com.curamatrix.hsm.enums.FinancialStatus.REGISTERED_UNPAID.name())
                     .currentOutstanding(liveOutstanding)

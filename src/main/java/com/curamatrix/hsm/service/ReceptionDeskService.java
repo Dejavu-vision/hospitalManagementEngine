@@ -179,11 +179,47 @@ public class ReceptionDeskService {
         HospitalService regService = catalogResolver.resolveRequired("REG_FEE", tenantId);
         BigDecimal regFee = regService != null ? regService.getPrice() : BigDecimal.ZERO;
 
+        // Query 6: Previous visit analysis for automatic follow-up detection
+        BookingContextResponse.PreviousVisitInfo previousVisit = null;
+        if (patientId != null && patientId > 0) {
+            try {
+                List<com.curamatrix.hsm.entity.Appointment> recent =
+                        appointmentRepository.findTopByPatientIdAndTenantIdOrderByAppointmentDateDesc(
+                                patientId, tenantId, org.springframework.data.domain.PageRequest.of(0, 1));
+                if (!recent.isEmpty()) {
+                    com.curamatrix.hsm.entity.Appointment appt = recent.get(0);
+                    LocalDate vDate = appt.getAppointmentDate();
+                    Long daysAgo = vDate != null ? java.time.temporal.ChronoUnit.DAYS.between(vDate, LocalDate.now()) : null;
+                    boolean withinWindow = daysAgo != null && daysAgo <= 14;
+                    Long dId = appt.getDoctor() != null ? appt.getDoctor().getId() : null;
+                    String dName = (appt.getDoctor() != null && appt.getDoctor().getUser() != null)
+                            ? appt.getDoctor().getUser().getFullName() : null;
+                    Long deptId = appt.getDepartment() != null ? appt.getDepartment().getId() : null;
+                    String deptName = appt.getDepartment() != null ? appt.getDepartment().getName() : null;
+
+                    previousVisit = BookingContextResponse.PreviousVisitInfo.builder()
+                            .appointmentId(appt.getId())
+                            .visitDate(vDate)
+                            .daysAgo(daysAgo)
+                            .withinFollowUpWindow(withinWindow)
+                            .doctorId(dId)
+                            .doctorName(dName)
+                            .departmentId(deptId)
+                            .departmentName(deptName)
+                            .status(appt.getStatus() != null ? appt.getStatus().name() : null)
+                            .build();
+                }
+            } catch (Exception e) {
+                log.warn("Could not determine previous visit for booking context patient {}: {}", patientId, e.getMessage());
+            }
+        }
+
         return BookingContextResponse.builder()
                 .patientId(patientId)
                 .casePaper(casePaperStatus)
                 .registrationFee(regFee)
                 .departments(deptResponses)
+                .previousVisit(previousVisit)
                 .build();
     }
 

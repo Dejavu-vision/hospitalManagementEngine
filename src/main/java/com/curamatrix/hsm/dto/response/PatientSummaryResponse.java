@@ -27,6 +27,12 @@ public class PatientSummaryResponse {
     private String dateOfBirth;
     private String gender;
     private LocalDate lastVisitDate;
+    private Long lastDoctorId;
+    private String lastDoctorName;
+    private Long lastDepartmentId;
+    private String lastDepartmentName;
+    private Long daysSinceLastVisit;
+    private Boolean withinFollowUpWindow;
     private String financialStatus;
     private java.math.BigDecimal currentOutstanding;
 

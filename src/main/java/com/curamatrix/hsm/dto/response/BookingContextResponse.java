@@ -12,7 +12,21 @@ public class BookingContextResponse {
     private Long patientId;
     private CasePaperStatus casePaper;
     private BigDecimal registrationFee;
+    private PreviousVisitInfo previousVisit;
     private List<DepartmentWithDoctors> departments;
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class PreviousVisitInfo {
+        private Long appointmentId;
+        private java.time.LocalDate visitDate;
+        private Long daysAgo;
+        private boolean withinFollowUpWindow;
+        private Long doctorId;
+        private String doctorName;
+        private Long departmentId;
+        private String departmentName;
+        private String status;
+    }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class CasePaperStatus {
