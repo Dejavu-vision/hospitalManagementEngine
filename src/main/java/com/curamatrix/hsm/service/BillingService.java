@@ -1062,7 +1062,7 @@ public class BillingService {
         List<PaymentRecordResponse> paymentRecords = new ArrayList<>();
         if (billing.getId() != null) {
             try {
-                List<Payment> payments = paymentRepository.findAllByBillingIdAndTenantIdOrderByCreatedAtDesc(billing.getId(), billing.getTenantId());
+                List<Payment> payments = paymentRepository.findAllByBillingIdAndTenantIdOrderByTimestampDesc(billing.getId(), billing.getTenantId());
                 if (payments != null && !payments.isEmpty()) {
                     paymentRecords = payments.stream().map(p -> PaymentRecordResponse.builder()
                             .id(p.getId())
@@ -1070,7 +1070,7 @@ public class BillingService {
                             .amount(p.getAmount())
                             .paymentMethod(p.getMethod() != null ? p.getMethod().name() : (billing.getPaymentMethod() != null ? billing.getPaymentMethod().name() : "CASH"))
                             .referenceNumber(p.getReferenceNumber())
-                            .paymentDate(p.getCreatedAt() != null ? p.getCreatedAt() : billing.getPaidAt())
+                            .paymentDate(p.getTimestamp() != null ? p.getTimestamp() : billing.getPaidAt())
                             .build()).collect(Collectors.toList());
                 }
             } catch (Exception e) {

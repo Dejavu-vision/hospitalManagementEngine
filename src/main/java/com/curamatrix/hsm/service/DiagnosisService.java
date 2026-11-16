@@ -128,7 +128,7 @@ public class DiagnosisService {
      * Retrieves all past diagnoses for a patient (read-only reference for doctors).
      */
     public List<DiagnosisResponse> getDiagnosesByPatientId(Long patientId) {
-        return diagnosisRepository.findByAppointmentPatientIdOrderByCreatedAtDesc(patientId).stream()
+        return diagnosisRepository.findByPatientIdAndTenantId(patientId, com.curamatrix.hsm.context.TenantContext.getTenantId()).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }

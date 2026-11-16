@@ -30,7 +30,8 @@ public class PatientTimelineController {
         Long tenantId = TenantContext.getTenantId();
 
         patientRepository.findByIdAndTenantId(patientId, tenantId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+                .orElseThrow(() -> new com.curamatrix.hsm.exception.ResourceNotFoundException("Patient", "id", patientId));
+        boolean clinicalAccess = com.curamatrix.hsm.service.PatientViewRole.current().canSeeClinical();
 
         List<Map<String, Object>> events = new ArrayList<>();
 
@@ -40,6 +41,7 @@ public class PatientTimelineController {
             for (Appointment a : appts) {
                 Map<String, Object> e = new HashMap<>();
                 e.put("type", "APPOINTMENT");
+                e.put("appointmentId", a.getId());
                 e.put("date", a.getAppointmentDate() != null ? a.getAppointmentDate().toString() : null);
                 e.put("timestamp", a.getCreatedAt() != null ? a.getCreatedAt().toString() : null);
                 e.put("doctorName", a.getDoctor() != null && a.getDoctor().getUser() != null ? a.getDoctor().getUser().getFullName() : null);
@@ -110,16 +112,16 @@ public class PatientTimelineController {
             log.warn("Failed to load case papers for timeline: {}", ex.getMessage());
         }
 
-        // 5. Diagnoses
-        try {
+        // 5. Diagnoses (clinical data: doctors and admins only)
+        if (clinicalAccess) try {
             List<Diagnosis> diagnoses = diagnosisRepository.findByPatientIdAndTenantId(patientId, tenantId);
             for (Diagnosis d : diagnoses) {
                 Map<String, Object> e = new HashMap<>();
                 e.put("type", "DIAGNOSIS");
                 e.put("timestamp", d.getCreatedAt() != null ? d.getCreatedAt().toString() : null);
                 e.put("doctorName", d.getDoctor() != null && d.getDoctor().getUser() != null ? d.getDoctor().getUser().getFullName() : null);
-                e.put("summary", d.getClinicalNotes());
-                e.put("chiefComplaint", d.getSymptoms());
+                e.put("summary", clinicalAccess ? d.getClinicalNotes() : null);
+                e.put("chiefComplaint", clinicalAccess ? d.getSymptoms() : null);
                 events.add(e);
             }
         } catch (Exception ex) {

@@ -226,14 +226,14 @@ public class PatientService {
     }
 
     public PatientResponse getPatientById(Long id) {
-        Patient patient = patientRepository.findById(id)
+        Patient patient = patientRepository.findByIdAndTenantId(id, TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", id));
         return mapToResponse(patient);
     }
 
     @Transactional
     public PatientResponse updatePatient(Long id, PatientRequest request) {
-        Patient patient = patientRepository.findById(id)
+        Patient patient = patientRepository.findByIdAndTenantId(id, TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", id));
 
         patient.setFirstName(request.getFirstName());
@@ -287,7 +287,7 @@ public class PatientService {
 
     @Transactional
     public PatientResponse checkInPatient(Long id) {
-        Patient patient = patientRepository.findById(id)
+        Patient patient = patientRepository.findByIdAndTenantId(id, TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", id));
         patient.setCheckedIn(true);
         // Usually checkedOut is reset when checked in for a new visit
@@ -406,7 +406,7 @@ public class PatientService {
 
     @Transactional
     public PatientResponse checkOutPatient(Long id) {
-        Patient patient = patientRepository.findById(id)
+        Patient patient = patientRepository.findByIdAndTenantId(id, TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", id));
         
         // Fulfill user request: checkin should be false
@@ -458,7 +458,7 @@ public class PatientService {
 
     public PatientVisitHistoryResponse getVisitHistory(Long patientId) {
         Long tenantId = TenantContext.getTenantId();
-        patientRepository.findById(patientId)
+        patientRepository.findByIdAndTenantId(patientId, TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", patientId));
         // findVisitSummaryByPatient returns List<Object[]> — get the first row
         java.util.List<Object[]> rows = appointmentRepository.findVisitSummaryByPatient(patientId, tenantId);
