@@ -61,6 +61,8 @@ public class PatientTimelineController {
             for (IpdAdmission adm : admissions) {
                 Map<String, Object> e = new HashMap<>();
                 e.put("type", "ADMISSION");
+                e.put("id", adm.getId());
+                e.put("admissionId", adm.getId());
                 e.put("timestamp", adm.getAdmissionTime() != null ? adm.getAdmissionTime().toString() : null);
                 e.put("admissionNumber", adm.getAdmissionNumber());
                 e.put("status", adm.getStatus() != null ? adm.getStatus().name() : null);
@@ -69,6 +71,8 @@ public class PatientTimelineController {
                 e.put("doctorName", adm.getPrimaryDoctor() != null && adm.getPrimaryDoctor().getUser() != null ? adm.getPrimaryDoctor().getUser().getFullName() : null);
                 e.put("department", adm.getPrimaryDoctor() != null && adm.getPrimaryDoctor().getDepartment() != null ? adm.getPrimaryDoctor().getDepartment().getName() : null);
                 e.put("admissionType", adm.getAdmissionType() != null ? adm.getAdmissionType().name() : null);
+                e.put("dischargeSummary", adm.getDischargeSummary());
+                e.put("admissionNotes", adm.getAdmissionNotes());
                 events.add(e);
             }
         } catch (Exception ex) {
