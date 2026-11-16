@@ -22,7 +22,7 @@ public class ReceptionDeskController {
     private final ReceptionDeskService receptionDeskService;
 
     @GetMapping({"/booking-context", "/booking-context/{patientId}"})
-    @PreAuthorize("hasRole('RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<BookingContextResponse> getBookingContext(
             @PathVariable(required = false) Long patientId) {
         log.info("Fetching booking context for patient: {}", patientId);
@@ -31,7 +31,7 @@ public class ReceptionDeskController {
     }
 
     @PostMapping("/case-paper/{patientId}")
-    @PreAuthorize("hasRole('RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<CasePaperResponse> createCasePaper(
             @PathVariable Long patientId,
             @RequestParam(required = false) String paymentMethod) {
@@ -46,7 +46,7 @@ public class ReceptionDeskController {
      * DELETE /api/case-paper/patient/{patientId}
      */
     @DeleteMapping("/case-paper/patient/{patientId}")
-    @PreAuthorize("hasRole('RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<Void> deleteCasePaper(@PathVariable Long patientId) {
         log.info("Deactivating case paper for patient: {}", patientId);
         receptionDeskService.deleteCasePaper(patientId, TenantContext.getTenantId());
@@ -54,7 +54,7 @@ public class ReceptionDeskController {
     }
 
     @PostMapping("/unified-registration")
-    @PreAuthorize("hasRole('RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<UnifiedRegistrationResponse> unifiedRegistration(
             @RequestBody UnifiedRegistrationRequest request) {
         log.info("Executing unified registration/billing flow");
