@@ -83,15 +83,22 @@ public class BedChargeEngine {
             return;
         }
 
-        // 2. Add New Billing Item representing today's Bed Charge
+        // 2. Calculate stay day counter and add New Billing Item representing today's Bed Charge
         BigDecimal dailyPrice = allocation.getDailyPriceAtTime();
         if (dailyPrice == null || dailyPrice.compareTo(BigDecimal.ZERO) <= 0) {
             log.warn("No bed charge snapshot for Allocation {}, skipping.", allocation.getId());
             return;
         }
 
+        long stayDays = 1;
+        if (allocation.getAdmission() != null && allocation.getAdmission().getAdmissionTime() != null) {
+            stayDays = java.time.temporal.ChronoUnit.DAYS.between(
+                    allocation.getAdmission().getAdmissionTime().toLocalDate(), LocalDate.now()) + 1;
+            if (stayDays < 1) stayDays = 1;
+        }
+
         BillingItem chargeItem = BillingItem.builder()
-                .description("Daily Bed Charge (" + allocation.getBed().getBedNumber() + ") on " + LocalDate.now())
+                .description("Bed Charge - " + allocation.getBed().getBedNumber() + " (Day " + stayDays + " - " + LocalDate.now() + ")")
                 .amount(dailyPrice)
                 .quantity(1)
                 .itemType(BillingItemType.BED_CHARGE)
@@ -100,44 +107,17 @@ public class BedChargeEngine {
         
         runningBill.getItems().add(chargeItem);
 
-        // 3. Update the Running Bill Totals
+        // 3. Update the Running Bill Totals (pure Bed Charge only; nursing/diet are handled manually per clinical orders)
         BigDecimal newTotal = runningBill.getTotalAmount().add(dailyPrice);
-
-        // 3a. Post Nursing Charge if snapshotted
-        BigDecimal nursingCharge = allocation.getNursingChargeAtTime();
-        if (nursingCharge != null && nursingCharge.compareTo(BigDecimal.ZERO) > 0) {
-            BillingItem nursingItem = BillingItem.builder()
-                    .description("Daily Nursing Charge on " + LocalDate.now())
-                    .amount(nursingCharge)
-                    .quantity(1)
-                    .itemType(BillingItemType.NURSING_CHARGE)
-                    .billing(runningBill)
-                    .build();
-            runningBill.getItems().add(nursingItem);
-            newTotal = newTotal.add(nursingCharge);
-        }
-
-        // 3b. Post Diet Charge if snapshotted
-        BigDecimal dietCharge = allocation.getDietChargeAtTime();
-        if (dietCharge != null && dietCharge.compareTo(BigDecimal.ZERO) > 0) {
-            BillingItem dietItem = BillingItem.builder()
-                    .description("Daily Diet Charge on " + LocalDate.now())
-                    .amount(dietCharge)
-                    .quantity(1)
-                    .itemType(BillingItemType.DIET_CHARGE)
-                    .billing(runningBill)
-                    .build();
-            runningBill.getItems().add(dietItem);
-            newTotal = newTotal.add(dietCharge);
-        }
-
         runningBill.setTotalAmount(newTotal);
         
-        BigDecimal netAmount = newTotal.subtract(runningBill.getDiscount()).add(runningBill.getTax());
+        BigDecimal discount = runningBill.getDiscount() != null ? runningBill.getDiscount() : BigDecimal.ZERO;
+        BigDecimal tax = runningBill.getTax() != null ? runningBill.getTax() : BigDecimal.ZERO;
+        BigDecimal netAmount = newTotal.subtract(discount).add(tax);
         runningBill.setNetAmount(netAmount);
 
         // 4. Save
         billingRepository.save(runningBill);
-        log.info("Added Bed Charge {} to Admission {}", dailyPrice, allocation.getAdmission().getId());
+        log.info("Added Bed Charge {} (Day {}) to Admission {}", dailyPrice, stayDays, allocation.getAdmission().getId());
     }
 }

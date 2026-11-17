@@ -75,15 +75,20 @@ public class IpdAdmissionController {
         return ResponseEntity.ok(admissionService.getAdmissionBilling(id));
     }
 
-    @PostMapping("/{id}/transfer-bed/{newBedId}")
+    @PostMapping(value = {"/{id}/transfer-bed", "/{id}/transfer-bed/{newBedId}"})
+    @PutMapping(value = {"/{id}/transfer-bed", "/{id}/transfer-bed/{newBedId}"})
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'DOCTOR', 'ADMIN')")
     @Operation(summary = "Transfer patient to a different bed/ward")
     public ResponseEntity<Void> transferBed(
             @PathVariable Long id, 
-            @PathVariable Long newBedId,
+            @PathVariable(required = false) Long newBedId,
             @RequestBody(required = false) BedTransferRequest request) {
+        Long targetBedId = newBedId != null ? newBedId : (request != null ? request.getNewBedId() : null);
+        if (targetBedId == null) {
+            throw new IllegalArgumentException("New bed id must be provided");
+        }
         String reason = request != null ? request.getTransferReason() : null;
-        admissionService.transferBed(id, newBedId, reason);
+        admissionService.transferBed(id, targetBedId, reason);
         return ResponseEntity.ok().build();
     }
 

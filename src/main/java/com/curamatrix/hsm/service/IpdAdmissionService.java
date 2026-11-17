@@ -729,9 +729,9 @@ public class IpdAdmissionService {
         activeAlloc.setTransferReason(transferReason != null && !transferReason.trim().isEmpty() ? transferReason.trim() : "Transferred to Bed " + newBed.getBedNumber());
         allocationRepository.save(activeAlloc);
 
-        // Free old bed
+        // Free old bed - mark CLEANING so housekeeping is alerted
         Bed oldBed = activeAlloc.getBed();
-        oldBed.setStatus(BedStatus.AVAILABLE);
+        oldBed.setStatus(BedStatus.CLEANING);
         bedRepository.save(oldBed);
 
         // 5. Occupy new bed
@@ -739,17 +739,43 @@ public class IpdAdmissionService {
         bedRepository.save(newBed);
 
         // 6. Create new allocation
+        BigDecimal newDailyPrice = catalogResolver.resolveBedCharge(newBed.getRoom().getRoomType(), tenantId).getPrice();
         BedAllocation newAlloc = BedAllocation.builder()
                 .admission(admission)
                 .bed(newBed)
                 .startTime(LocalDateTime.now())
                 .isCurrent(true)
-                .dailyPriceAtTime(catalogResolver.resolveBedCharge(newBed.getRoom().getRoomType(), tenantId).getPrice())
-                .nursingChargeAtTime(catalogResolver.resolveOptional("NURSING_CHARGE", tenantId).map(HospitalService::getPrice).orElse(null))
-                .dietChargeAtTime(catalogResolver.resolveOptional("DIET_CHARGE", tenantId).map(HospitalService::getPrice).orElse(null))
+                .dailyPriceAtTime(newDailyPrice)
+                .nursingChargeAtTime(null)
+                .dietChargeAtTime(null)
                 .build();
         newAlloc.setTenantId(tenantId);
         allocationRepository.save(newAlloc);
+
+        // 7. Higher Category Rule: If upgraded to higher room type today, post upgrade differential
+        BigDecimal oldDailyPrice = activeAlloc.getDailyPriceAtTime() != null ? activeAlloc.getDailyPriceAtTime() : BigDecimal.ZERO;
+        if (newDailyPrice != null && newDailyPrice.compareTo(oldDailyPrice) > 0) {
+            Billing runningBill = billingRepository.findByIpdAdmissionId(admissionId).orElse(null);
+            if (runningBill != null && runningBill.getPaymentStatus() != PaymentStatus.PAID) {
+                BigDecimal differential = newDailyPrice.subtract(oldDailyPrice);
+                BillingItem upgradeItem = BillingItem.builder()
+                        .billing(runningBill)
+                        .description("Bed Upgrade Differential (" + oldBed.getBedNumber() + " → " + newBed.getBedNumber() + ") on " + LocalDate.now())
+                        .amount(differential)
+                        .quantity(1)
+                        .itemType(BillingItemType.BED_CHARGE)
+                        .build();
+                runningBill.getItems().add(upgradeItem);
+                BigDecimal newTotal = runningBill.getTotalAmount().add(differential);
+                runningBill.setTotalAmount(newTotal);
+
+                BigDecimal discount = runningBill.getDiscount() != null ? runningBill.getDiscount() : BigDecimal.ZERO;
+                BigDecimal tax = runningBill.getTax() != null ? runningBill.getTax() : BigDecimal.ZERO;
+                runningBill.setNetAmount(newTotal.subtract(discount).add(tax));
+                billingRepository.save(runningBill);
+                log.info("Auto-posted bed upgrade differential ₹{} for admission {}", differential, admission.getAdmissionNumber());
+            }
+        }
 
         log.info("Transferred patient in Admission {} from Bed {} to Bed {} (Reason: {})", admissionId, oldBed.getBedNumber(), newBed.getBedNumber(), transferReason);
     }
