@@ -3,9 +3,9 @@ spring:
     name: hsm
 
   datasource:
-    url: jdbc:postgresql://dpg-dbq51ron74is739oc4m0-a.virginia-postgres.render.com:5432/curamatrix_db?sslmode=require
-    username: curamatrix_db_user
-    password: ut7UPowmHClmLvbPnjuRUbJ7z0nYMJzF
+    url: ${SPRING_DATASOURCE_URL:${DB_URL:jdbc:postgresql://dpg-dbq51ron74is739oc4m0-a.virginia-postgres.render.com:5432/curamatrix_db?sslmode=require}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME:curamatrix_db_user}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:ut7UPowmHClmLvbPnjuRUbJ7z0nYMJzF}}
     driver-class-name: org.postgresql.Driver
     hikari:
       connection-timeout: 60000
@@ -46,14 +46,15 @@ deepgram:
 
 server:
   port: ${PORT:8080}
+  address: 0.0.0.0
 
 logging:
   file:
-    path: /app/logs
+    path: ${LOG_PATH:/app/logs}
   logback:
     rollingpolicy:
-      file-name-pattern: /app/logs/hsm-%d{yyyy-MM-dd}.%i.log
-      max-history: 30
+      file-name-pattern: ${LOG_PATH:/app/logs}/hsm-%d{yyyy-MM-dd}.%i.log
+      max-history: 7
       clean-history-on-start: false
 
 springdoc:

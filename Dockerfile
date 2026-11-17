@@ -31,25 +31,25 @@ FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
-# Create non-root user for security
-RUN addgroup -S curamatrix && adduser -S curamatrix -G curamatrix
+# Create non-root user and pre-create log directory with full permissions
+RUN addgroup -S curamatrix && adduser -S curamatrix -G curamatrix \
+    && mkdir -p /app/logs \
+    && chown -R curamatrix:curamatrix /app
 
-# Copy JAR from builder stage
-COPY --from=builder /app/build/libs/*.jar app.jar
-
-# Set ownership
-RUN chown curamatrix:curamatrix app.jar
+# Copy JAR from builder stage with proper ownership
+COPY --from=builder --chown=curamatrix:curamatrix /app/build/libs/*.jar app.jar
 
 USER curamatrix
 
-# Expose application port
+# Expose default application port (Render dynamically overrides this with $PORT)
 EXPOSE 8080
 
-# Health check
+# Health check dynamically targeting $PORT (falls back to 8080)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+  CMD wget -qO- http://127.0.0.1:${PORT:-8080}/actuator/health || exit 1
 
 # JVM tuning for containers (safe for Render 512MB free tier to prevent OOM kills)
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -XX:InitialRAMPercentage=40.0 -XX:+ExitOnOutOfMemoryError"
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+# Explicitly bind to 0.0.0.0 and dynamically accept $PORT assigned by Render
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar --server.port=${PORT:-8080} --server.address=0.0.0.0"]
