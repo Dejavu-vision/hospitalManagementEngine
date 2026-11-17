@@ -50,7 +50,7 @@ public class AccessBootstrapService {
         upsertPage("RECEPTIONIST_PATIENTS", "/receptionist/patients", "Patient Registration");
         upsertPage("RECEPTIONIST_BILLING", "/receptionist/billing", "Billing");
         upsertPage("RECEPTIONIST_QUEUE", "/reception/queue", "Queue Management");
-        upsertPage("LAB_DASHBOARD", "/lab-dashboard", "Lab Dashboard");
+        upsertPage("LAB_DASHBOARD", "/lab/dashboard", "Lab Dashboard");
     }
 
     private void upsertPage(String pageKey, String route, String displayName) {

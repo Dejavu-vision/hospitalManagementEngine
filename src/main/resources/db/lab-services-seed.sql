@@ -4,7 +4,7 @@
 
 -- 1. Insert UI Pages for Lab module
 INSERT INTO ui_pages (page_key, route, display_name, is_active)
-VALUES ('LAB_DASHBOARD', '/lab-dashboard', 'Lab Dashboard', true)
+VALUES ('LAB_DASHBOARD', '/lab/dashboard', 'Lab Dashboard', true)
 ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), is_active = VALUES(is_active);
 
 INSERT INTO ui_pages (page_key, route, display_name, is_active)
