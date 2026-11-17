@@ -53,7 +53,7 @@ public class LabServiceController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST', 'LAB_STAFF')")
     public ResponseEntity<Page<LabServiceResponse>> listLabServices(
             @RequestParam(required = false) ServiceCategory category,
             @RequestParam(required = false) Boolean active,

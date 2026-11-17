@@ -162,3 +162,31 @@ WHERE NOT EXISTS (
     SELECT 1 FROM medicines x
     WHERE x.name = m.name AND COALESCE(x.strength,'') = COALESCE(m.strength,'') AND COALESCE(x.brand,'') = COALESCE(m.brand,'')
 );
+
+-- ------------------------------------------------------------
+-- LAB SERVICES (unique per service_code + tenant)
+-- ------------------------------------------------------------
+INSERT INTO lab_services (tenant_id, service_name, service_code, category, description, default_price, is_active, created_at, updated_at)
+SELECT t.id, s.service_name, s.service_code, s.category, s.description, s.default_price, TRUE, NOW(), NOW()
+FROM tenants t
+CROSS JOIN (VALUES
+    ('Complete Blood Count (CBC)',        'CBC01',   'BLOOD_TEST',   'Complete hemogram with automated differential count',  350.00),
+    ('Kidney Function Test (KFT / RFT)',  'KFT01',   'PATHOLOGY',    'Renal panel including Urea, Creatinine, Electrolytes', 600.00),
+    ('Liver Function Test (LFT)',         'LFT01',   'PATHOLOGY',    'Hepatic panel including Bilirubin, AST, ALT, Protein', 650.00),
+    ('Lipid Profile',                     'LIPID01', 'PATHOLOGY',    'Cardiovascular risk lipid screen (Chol, HDL, LDL, TG)',550.00),
+    ('Fasting Blood Sugar (FBS)',         'FBS01',   'BLOOD_TEST',   'Fasting plasma glucose level',                          80.00),
+    ('Post Prandial Blood Sugar (PPBS)',  'PPBS01',  'BLOOD_TEST',   '2-hour post prandial blood glucose',                    80.00),
+    ('Random Blood Sugar (RBS)',          'RBS01',   'BLOOD_TEST',   'Instant random blood glucose check',                    80.00),
+    ('HbA1c (Glycated Hemoglobin)',       'HBA1C01', 'BLOOD_TEST',   '3-month glycemic control profile',                     450.00),
+    ('Thyroid Profile (T3, T4, TSH)',     'TFT01',   'PATHOLOGY',    'Complete thyroid function screening',                  500.00),
+    ('Urine Routine & Microscopic',       'URINE01', 'PATHOLOGY',    'Physical, chemical, and microscopic urine analysis',   150.00),
+    ('Serum Electrolytes (Na, K, Cl)',    'ELEC01',  'PATHOLOGY',    'Serum Sodium, Potassium, and Chloride',                400.00),
+    ('Widal Agglutination Test',          'WIDAL01', 'MICROBIOLOGY', 'Slide/Tube agglutination test for enteric fever',      200.00),
+    ('Chest X-Ray PA View',               'XRAY01',  'IMAGING',      'Standard chest digital radiograph',                    400.00),
+    ('Ultrasound Abdomen & Pelvis',       'USG01',   'IMAGING',      'Whole abdomen sonography scan',                       1200.00),
+    ('12-Lead Electrocardiogram (ECG)',   'ECG01',   'DIAGNOSTIC',   'Resting 12-lead ECG tracing',                          250.00)
+) AS s(service_name, service_code, category, description, default_price)
+WHERE NOT EXISTS (
+    SELECT 1 FROM lab_services ls
+    WHERE ls.service_code = s.service_code AND ls.tenant_id = t.id
+);
