@@ -124,13 +124,13 @@ public class LabPrescriptionService {
 
         LabPrescription savedPrescription = labPrescriptionRepository.save(prescription);
 
-        // Create BillingItems and associate with Billing (no appointment)
-        Billing billing = findOrCreateBillingForPatient(patient, tenantId);
+        // Create dedicated Billing for this lab order (isolated from other patient hospital debts)
+        Billing billing = createDedicatedBillingForLabOrder(patient, tenantId);
         createBillingItems(labTests, labServices, billing);
         Billing savedBilling = billingRepository.save(billing);
 
-        log.info("Receptionist lab registration created: id={}, patientId={}, tests={}",
-                savedPrescription.getId(), patient.getId(), labTests.size());
+        log.info("Receptionist lab registration created: id={}, patientId={}, tests={}, billingId={}, invoiceNumber={}",
+                savedPrescription.getId(), patient.getId(), labTests.size(), savedBilling.getId(), savedBilling.getInvoiceNumber());
 
         LabPrescriptionResponse response = mapToResponse(savedPrescription);
         if (savedBilling != null) {
@@ -139,6 +139,18 @@ public class LabPrescriptionService {
             response.setTotalAmount(savedBilling.getTotalAmount());
         }
         return response;
+    }
+
+    private Billing createDedicatedBillingForLabOrder(Patient patient, Long tenantId) {
+        Billing newBilling = Billing.builder()
+                .patient(patient)
+                .invoiceNumber("INV-LAB-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                .totalAmount(BigDecimal.ZERO)
+                .netAmount(BigDecimal.ZERO)
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        newBilling.setTenantId(tenantId);
+        return newBilling;
     }
 
     // ==================== 7.3: Prescription Retrieval Methods ====================
