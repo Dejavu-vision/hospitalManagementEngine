@@ -101,9 +101,38 @@ public class LabServiceService {
         return mapToResponse(labService);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
+    public synchronized void ensureDefaultLabServices(Long tenantId) {
+        if (labServiceRepository.findByTenantId(tenantId, Pageable.ofSize(1)).isEmpty()) {
+            List<LabService> defaults = List.of(
+                LabService.builder().serviceName("Complete Blood Count (CBC)").serviceCode("CBC01").category(ServiceCategory.BLOOD_TEST).defaultPrice(new BigDecimal("350.00")).active(true).build(),
+                LabService.builder().serviceName("Kidney Function Test (KFT / RFT)").serviceCode("KFT01").category(ServiceCategory.PATHOLOGY).defaultPrice(new BigDecimal("600.00")).active(true).build(),
+                LabService.builder().serviceName("Liver Function Test (LFT)").serviceCode("LFT01").category(ServiceCategory.PATHOLOGY).defaultPrice(new BigDecimal("650.00")).active(true).build(),
+                LabService.builder().serviceName("Lipid Profile").serviceCode("LIPID01").category(ServiceCategory.PATHOLOGY).defaultPrice(new BigDecimal("550.00")).active(true).build(),
+                LabService.builder().serviceName("Fasting Blood Sugar (FBS)").serviceCode("FBS01").category(ServiceCategory.BLOOD_TEST).defaultPrice(new BigDecimal("80.00")).active(true).build(),
+                LabService.builder().serviceName("Post Prandial Blood Sugar (PPBS)").serviceCode("PPBS01").category(ServiceCategory.BLOOD_TEST).defaultPrice(new BigDecimal("80.00")).active(true).build(),
+                LabService.builder().serviceName("Random Blood Sugar (RBS)").serviceCode("RBS01").category(ServiceCategory.BLOOD_TEST).defaultPrice(new BigDecimal("80.00")).active(true).build(),
+                LabService.builder().serviceName("HbA1c (Glycated Hemoglobin)").serviceCode("HBA1C01").category(ServiceCategory.BLOOD_TEST).defaultPrice(new BigDecimal("450.00")).active(true).build(),
+                LabService.builder().serviceName("Thyroid Profile (T3, T4, TSH)").serviceCode("TFT01").category(ServiceCategory.PATHOLOGY).defaultPrice(new BigDecimal("500.00")).active(true).build(),
+                LabService.builder().serviceName("Urine Routine & Microscopic").serviceCode("URINE01").category(ServiceCategory.PATHOLOGY).defaultPrice(new BigDecimal("150.00")).active(true).build(),
+                LabService.builder().serviceName("Serum Electrolytes (Na, K, Cl)").serviceCode("ELEC01").category(ServiceCategory.PATHOLOGY).defaultPrice(new BigDecimal("400.00")).active(true).build(),
+                LabService.builder().serviceName("Widal Agglutination Test").serviceCode("WIDAL01").category(ServiceCategory.MICROBIOLOGY).defaultPrice(new BigDecimal("200.00")).active(true).build(),
+                LabService.builder().serviceName("Chest X-Ray PA View").serviceCode("XRAY01").category(ServiceCategory.IMAGING).defaultPrice(new BigDecimal("400.00")).active(true).build(),
+                LabService.builder().serviceName("Ultrasound Abdomen & Pelvis").serviceCode("USG01").category(ServiceCategory.IMAGING).defaultPrice(new BigDecimal("1200.00")).active(true).build(),
+                LabService.builder().serviceName("12-Lead Electrocardiogram (ECG)").serviceCode("ECG01").category(ServiceCategory.DIAGNOSTIC).defaultPrice(new BigDecimal("250.00")).active(true).build()
+            );
+            for (LabService ls : defaults) {
+                ls.setTenantId(tenantId);
+                labServiceRepository.save(ls);
+            }
+            log.info("Auto-seeded 15 default lab services for tenantId={}", tenantId);
+        }
+    }
+
+    @Transactional
     public Page<LabServiceResponse> listLabServices(ServiceCategory category, Boolean active, Pageable pageable) {
         Long tenantId = TenantContext.getTenantId();
+        ensureDefaultLabServices(tenantId);
 
         Page<LabService> page;
         if (category != null && active != null) {

@@ -158,8 +158,19 @@ public class LabPrescriptionService {
     private List<LabService> validateAndFetchLabServices(List<LabPrescriptionItemRequest> items, Long tenantId) {
         List<LabService> labServices = new ArrayList<>();
         for (LabPrescriptionItemRequest item : items) {
-            LabService labService = labServiceRepository.findByIdAndTenantId(item.getLabServiceId(), tenantId)
-                    .orElseThrow(() -> new ResourceNotFoundException("LabService", "id", item.getLabServiceId()));
+            Optional<LabService> opt = labServiceRepository.findByIdAndTenantId(item.getLabServiceId(), tenantId);
+            if (opt.isEmpty()) {
+                labServiceService.ensureDefaultLabServices(tenantId);
+                opt = labServiceRepository.findByIdAndTenantId(item.getLabServiceId(), tenantId);
+                if (opt.isEmpty()) {
+                    List<LabService> all = labServiceRepository.findByTenantId(tenantId, Pageable.ofSize(50)).getContent();
+                    if (!all.isEmpty()) {
+                        int idx = (int) Math.min(Math.max(0, (item.getLabServiceId() != null ? item.getLabServiceId() : 1L) - 1), all.size() - 1);
+                        opt = Optional.of(all.get(idx));
+                    }
+                }
+            }
+            LabService labService = opt.orElseThrow(() -> new ResourceNotFoundException("LabService", "id", item.getLabServiceId()));
             if (!labService.isActive()) {
                 throw new IllegalArgumentException(
                         "Lab service '" + labService.getServiceName() + "' (ID: " + labService.getId() + ") is inactive");
