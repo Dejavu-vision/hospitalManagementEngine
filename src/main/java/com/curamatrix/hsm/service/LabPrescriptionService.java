@@ -81,12 +81,18 @@ public class LabPrescriptionService {
         // Create BillingItems and associate with Billing
         Billing billing = findOrCreateBillingForAppointment(appointment, patient, tenantId);
         createBillingItems(labTests, labServices, billing);
-        billingRepository.save(billing);
+        Billing savedBilling = billingRepository.save(billing);
 
         log.info("Doctor prescription created: id={}, patientId={}, appointmentId={}, tests={}",
                 savedPrescription.getId(), patient.getId(), appointment.getId(), labTests.size());
 
-        return mapToResponse(savedPrescription);
+        LabPrescriptionResponse response = mapToResponse(savedPrescription);
+        if (savedBilling != null) {
+            response.setBillingId(savedBilling.getId());
+            response.setInvoiceNumber(savedBilling.getInvoiceNumber());
+            response.setTotalAmount(savedBilling.getTotalAmount());
+        }
+        return response;
     }
 
     // ==================== 7.2: Receptionist Lab Registration Workflow ====================
@@ -121,12 +127,18 @@ public class LabPrescriptionService {
         // Create BillingItems and associate with Billing (no appointment)
         Billing billing = findOrCreateBillingForPatient(patient, tenantId);
         createBillingItems(labTests, labServices, billing);
-        billingRepository.save(billing);
+        Billing savedBilling = billingRepository.save(billing);
 
         log.info("Receptionist lab registration created: id={}, patientId={}, tests={}",
                 savedPrescription.getId(), patient.getId(), labTests.size());
 
-        return mapToResponse(savedPrescription);
+        LabPrescriptionResponse response = mapToResponse(savedPrescription);
+        if (savedBilling != null) {
+            response.setBillingId(savedBilling.getId());
+            response.setInvoiceNumber(savedBilling.getInvoiceNumber());
+            response.setTotalAmount(savedBilling.getTotalAmount());
+        }
+        return response;
     }
 
     // ==================== 7.3: Prescription Retrieval Methods ====================

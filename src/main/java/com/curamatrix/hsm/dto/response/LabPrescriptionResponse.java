@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -20,5 +21,8 @@ public class LabPrescriptionResponse {
     private String doctorName;
     private String createdByName;
     private LocalDateTime createdAt;
+    private Long billingId;
+    private String invoiceNumber;
+    private BigDecimal totalAmount;
     private List<LabTestResponse> labTests;
 }
