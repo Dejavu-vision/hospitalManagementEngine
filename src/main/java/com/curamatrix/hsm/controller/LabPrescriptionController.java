@@ -41,14 +41,14 @@ public class LabPrescriptionController {
     }
 
     @GetMapping("/patient/{patientId}")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN', 'RECEPTIONIST')")
     public ResponseEntity<List<LabPrescriptionResponse>> getPatientPrescriptions(@PathVariable Long patientId) {
         List<LabPrescriptionResponse> response = labPrescriptionService.getPrescriptionsByPatient(patientId);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN', 'LAB_STAFF')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN', 'LAB_STAFF', 'RECEPTIONIST')")
     public ResponseEntity<LabPrescriptionResponse> getPrescriptionDetails(@PathVariable Long id) {
         LabPrescriptionResponse response = labPrescriptionService.getPrescriptionById(id);
         return ResponseEntity.ok(response);
