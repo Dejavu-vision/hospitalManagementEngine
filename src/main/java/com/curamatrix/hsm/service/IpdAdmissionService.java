@@ -752,29 +752,45 @@ public class IpdAdmissionService {
         newAlloc.setTenantId(tenantId);
         allocationRepository.save(newAlloc);
 
-        // 7. Higher Category Rule: If upgraded to higher room type today, post upgrade differential
-        BigDecimal oldDailyPrice = activeAlloc.getDailyPriceAtTime() != null ? activeAlloc.getDailyPriceAtTime() : BigDecimal.ZERO;
-        if (newDailyPrice != null && newDailyPrice.compareTo(oldDailyPrice) > 0) {
-            Billing runningBill = billingRepository.findByIpdAdmissionId(admissionId).orElse(null);
-            if (runningBill != null && runningBill.getPaymentStatus() != PaymentStatus.PAID) {
-                BigDecimal differential = newDailyPrice.subtract(oldDailyPrice);
-                BillingItem upgradeItem = BillingItem.builder()
-                        .billing(runningBill)
-                        .description("Bed Upgrade Differential (" + oldBed.getBedNumber() + " → " + newBed.getBedNumber() + ") on " + LocalDate.now())
-                        .amount(differential)
-                        .quantity(1)
-                        .itemType(BillingItemType.BED_CHARGE)
-                        .build();
-                runningBill.getItems().add(upgradeItem);
-                BigDecimal newTotal = runningBill.getTotalAmount().add(differential);
-                runningBill.setTotalAmount(newTotal);
+        // 7. Post explicit Bed Transfer record & price adjustment on Running Bill
+        Billing runningBill = billingRepository.findByIpdAdmissionId(admissionId).orElse(null);
+        if (runningBill != null && runningBill.getPaymentStatus() != PaymentStatus.PAID) {
+            BigDecimal differential = BigDecimal.ZERO;
+            String itemDesc;
+            BigDecimal oldDailyPrice = activeAlloc.getDailyPriceAtTime() != null ? activeAlloc.getDailyPriceAtTime() : BigDecimal.ZERO;
 
-                BigDecimal discount = runningBill.getDiscount() != null ? runningBill.getDiscount() : BigDecimal.ZERO;
-                BigDecimal tax = runningBill.getTax() != null ? runningBill.getTax() : BigDecimal.ZERO;
-                runningBill.setNetAmount(newTotal.subtract(discount).add(tax));
-                billingRepository.save(runningBill);
-                log.info("Auto-posted bed upgrade differential ₹{} for admission {}", differential, admission.getAdmissionNumber());
+            if (newDailyPrice != null && newDailyPrice.compareTo(oldDailyPrice) > 0) {
+                // Upgraded to higher ward category (Higher Category Rule)
+                differential = newDailyPrice.subtract(oldDailyPrice);
+                itemDesc = "Bed Upgrade: " + oldBed.getBedNumber() + " → " + newBed.getBedNumber() 
+                        + " (" + newBed.getRoom().getRoomType() + ") [Rate diff: ₹" + differential + "]";
+            } else if (newDailyPrice != null && newDailyPrice.compareTo(oldDailyPrice) < 0) {
+                // Stepped down to lower ward category
+                itemDesc = "Bed Step-Down: " + oldBed.getBedNumber() + " → " + newBed.getBedNumber() 
+                        + " (" + newBed.getRoom().getRoomType() + ") [Effective next cycle: ₹" + newDailyPrice + "/d]";
+            } else {
+                // Lateral shift (same room rate)
+                itemDesc = "Bed Transfer: " + oldBed.getBedNumber() + " → " + newBed.getBedNumber() 
+                        + " (" + newBed.getRoom().getRoomType() + ") on " + LocalDate.now();
             }
+
+            BillingItem transferItem = BillingItem.builder()
+                    .billing(runningBill)
+                    .description(itemDesc)
+                    .amount(differential)
+                    .quantity(1)
+                    .itemType(BillingItemType.BED_CHARGE)
+                    .build();
+            runningBill.getItems().add(transferItem);
+
+            BigDecimal newTotal = runningBill.getTotalAmount().add(differential);
+            runningBill.setTotalAmount(newTotal);
+
+            BigDecimal discount = runningBill.getDiscount() != null ? runningBill.getDiscount() : BigDecimal.ZERO;
+            BigDecimal tax = runningBill.getTax() != null ? runningBill.getTax() : BigDecimal.ZERO;
+            runningBill.setNetAmount(newTotal.subtract(discount).add(tax));
+            billingRepository.save(runningBill);
+            log.info("Posted bed transfer line item '{}' (₹{}) for admission {}", itemDesc, differential, admission.getAdmissionNumber());
         }
 
         log.info("Transferred patient in Admission {} from Bed {} to Bed {} (Reason: {})", admissionId, oldBed.getBedNumber(), newBed.getBedNumber(), transferReason);
