@@ -257,8 +257,12 @@ public class LabPrescriptionService {
         BigDecimal totalLabAmount = labTests.stream()
                 .map(LabTest::getBilledPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        billing.setTotalAmount(billing.getTotalAmount().add(totalLabAmount));
-        billing.setNetAmount(billing.getTotalAmount().subtract(billing.getDiscount()).add(billing.getTax()));
+        BigDecimal currentTotal = billing.getTotalAmount() != null ? billing.getTotalAmount() : BigDecimal.ZERO;
+        BigDecimal newTotal = currentTotal.add(totalLabAmount);
+        BigDecimal discount = billing.getDiscount() != null ? billing.getDiscount() : BigDecimal.ZERO;
+        BigDecimal tax = billing.getTax() != null ? billing.getTax() : BigDecimal.ZERO;
+        billing.setTotalAmount(newTotal);
+        billing.setNetAmount(newTotal.subtract(discount).add(tax));
     }
 
     // ==================== DTO Mapping ====================
