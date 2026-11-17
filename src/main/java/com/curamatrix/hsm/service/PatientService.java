@@ -542,10 +542,10 @@ public class PatientService {
                         if (appt.getDoctor().getUser() != null) {
                             lastDoctorName = appt.getDoctor().getUser().getFullName();
                         }
-                    }
-                    if (appt.getDepartment() != null) {
-                        lastDeptId = appt.getDepartment().getId();
-                        lastDeptName = appt.getDepartment().getName();
+                        if (appt.getDoctor().getDepartment() != null) {
+                            lastDeptId = appt.getDoctor().getDepartment().getId();
+                            lastDeptName = appt.getDoctor().getDepartment().getName();
+                        }
                     }
                 }
             } catch (Exception e) {

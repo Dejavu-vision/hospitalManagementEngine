@@ -194,8 +194,10 @@ public class ReceptionDeskService {
                     Long dId = appt.getDoctor() != null ? appt.getDoctor().getId() : null;
                     String dName = (appt.getDoctor() != null && appt.getDoctor().getUser() != null)
                             ? appt.getDoctor().getUser().getFullName() : null;
-                    Long deptId = appt.getDepartment() != null ? appt.getDepartment().getId() : null;
-                    String deptName = appt.getDepartment() != null ? appt.getDepartment().getName() : null;
+                    Long deptId = (appt.getDoctor() != null && appt.getDoctor().getDepartment() != null)
+                            ? appt.getDoctor().getDepartment().getId() : null;
+                    String deptName = (appt.getDoctor() != null && appt.getDoctor().getDepartment() != null)
+                            ? appt.getDoctor().getDepartment().getName() : null;
 
                     previousVisit = BookingContextResponse.PreviousVisitInfo.builder()
                             .appointmentId(appt.getId())
