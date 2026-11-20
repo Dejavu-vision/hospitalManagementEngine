@@ -28,7 +28,7 @@ public class LabServiceController {
     private final LabServiceService labServiceService;
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'LAB_STAFF')")
     public ResponseEntity<LabServiceResponse> createLabService(@Valid @RequestBody LabServiceRequest request) {
         log.info("Creating lab service: code={}", request.getServiceCode());
         LabServiceResponse response = labServiceService.createLabService(request);
