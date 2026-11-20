@@ -109,6 +109,12 @@ public class ConsultationService {
                     ", expected IN_PROGRESS or COMPLETED.");
         }
 
+        // Safe fallback for optional symptoms and diagnosis
+        String symptoms = (request.getSymptoms() != null && !request.getSymptoms().trim().isEmpty())
+                ? request.getSymptoms().trim() : "General Clinical Evaluation";
+        String diagnosisText = (request.getDiagnosis() != null && !request.getDiagnosis().trim().isEmpty())
+                ? request.getDiagnosis().trim() : "Under Evaluation";
+
         // Create or update Diagnosis (upsert — exactly one per appointment)
         Diagnosis diagnosis;
         boolean existingDiagnosis = diagnosisRepository.existsByAppointmentId(request.getAppointmentId());
@@ -116,8 +122,8 @@ public class ConsultationService {
             diagnosis = diagnosisRepository.findByAppointmentId(request.getAppointmentId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Diagnosis not found for appointment with id: " + request.getAppointmentId()));
-            diagnosis.setSymptoms(request.getSymptoms());
-            diagnosis.setDiagnosis(request.getDiagnosis());
+            diagnosis.setSymptoms(symptoms);
+            diagnosis.setDiagnosis(diagnosisText);
             diagnosis.setClinicalNotes(request.getClinicalNotes());
             diagnosis.setSeverity(request.getSeverity());
             diagnosis.setFollowUpDate(request.getFollowUpDate());
@@ -131,8 +137,8 @@ public class ConsultationService {
             diagnosis = Diagnosis.builder()
                     .appointment(appointment)
                     .doctor(doctor)
-                    .symptoms(request.getSymptoms())
-                    .diagnosis(request.getDiagnosis())
+                    .symptoms(symptoms)
+                    .diagnosis(diagnosisText)
                     .clinicalNotes(request.getClinicalNotes())
                     .severity(request.getSeverity())
                     .followUpDate(request.getFollowUpDate())

@@ -14,10 +14,8 @@ public class ConsultationSubmitRequest {
     @NotNull(message = "Appointment ID is required")
     private Long appointmentId;
 
-    @NotBlank(message = "Symptoms are required")
     private String symptoms;
 
-    @NotBlank(message = "Diagnosis is required")
     private String diagnosis;
 
     private String clinicalNotes;
