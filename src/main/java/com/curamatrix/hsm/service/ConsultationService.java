@@ -484,9 +484,20 @@ public class ConsultationService {
             LocalDate today = LocalDate.now();
             List<Appointment> todayAppts = appointmentRepository.findByPatientIdAndAppointmentDate(p.getId(), today);
             todayAppts.stream()
-                .filter(a -> a.getStatus() == AppointmentStatus.BOOKED || 
+                .filter(a -> a.getStatus() == AppointmentStatus.IN_PROGRESS || 
+                             a.getStatus() == AppointmentStatus.RECALLED || 
                              a.getStatus() == AppointmentStatus.CHECKED_IN || 
-                             a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                             a.getStatus() == AppointmentStatus.BOOKED)
+                .sorted((a1, a2) -> {
+                    // Highest priority: IN_PROGRESS (0) > RECALLED (1) > CHECKED_IN (2) > BOOKED (3)
+                    int p1 = a1.getStatus() == AppointmentStatus.IN_PROGRESS ? 0 : 
+                             a1.getStatus() == AppointmentStatus.RECALLED ? 1 : 
+                             a1.getStatus() == AppointmentStatus.CHECKED_IN ? 2 : 3;
+                    int p2 = a2.getStatus() == AppointmentStatus.IN_PROGRESS ? 0 : 
+                             a2.getStatus() == AppointmentStatus.RECALLED ? 1 : 
+                             a2.getStatus() == AppointmentStatus.CHECKED_IN ? 2 : 3;
+                    return Integer.compare(p1, p2);
+                })
                 .findFirst()
             .ifPresent(appt -> {
                 resp.setActiveAppointmentId(appt.getId());
@@ -495,6 +506,10 @@ public class ConsultationService {
                 if (appt.getDoctor() != null) {
                     resp.setActiveAppointmentDoctorId(appt.getDoctor().getId());
                     resp.setActiveAppointmentDoctorName(appt.getDoctor().getUser().getFullName());
+                }
+                if (appt.getStatus() == AppointmentStatus.IN_PROGRESS || appt.getStatus() == AppointmentStatus.CHECKED_IN) {
+                    resp.setCheckedIn(true);
+                    resp.setCheckedOut(false);
                 }
             });
         } catch (Exception e) {
