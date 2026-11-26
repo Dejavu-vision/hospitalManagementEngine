@@ -316,15 +316,15 @@ public class LabTestService {
 
     @Transactional(readOnly = true)
     public List<LabTestDashboardResponse> getTodayTests(TestStatus status, ServiceCategory category) {
-        Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
+        return getTestsByDateRange(today, today, status, category);
+    }
 
-        List<LabTest> tests;
-        if (status != null) {
-            tests = labTestRepository.findByTestDateAndTenantIdAndStatus(today, tenantId, status);
-        } else {
-            tests = labTestRepository.findByTestDateAndTenantIdOrderByCreatedAtAsc(today, tenantId);
-        }
+    @Transactional(readOnly = true)
+    public List<LabTestDashboardResponse> getTestsByDateRange(LocalDate startDate, LocalDate endDate, TestStatus status, ServiceCategory category) {
+        Long tenantId = TenantContext.getTenantId();
+
+        List<LabTest> tests = labTestRepository.findByDateRangeAndTenantIdAndStatus(startDate, endDate, tenantId, status);
 
         // Apply category filter in-memory if provided
         if (category != null) {
@@ -340,10 +340,15 @@ public class LabTestService {
 
     @Transactional(readOnly = true)
     public LabTestSummaryResponse getTodaySummary() {
-        Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
+        return getSummaryByDateRange(today, today);
+    }
 
-        List<Object[]> statusCounts = labTestRepository.countByStatusForDate(today, tenantId);
+    @Transactional(readOnly = true)
+    public LabTestSummaryResponse getSummaryByDateRange(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = TenantContext.getTenantId();
+
+        List<Object[]> statusCounts = labTestRepository.countByStatusForDateRange(startDate, endDate, tenantId);
 
         long totalPending = 0;
         long totalInProgress = 0;

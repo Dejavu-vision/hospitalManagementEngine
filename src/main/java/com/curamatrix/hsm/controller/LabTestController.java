@@ -33,16 +33,40 @@ public class LabTestController {
     @GetMapping("/today")
     @PreAuthorize("hasAnyRole('LAB_STAFF', 'RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<List<LabTestDashboardResponse>> getTodayTests(
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
             @RequestParam(required = false) TestStatus status,
             @RequestParam(required = false) ServiceCategory category) {
-        List<LabTestDashboardResponse> response = labTestService.getTodayTests(status, category);
+        java.time.LocalDate effectiveStart = startDate != null ? startDate : (date != null ? date : null);
+        java.time.LocalDate effectiveEnd = endDate != null ? endDate : (date != null ? date : null);
+
+        // If no dates provided at all, default to today
+        if (effectiveStart == null && effectiveEnd == null) {
+            effectiveStart = java.time.LocalDate.now();
+            effectiveEnd = effectiveStart;
+        }
+
+        List<LabTestDashboardResponse> response = labTestService.getTestsByDateRange(effectiveStart, effectiveEnd, status, category);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/today/summary")
     @PreAuthorize("hasAnyRole('LAB_STAFF', 'RECEPTIONIST', 'ADMIN')")
-    public ResponseEntity<LabTestSummaryResponse> getTodaySummary() {
-        LabTestSummaryResponse response = labTestService.getTodaySummary();
+    public ResponseEntity<LabTestSummaryResponse> getTodaySummary(
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date) {
+        java.time.LocalDate effectiveStart = startDate != null ? startDate : (date != null ? date : null);
+        java.time.LocalDate effectiveEnd = endDate != null ? endDate : (date != null ? date : null);
+
+        // If no dates provided at all, default to today
+        if (effectiveStart == null && effectiveEnd == null) {
+            effectiveStart = java.time.LocalDate.now();
+            effectiveEnd = effectiveStart;
+        }
+
+        LabTestSummaryResponse response = labTestService.getSummaryByDateRange(effectiveStart, effectiveEnd);
         return ResponseEntity.ok(response);
     }
 

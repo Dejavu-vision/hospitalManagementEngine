@@ -22,10 +22,28 @@ public interface LabTestRepository extends JpaRepository<LabTest, Long> {
                                                       @Param("tenantId") Long tenantId,
                                                       @Param("status") TestStatus status);
 
+    @Query("SELECT lt FROM LabTest lt WHERE lt.tenantId = :tenantId " +
+           "AND (:startDate IS NULL OR lt.testDate >= :startDate) " +
+           "AND (:endDate IS NULL OR lt.testDate <= :endDate) " +
+           "AND (:status IS NULL OR lt.status = :status) " +
+           "ORDER BY lt.testDate DESC, lt.createdAt DESC")
+    List<LabTest> findByDateRangeAndTenantIdAndStatus(@Param("startDate") LocalDate startDate,
+                                                      @Param("endDate") LocalDate endDate,
+                                                      @Param("tenantId") Long tenantId,
+                                                      @Param("status") TestStatus status);
+
     @Query("SELECT lt.status, COUNT(lt) FROM LabTest lt WHERE lt.testDate = :date " +
            "AND lt.tenantId = :tenantId GROUP BY lt.status")
     List<Object[]> countByStatusForDate(@Param("date") LocalDate date,
                                         @Param("tenantId") Long tenantId);
+
+    @Query("SELECT lt.status, COUNT(lt) FROM LabTest lt WHERE lt.tenantId = :tenantId " +
+           "AND (:startDate IS NULL OR lt.testDate >= :startDate) " +
+           "AND (:endDate IS NULL OR lt.testDate <= :endDate) " +
+           "GROUP BY lt.status")
+    List<Object[]> countByStatusForDateRange(@Param("startDate") LocalDate startDate,
+                                             @Param("endDate") LocalDate endDate,
+                                             @Param("tenantId") Long tenantId);
 
     boolean existsByLabServiceId(Long labServiceId);
 
