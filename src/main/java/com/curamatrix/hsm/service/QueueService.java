@@ -43,9 +43,13 @@ public class QueueService {
     // ── Legacy endpoints (kept for backward compatibility) ────────────────────
 
     public List<QueueEntryResponse> getTodayQueue() {
+        return getQueueByDate(LocalDate.now());
+    }
+
+    public List<QueueEntryResponse> getQueueByDate(LocalDate date) {
         Long tenantId = TenantContext.getTenantId();
-        LocalDate today = LocalDate.now();
-        return appointmentRepository.findAllByDateAndTenant(today, tenantId)
+        LocalDate targetDate = date != null ? date : LocalDate.now();
+        return appointmentRepository.findAllByDateAndTenant(targetDate, tenantId)
                 .stream().map(this::toQueueEntry).collect(Collectors.toList());
     }
 

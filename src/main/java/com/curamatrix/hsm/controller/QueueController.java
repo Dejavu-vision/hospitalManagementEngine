@@ -9,6 +9,7 @@ import com.curamatrix.hsm.service.QueueService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,6 +17,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,9 +33,10 @@ public class QueueController {
     private final QueueEventService queueEventService;
 
     @GetMapping("/today")
-    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
-    public ResponseEntity<List<QueueEntryResponse>> getTodayQueue() {
-        return ResponseEntity.ok(queueService.getTodayQueue());
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN', 'DOCTOR', 'LAB_STAFF')")
+    public ResponseEntity<List<QueueEntryResponse>> getTodayQueue(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(queueService.getQueueByDate(date));
     }
 
     @GetMapping("/doctor/{doctorId}/today")
