@@ -315,35 +315,47 @@ public class PatientService {
 
         if (doctor != null) {
             Appointment targetAppt = null;
-            // 1. If patient already has a BOOKED or CHECKED_IN appointment with this doctor, transition it to IN_PROGRESS
+            // 1. If patient already has an appointment with this doctor today (BOOKED, CHECKED_IN, IN_PROGRESS, or COMPLETED),
+            // reuse that same appointment and token instead of creating a redundant new walk-in and incrementing token!
             for (Appointment existing : existingToday) {
-                if (existing.getDoctor() != null && existing.getDoctor().getId().equals(doctor.getId())
-                        && (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.BOOKED
-                            || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.CHECKED_IN)) {
-                    existing.setStatus(com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS);
-                    existing.setConsultationStart(java.time.LocalDateTime.now());
-                    existing.setReassignNeeded(false);
-                    targetAppt = appointmentRepository.save(existing);
-                    log.info("Advanced existing appointment {} to IN_PROGRESS for patient {}", targetAppt.getId(), id);
-                    break;
-                } else if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS
-                        && existing.getDoctor() != null && existing.getDoctor().getId().equals(doctor.getId())) {
-                    targetAppt = existing;
-                    break;
+                if (existing.getDoctor() != null && existing.getDoctor().getId().equals(doctor.getId())) {
+                    if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.BOOKED
+                            || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.CHECKED_IN
+                            || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.COMPLETED) {
+                        existing.setStatus(com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS);
+                        existing.setConsultationStart(java.time.LocalDateTime.now());
+                        existing.setReassignNeeded(false);
+                        targetAppt = appointmentRepository.save(existing);
+                        log.info("Reusing existing appointment {} (Token {}) and advancing to IN_PROGRESS for patient {}", 
+                                targetAppt.getId(), targetAppt.getTokenNumber(), id);
+                        break;
+                    } else if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS) {
+                        targetAppt = existing;
+                        break;
+                    }
                 }
             }
 
-            // 2. If no existing appointment with this doctor, create an IN_PROGRESS walk-in appointment
+            // 1b. If the patient has ANY existing appointment today (e.g. booked under another doctor or waiting), check if we can reuse it
             if (targetAppt == null) {
                 for (Appointment existing : existingToday) {
-                    if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.BOOKED
-                            || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.CHECKED_IN) {
-                        existing.setStatus(com.curamatrix.hsm.enums.AppointmentStatus.CANCELLED);
-                        appointmentRepository.save(existing);
-                        log.info("Cancelled pre-existing appointment {} for patient {} on direct check-in", existing.getId(), id);
+                    if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.CHECKED_IN
+                            || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.BOOKED
+                            || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.COMPLETED) {
+                        existing.setDoctor(doctor);
+                        existing.setStatus(com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS);
+                        existing.setConsultationStart(java.time.LocalDateTime.now());
+                        existing.setReassignNeeded(false);
+                        targetAppt = appointmentRepository.save(existing);
+                        log.info("Reassigned existing appointment {} (Token {}) to doctor {} for patient {}", 
+                                targetAppt.getId(), targetAppt.getTokenNumber(), doctor.getId(), id);
+                        break;
                     }
                 }
+            }
 
+            // 2. Only if the patient has NO appointment at all today, create a new walk-in appointment and increment token
+            if (targetAppt == null) {
                 Integer maxToken = appointmentRepository.findMaxTokenNumber(doctor.getId(), java.time.LocalDate.now(), tenantId);
                 if (maxToken == null) {
                     maxToken = appointmentRepository.findMaxTokenNumber(doctor.getId(), java.time.LocalDate.now());
