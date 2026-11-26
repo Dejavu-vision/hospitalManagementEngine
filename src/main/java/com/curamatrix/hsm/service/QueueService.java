@@ -47,9 +47,19 @@ public class QueueService {
     }
 
     public List<QueueEntryResponse> getQueueByDate(LocalDate date) {
-        Long tenantId = TenantContext.getTenantId();
         LocalDate targetDate = date != null ? date : LocalDate.now();
-        return appointmentRepository.findAllByDateAndTenant(targetDate, tenantId)
+        return getQueueByDateRange(targetDate, targetDate);
+    }
+
+    public List<QueueEntryResponse> getQueueByDateRange(LocalDate fromDate, LocalDate toDate) {
+        Long tenantId = TenantContext.getTenantId();
+        LocalDate start = fromDate != null ? fromDate : LocalDate.now();
+        LocalDate end = toDate != null ? toDate : start;
+        if (start.isEqual(end)) {
+            return appointmentRepository.findAllByDateAndTenant(start, tenantId)
+                    .stream().map(this::toQueueEntry).collect(Collectors.toList());
+        }
+        return appointmentRepository.findAllByDateRangeAndTenant(start, end, tenantId)
                 .stream().map(this::toQueueEntry).collect(Collectors.toList());
     }
 

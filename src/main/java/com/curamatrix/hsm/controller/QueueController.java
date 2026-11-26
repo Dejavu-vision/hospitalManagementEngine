@@ -35,8 +35,12 @@ public class QueueController {
     @GetMapping("/today")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN', 'DOCTOR', 'LAB_STAFF')")
     public ResponseEntity<List<QueueEntryResponse>> getTodayQueue(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(queueService.getQueueByDate(date));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(name = "from_date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(name = "to_date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+        LocalDate start = fromDate != null ? fromDate : date;
+        LocalDate end = toDate != null ? toDate : (start != null ? start : LocalDate.now());
+        return ResponseEntity.ok(queueService.getQueueByDateRange(start, end));
     }
 
     @GetMapping("/doctor/{doctorId}/today")
