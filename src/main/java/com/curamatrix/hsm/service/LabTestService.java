@@ -324,7 +324,22 @@ public class LabTestService {
     public List<LabTestDashboardResponse> getTestsByDateRange(LocalDate startDate, LocalDate endDate, TestStatus status, ServiceCategory category) {
         Long tenantId = TenantContext.getTenantId();
 
-        List<LabTest> tests = labTestRepository.findByDateRangeAndTenantIdAndStatus(startDate, endDate, tenantId, status);
+        List<LabTest> tests;
+        boolean hasDateRange = (startDate != null && endDate != null);
+
+        if (hasDateRange) {
+            if (status != null) {
+                tests = labTestRepository.findByDateBetweenAndTenantIdAndStatus(startDate, endDate, tenantId, status);
+            } else {
+                tests = labTestRepository.findByDateBetweenAndTenantId(startDate, endDate, tenantId);
+            }
+        } else {
+            if (status != null) {
+                tests = labTestRepository.findByTenantIdAndStatus(tenantId, status);
+            } else {
+                tests = labTestRepository.findByTenantIdOrderByTestDateDescCreatedAtDesc(tenantId);
+            }
+        }
 
         // Apply category filter in-memory if provided
         if (category != null) {
@@ -348,7 +363,12 @@ public class LabTestService {
     public LabTestSummaryResponse getSummaryByDateRange(LocalDate startDate, LocalDate endDate) {
         Long tenantId = TenantContext.getTenantId();
 
-        List<Object[]> statusCounts = labTestRepository.countByStatusForDateRange(startDate, endDate, tenantId);
+        List<Object[]> statusCounts;
+        if (startDate != null && endDate != null) {
+            statusCounts = labTestRepository.countByStatusForDateRange(startDate, endDate, tenantId);
+        } else {
+            statusCounts = labTestRepository.countByStatusAll(tenantId);
+        }
 
         long totalPending = 0;
         long totalInProgress = 0;

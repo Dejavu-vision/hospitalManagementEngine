@@ -16,6 +16,8 @@ public interface LabTestRepository extends JpaRepository<LabTest, Long> {
 
     List<LabTest> findByTestDateAndTenantIdOrderByCreatedAtAsc(LocalDate testDate, Long tenantId);
 
+    List<LabTest> findByTenantIdOrderByTestDateDescCreatedAtDesc(Long tenantId);
+
     @Query("SELECT lt FROM LabTest lt WHERE lt.testDate = :date AND lt.tenantId = :tenantId " +
            "AND lt.status = :status ORDER BY lt.createdAt ASC")
     List<LabTest> findByTestDateAndTenantIdAndStatus(@Param("date") LocalDate date,
@@ -23,14 +25,26 @@ public interface LabTestRepository extends JpaRepository<LabTest, Long> {
                                                       @Param("status") TestStatus status);
 
     @Query("SELECT lt FROM LabTest lt WHERE lt.tenantId = :tenantId " +
-           "AND (:startDate IS NULL OR lt.testDate >= :startDate) " +
-           "AND (:endDate IS NULL OR lt.testDate <= :endDate) " +
-           "AND (:status IS NULL OR lt.status = :status) " +
+           "AND lt.testDate >= :startDate AND lt.testDate <= :endDate " +
            "ORDER BY lt.testDate DESC, lt.createdAt DESC")
-    List<LabTest> findByDateRangeAndTenantIdAndStatus(@Param("startDate") LocalDate startDate,
-                                                      @Param("endDate") LocalDate endDate,
-                                                      @Param("tenantId") Long tenantId,
-                                                      @Param("status") TestStatus status);
+    List<LabTest> findByDateBetweenAndTenantId(@Param("startDate") LocalDate startDate,
+                                               @Param("endDate") LocalDate endDate,
+                                               @Param("tenantId") Long tenantId);
+
+    @Query("SELECT lt FROM LabTest lt WHERE lt.tenantId = :tenantId " +
+           "AND lt.testDate >= :startDate AND lt.testDate <= :endDate " +
+           "AND lt.status = :status " +
+           "ORDER BY lt.testDate DESC, lt.createdAt DESC")
+    List<LabTest> findByDateBetweenAndTenantIdAndStatus(@Param("startDate") LocalDate startDate,
+                                                        @Param("endDate") LocalDate endDate,
+                                                        @Param("tenantId") Long tenantId,
+                                                        @Param("status") TestStatus status);
+
+    @Query("SELECT lt FROM LabTest lt WHERE lt.tenantId = :tenantId " +
+           "AND lt.status = :status " +
+           "ORDER BY lt.testDate DESC, lt.createdAt DESC")
+    List<LabTest> findByTenantIdAndStatus(@Param("tenantId") Long tenantId,
+                                          @Param("status") TestStatus status);
 
     @Query("SELECT lt.status, COUNT(lt) FROM LabTest lt WHERE lt.testDate = :date " +
            "AND lt.tenantId = :tenantId GROUP BY lt.status")
@@ -38,12 +52,15 @@ public interface LabTestRepository extends JpaRepository<LabTest, Long> {
                                         @Param("tenantId") Long tenantId);
 
     @Query("SELECT lt.status, COUNT(lt) FROM LabTest lt WHERE lt.tenantId = :tenantId " +
-           "AND (:startDate IS NULL OR lt.testDate >= :startDate) " +
-           "AND (:endDate IS NULL OR lt.testDate <= :endDate) " +
+           "AND lt.testDate >= :startDate AND lt.testDate <= :endDate " +
            "GROUP BY lt.status")
     List<Object[]> countByStatusForDateRange(@Param("startDate") LocalDate startDate,
                                              @Param("endDate") LocalDate endDate,
                                              @Param("tenantId") Long tenantId);
+
+    @Query("SELECT lt.status, COUNT(lt) FROM LabTest lt WHERE lt.tenantId = :tenantId " +
+           "GROUP BY lt.status")
+    List<Object[]> countByStatusAll(@Param("tenantId") Long tenantId);
 
     boolean existsByLabServiceId(Long labServiceId);
 
