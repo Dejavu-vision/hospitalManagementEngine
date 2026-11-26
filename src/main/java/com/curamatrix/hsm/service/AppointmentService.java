@@ -150,6 +150,28 @@ public class AppointmentService {
         final Doctor finalDoctor = doctor;
         User bookedBy = getCurrentUser();
 
+        // ── Reuse existing active appointment today with this doctor if one exists ──
+        List<Appointment> existingToday = appointmentRepository.findByPatientIdAndAppointmentDate(patient.getId(), today);
+        for (Appointment existing : existingToday) {
+            if (existing.getDoctor() != null && existing.getDoctor().getId().equals(doctor.getId())
+                    && existing.getStatus() != AppointmentStatus.CANCELLED) {
+                if (existing.getStatus() == AppointmentStatus.BOOKED
+                        || existing.getStatus() == AppointmentStatus.CHECKED_IN
+                        || existing.getStatus() == AppointmentStatus.IN_PROGRESS
+                        || existing.getStatus() == AppointmentStatus.ON_HOLD
+                        || existing.getStatus() == AppointmentStatus.RECALLED) {
+                    if (existing.getStatus() == AppointmentStatus.BOOKED) {
+                        existing.setStatus(AppointmentStatus.CHECKED_IN);
+                        existing.setCheckedInAt(LocalDateTime.now());
+                        existing = appointmentRepository.save(existing);
+                    }
+                    log.info("createWalkIn: Reusing existing active appointment {} (Token {}) for patient {}",
+                            existing.getId(), existing.getTokenNumber(), patient.getId());
+                    return mapToResponse(existing);
+                }
+            }
+        }
+
         // ── Encode counter into notes ─────────────────────────────────────────
         String encodedNotes = encodeCounter(request.getCounter(), request.getNotes());
 

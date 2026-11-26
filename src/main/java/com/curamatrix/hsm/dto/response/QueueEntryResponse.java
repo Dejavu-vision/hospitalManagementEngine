@@ -22,6 +22,7 @@ public class QueueEntryResponse {
     private String counterLabel;        // e.g. "Counter 1"
     private Integer tokenNumber;
     private String tokenDisplay;        // e.g. "T-042"
+    private java.time.LocalDate appointmentDate;
     private LocalTime appointmentTime;
     private AppointmentStatus status;
     private AppointmentType type;

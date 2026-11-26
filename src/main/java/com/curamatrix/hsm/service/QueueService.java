@@ -66,8 +66,9 @@ public class QueueService {
     public List<QueueEntryResponse> getDoctorQueue(Long doctorId) {
         Long tenantId = TenantContext.getTenantId();
         LocalDate today = LocalDate.now();
-        List<Appointment> queue = appointmentRepository
+        List<Appointment> rawQueue = appointmentRepository
                 .findTodayQueueByDoctorAndTenant(doctorId, today, tenantId);
+        List<Appointment> queue = deduplicateAppointments(rawQueue);
 
         // Build a minimal activeQueues list for counter label lookup
         List<QueueDashboardResponse.ActiveQueueSummary> activeQueues = List.of(
@@ -98,13 +99,9 @@ public class QueueService {
         appointmentRepository.countByStatusForDate(today, tenantId)
                 .forEach(row -> counts.put((AppointmentStatus) row[0], (Long) row[1]));
 
-        List<Appointment> checkedIn = appointmentRepository
-                .findCheckedInByDateAndTenant(today, tenantId)
-                .stream()
-                .collect(Collectors.collectingAndThen(
-                        Collectors.toMap(Appointment::getId, a -> a, (a, b) -> a, java.util.LinkedHashMap::new),
-                        map -> new ArrayList<>(map.values())
-                ));
+        List<Appointment> rawCheckedIn = appointmentRepository
+                .findCheckedInByDateAndTenant(today, tenantId);
+        List<Appointment> checkedIn = deduplicateAppointments(rawCheckedIn);
         LocalDateTime alertThreshold = LocalDateTime.now().minusMinutes(WAIT_ALERT_MINUTES);
         List<QueueEntryResponse> alerts = checkedIn.stream()
                 .filter(a -> a.getCheckedInAt() != null && a.getCheckedInAt().isBefore(alertThreshold))
@@ -141,15 +138,11 @@ public class QueueService {
         LocalDate effectiveTo = toDate != null ? toDate : today;
 
         // All today's appointments (all statuses — for stats and recent activity)
-        // Deduplicate by appointment ID in case JOIN FETCH produces duplicates
-        List<Appointment> allToday = ((fromDate != null || toDate != null)
+        // Deduplicate duplicate appointments for the same patient with the same doctor on the same date
+        List<Appointment> rawToday = ((fromDate != null || toDate != null)
                 ? appointmentRepository.findAllByDateRangeAndTenant(effectiveFrom, effectiveTo, tenantId)
-                : appointmentRepository.findAllByDateAndTenant(today, tenantId))
-                .stream()
-                .collect(Collectors.collectingAndThen(
-                        Collectors.toMap(a -> a.getId(), a -> a, (a, b) -> a, java.util.LinkedHashMap::new),
-                        map -> new ArrayList<>(map.values())
-                ));
+                : appointmentRepository.findAllByDateAndTenant(today, tenantId));
+        List<Appointment> allToday = deduplicateAppointments(rawToday);
 
         // Active only (BOOKED, CHECKED_IN, IN_PROGRESS, ON_HOLD, RECALLED) — for queue logic
         List<Appointment> activeToday = allToday.stream()
@@ -160,20 +153,19 @@ public class QueueService {
                           || a.getStatus() == AppointmentStatus.RECALLED)
                 .collect(Collectors.toList());
 
-        // Status counts
+        // Status counts derived directly from deduplicated appointments
         Map<AppointmentStatus, Long> counts = new EnumMap<>(AppointmentStatus.class);
-        if (fromDate != null || toDate != null) {
-            appointmentRepository.countByStatusForDateRange(effectiveFrom, effectiveTo, tenantId)
-                    .forEach(row -> counts.put((AppointmentStatus) row[0], (Long) row[1]));
-        } else {
-            appointmentRepository.countByStatusForDate(today, tenantId)
-                    .forEach(row -> counts.put((AppointmentStatus) row[0], (Long) row[1]));
+        for (Appointment a : allToday) {
+            if (a.getStatus() != null) {
+                counts.put(a.getStatus(), counts.getOrDefault(a.getStatus(), 0L) + 1L);
+            }
         }
 
         long totalTokens = allToday.size();
         long waiting = counts.getOrDefault(AppointmentStatus.BOOKED, 0L)
                      + counts.getOrDefault(AppointmentStatus.CHECKED_IN, 0L)
-                     + counts.getOrDefault(AppointmentStatus.RECALLED, 0L);
+                     + counts.getOrDefault(AppointmentStatus.RECALLED, 0L)
+                     + counts.getOrDefault(AppointmentStatus.ON_HOLD, 0L);
         long served = counts.getOrDefault(AppointmentStatus.COMPLETED, 0L);
         long noShows = counts.getOrDefault(AppointmentStatus.NO_SHOW, 0L);
 
@@ -276,14 +268,10 @@ public class QueueService {
         List<QueueEntryResponse> heldPatients = new ArrayList<>();
         String waitingQueueLabel = "Waiting Queue";
         if (queueDoctorId != null) {
-            List<Appointment> docQueue = ((fromDate != null || toDate != null)
+            List<Appointment> rawDocQueue = ((fromDate != null || toDate != null)
                     ? appointmentRepository.findQueueByDoctorAndDateRangeAndTenant(queueDoctorId, effectiveFrom, effectiveTo, tenantId)
-                    : appointmentRepository.findTodayQueueByDoctorAndTenant(queueDoctorId, today, tenantId))
-                    .stream()
-                    .collect(Collectors.collectingAndThen(
-                            Collectors.toMap(Appointment::getId, a -> a, (a, b) -> a, java.util.LinkedHashMap::new),
-                            map -> new ArrayList<>(map.values())
-                    ));
+                    : appointmentRepository.findTodayQueueByDoctorAndTenant(queueDoctorId, today, tenantId));
+            List<Appointment> docQueue = deduplicateAppointments(rawDocQueue);
             Doctor queueDoc = docQueue.isEmpty() ? null : docQueue.get(0).getDoctor();
             if (queueDoc != null && queueDoc.getDepartment() != null) {
                 waitingQueueLabel = "Waiting Queue — " + queueDoc.getDepartment().getName();
@@ -389,6 +377,7 @@ public class QueueService {
                 .doctorName(a.getDoctor().getUser().getFullName())
                 .tokenNumber(a.getTokenNumber())
                 .tokenDisplay(formatToken(a.getTokenNumber(), a.getType()))
+                .appointmentDate(a.getAppointmentDate())
                 .appointmentTime(a.getAppointmentTime())
                 .status(a.getStatus())
                 .type(a.getType())
@@ -457,6 +446,7 @@ public class QueueService {
                 .counterLabel(counterLabel)
                 .tokenNumber(a.getTokenNumber())
                 .tokenDisplay(formatToken(a.getTokenNumber(), a.getType()))
+                .appointmentDate(a.getAppointmentDate())
                 .appointmentTime(a.getAppointmentTime())
                 .status(a.getStatus())
                 .type(a.getType())
@@ -630,7 +620,8 @@ public class QueueService {
     }
 
     private List<DoctorQueueSummary> buildTopDoctorSummaries(LocalDate date, Long tenantId) {
-        return appointmentRepository.findAllByDateAndTenant(date, tenantId).stream()
+        List<Appointment> rawAppts = appointmentRepository.findAllByDateAndTenant(date, tenantId);
+        return deduplicateAppointments(rawAppts).stream()
                 .collect(Collectors.groupingBy(a -> a.getDoctor().getId()))
                 .entrySet().stream()
                 .map(e -> {
@@ -651,5 +642,61 @@ public class QueueService {
                 .sorted(Comparator.comparingInt(DoctorQueueSummary::getActiveQueueLength).reversed())
                 .limit(5)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Deduplicates appointments for the same patient with the same doctor on the same date.
+     * Keeps the most active / latest appointment, avoiding duplicate ghost tokens from repeated check-ins.
+     */
+    private List<Appointment> deduplicateAppointments(List<Appointment> rawList) {
+        if (rawList == null || rawList.isEmpty()) return Collections.emptyList();
+
+        Map<String, Appointment> dedupMap = new LinkedHashMap<>();
+        for (Appointment a : rawList) {
+            if (a.getPatient() == null || a.getDoctor() == null || a.getAppointmentDate() == null) {
+                dedupMap.put("ID_" + a.getId(), a);
+                continue;
+            }
+            String key = a.getPatient().getId() + "_" + a.getDoctor().getId() + "_" + a.getAppointmentDate();
+            Appointment existing = dedupMap.get(key);
+            if (existing == null) {
+                dedupMap.put(key, a);
+            } else {
+                int existingRank = getStatusRank(existing.getStatus());
+                int newRank = getStatusRank(a.getStatus());
+                if (newRank > existingRank) {
+                    dedupMap.put(key, a);
+                } else if (newRank == existingRank) {
+                    int existingToken = existing.getTokenNumber() != null ? existing.getTokenNumber() : 0;
+                    int newToken = a.getTokenNumber() != null ? a.getTokenNumber() : 0;
+                    if (newToken > existingToken || (newToken == existingToken && (a.getId() != null && existing.getId() != null && a.getId() > existing.getId()))) {
+                        dedupMap.put(key, a);
+                    }
+                }
+            }
+        }
+        return new ArrayList<>(dedupMap.values());
+    }
+
+    private static int getStatusRank(AppointmentStatus status) {
+        if (status == null) return 0;
+        switch (status) {
+            case IN_PROGRESS:
+            case RECALLED:
+                return 6;
+            case CHECKED_IN:
+            case ON_HOLD:
+                return 5;
+            case BOOKED:
+                return 4;
+            case COMPLETED:
+                return 3;
+            case NO_SHOW:
+                return 2;
+            case CANCELLED:
+                return 1;
+            default:
+                return 0;
+        }
     }
 }
