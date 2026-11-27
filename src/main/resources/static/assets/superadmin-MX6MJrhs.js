@@ -1,0 +1,1 @@
+import{ct as e,dt as t,gt as n,i as r,pt as i,st as a,t as o}from"./SuperAdminApp-Co4IslG2.js";var s=n(i(),1),c=t(),l=a();(0,c.createRoot)(document.getElementById(`root`)).render((0,l.jsx)(s.StrictMode,{children:(0,l.jsx)(e,{store:r,children:(0,l.jsx)(o,{})})}));
