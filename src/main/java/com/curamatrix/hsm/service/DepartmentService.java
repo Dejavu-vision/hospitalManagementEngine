@@ -35,9 +35,13 @@ public class DepartmentService {
 
     // ─── Department CRUD ─────────────────────────────────────────────────────
 
-    public List<Department> getAllDepartments() {
-        Long tenantId = TenantContext.getTenantId();
+    public List<Department> getAllDepartments(Long targetTenantId) {
+        Long tenantId = targetTenantId != null ? targetTenantId : TenantContext.getTenantId();
         return departmentRepository.findByTenantIdAndIsActiveTrue(tenantId);
+    }
+
+    public List<Department> getAllDepartments() {
+        return getAllDepartments(null);
     }
 
     public Department getDepartmentById(Long id) {
@@ -47,8 +51,8 @@ public class DepartmentService {
     }
 
     @Transactional
-    public Department createDepartment(DepartmentRequest request) {
-        Long tenantId = TenantContext.getTenantId();
+    public Department createDepartment(DepartmentRequest request, Long targetTenantId) {
+        Long tenantId = targetTenantId != null ? targetTenantId : TenantContext.getTenantId();
 
         departmentRepository.findByNameAndTenantId(request.getName(), tenantId)
                 .ifPresent(d -> {
@@ -65,6 +69,11 @@ public class DepartmentService {
         department = departmentRepository.save(department);
         log.info("Created department: {} for tenant: {}", department.getName(), tenantId);
         return department;
+    }
+
+    @Transactional
+    public Department createDepartment(DepartmentRequest request) {
+        return createDepartment(request, null);
     }
 
     @Transactional
