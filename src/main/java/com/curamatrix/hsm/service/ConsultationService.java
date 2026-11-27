@@ -61,15 +61,20 @@ public class ConsultationService {
         }
 
         // Status validation
-        if (appointment.getStatus() != AppointmentStatus.CHECKED_IN) {
+        if (appointment.getStatus() == AppointmentStatus.IN_PROGRESS) {
+            // Already in progress - idempotent return
+            return mapToAppointmentResponse(appointment);
+        }
+        if (appointment.getStatus() == AppointmentStatus.COMPLETED || appointment.getStatus() == AppointmentStatus.CANCELLED) {
             throw new InvalidStateTransitionException(
-                    "Cannot confirm arrival. Appointment status is " + appointment.getStatus().name() +
-                    ", expected CHECKED_IN.");
+                    "Cannot confirm arrival. Appointment status is " + appointment.getStatus().name() + ".");
         }
 
-        // Transition to IN_PROGRESS
+        // Transition to IN_PROGRESS (supports CHECKED_IN, BOOKED, NO_SHOW, ON_HOLD, RECALLED)
         appointment.setStatus(AppointmentStatus.IN_PROGRESS);
-        appointment.setConsultationStart(LocalDateTime.now());
+        if (appointment.getConsultationStart() == null) {
+            appointment.setConsultationStart(LocalDateTime.now());
+        }
         appointment = appointmentRepository.save(appointment);
 
         // Update doctor status to AVAILABLE
@@ -102,11 +107,19 @@ public class ConsultationService {
             throw new AccessDeniedException("Access denied. Appointment is not assigned to you.");
         }
 
-        // Status validation
-        if (appointment.getStatus() != AppointmentStatus.IN_PROGRESS && appointment.getStatus() != AppointmentStatus.COMPLETED) {
+        // Status validation — resilient to any active or pending states (CHECKED_IN, ON_HOLD, NO_SHOW, BOOKED)
+        if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
             throw new InvalidStateTransitionException(
-                    "Cannot submit consultation. Appointment status is " + appointment.getStatus().name() +
-                    ", expected IN_PROGRESS or COMPLETED.");
+                    "Cannot submit consultation. Appointment is CANCELLED.");
+        }
+        if (appointment.getStatus() != AppointmentStatus.IN_PROGRESS && appointment.getStatus() != AppointmentStatus.COMPLETED) {
+            log.info("Auto-advancing appointment {} from {} to IN_PROGRESS on consultation submission", 
+                    appointment.getId(), appointment.getStatus());
+            appointment.setStatus(AppointmentStatus.IN_PROGRESS);
+            if (appointment.getConsultationStart() == null) {
+                appointment.setConsultationStart(LocalDateTime.now());
+            }
+            appointment = appointmentRepository.save(appointment);
         }
 
         // Safe fallback for optional symptoms and diagnosis

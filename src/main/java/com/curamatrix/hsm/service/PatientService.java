@@ -315,36 +315,32 @@ public class PatientService {
 
         if (doctor != null) {
             Appointment targetAppt = null;
-            // 1. If patient already has an appointment with this doctor today (BOOKED, CHECKED_IN, IN_PROGRESS, or COMPLETED),
-            // reuse that same appointment and token instead of creating a redundant new walk-in and incrementing token!
+            // 1. If patient already has an appointment with this doctor today,
+            // reuse that same appointment and token and advance to IN_PROGRESS!
             for (Appointment existing : existingToday) {
-                if (existing.getDoctor() != null && existing.getDoctor().getId().equals(doctor.getId())) {
-                    if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.BOOKED
-                            || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.CHECKED_IN
-                            || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.COMPLETED) {
-                        existing.setStatus(com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS);
+                if (existing.getDoctor() != null && existing.getDoctor().getId().equals(doctor.getId())
+                        && existing.getStatus() != com.curamatrix.hsm.enums.AppointmentStatus.CANCELLED) {
+                    existing.setStatus(com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS);
+                    if (existing.getConsultationStart() == null) {
                         existing.setConsultationStart(java.time.LocalDateTime.now());
-                        existing.setReassignNeeded(false);
-                        targetAppt = appointmentRepository.save(existing);
-                        log.info("Reusing existing appointment {} (Token {}) and advancing to IN_PROGRESS for patient {}", 
-                                targetAppt.getId(), targetAppt.getTokenNumber(), id);
-                        break;
-                    } else if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS) {
-                        targetAppt = existing;
-                        break;
                     }
+                    existing.setReassignNeeded(false);
+                    targetAppt = appointmentRepository.save(existing);
+                    log.info("Reusing existing appointment {} (Token {}) and advancing to IN_PROGRESS for patient {}", 
+                            targetAppt.getId(), targetAppt.getTokenNumber(), id);
+                    break;
                 }
             }
 
-            // 1b. If the patient has ANY existing appointment today (e.g. booked under another doctor or waiting), check if we can reuse it
+            // 1b. If the patient has ANY existing appointment today with another doctor, reassign and reuse it
             if (targetAppt == null) {
                 for (Appointment existing : existingToday) {
-                    if (existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.CHECKED_IN
-                            || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.BOOKED
-                            || existing.getStatus() == com.curamatrix.hsm.enums.AppointmentStatus.COMPLETED) {
+                    if (existing.getStatus() != com.curamatrix.hsm.enums.AppointmentStatus.CANCELLED) {
                         existing.setDoctor(doctor);
                         existing.setStatus(com.curamatrix.hsm.enums.AppointmentStatus.IN_PROGRESS);
-                        existing.setConsultationStart(java.time.LocalDateTime.now());
+                        if (existing.getConsultationStart() == null) {
+                            existing.setConsultationStart(java.time.LocalDateTime.now());
+                        }
                         existing.setReassignNeeded(false);
                         targetAppt = appointmentRepository.save(existing);
                         log.info("Reassigned existing appointment {} (Token {}) to doctor {} for patient {}", 
@@ -716,9 +712,22 @@ public class PatientService {
             java.util.List<com.curamatrix.hsm.entity.Appointment> todayAppts = appointmentRepository.findByPatientIdAndAppointmentDate(patient.getId(), today);
             if (todayAppts != null) {
                 todayAppts.stream()
-                    .filter(a -> a.getStatus() == AppointmentStatus.BOOKED || 
-                                 a.getStatus() == AppointmentStatus.CHECKED_IN || 
-                                 a.getStatus() == AppointmentStatus.IN_PROGRESS)
+                    .filter(a -> a.getStatus() != AppointmentStatus.CANCELLED)
+                    .sorted((a1, a2) -> {
+                        int r1 = a1.getStatus() == AppointmentStatus.IN_PROGRESS ? 0 :
+                                 a1.getStatus() == AppointmentStatus.RECALLED ? 1 :
+                                 a1.getStatus() == AppointmentStatus.CHECKED_IN ? 2 :
+                                 a1.getStatus() == AppointmentStatus.ON_HOLD ? 3 :
+                                 a1.getStatus() == AppointmentStatus.BOOKED ? 4 :
+                                 a1.getStatus() == AppointmentStatus.NO_SHOW ? 5 : 6;
+                        int r2 = a2.getStatus() == AppointmentStatus.IN_PROGRESS ? 0 :
+                                 a2.getStatus() == AppointmentStatus.RECALLED ? 1 :
+                                 a2.getStatus() == AppointmentStatus.CHECKED_IN ? 2 :
+                                 a2.getStatus() == AppointmentStatus.ON_HOLD ? 3 :
+                                 a2.getStatus() == AppointmentStatus.BOOKED ? 4 :
+                                 a2.getStatus() == AppointmentStatus.NO_SHOW ? 5 : 6;
+                        return Integer.compare(r1, r2);
+                    })
                     .findFirst()
                     .ifPresent(appt -> {
                         resp.setActiveAppointmentId(appt.getId());
