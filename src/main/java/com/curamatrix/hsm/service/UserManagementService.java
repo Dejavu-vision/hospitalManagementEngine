@@ -41,10 +41,9 @@ public class UserManagementService {
 
     @Transactional
     public UserResponse createUser(CreateUserRequest request, Long targetTenantId) {
-        RoleName roleToAssign = request.getRole();
-        if (roleToAssign == RoleName.ROLE_LAB_TECH) {
-            roleToAssign = RoleName.ROLE_LAB_STAFF;
-        }
+        final RoleName roleToAssign = request.getRole() == RoleName.ROLE_LAB_TECH
+                ? RoleName.ROLE_LAB_STAFF
+                : request.getRole();
 
         Role role = roleRepository.findByName(roleToAssign)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", "name", roleToAssign));
@@ -209,7 +208,7 @@ public class UserManagementService {
     public UserResponse addRole(Long userId, RoleName roleName) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-        RoleName effectiveRole = (roleName == RoleName.ROLE_LAB_TECH) ? RoleName.ROLE_LAB_STAFF : roleName;
+        final RoleName effectiveRole = (roleName == RoleName.ROLE_LAB_TECH) ? RoleName.ROLE_LAB_STAFF : roleName;
         Role role = roleRepository.findByName(effectiveRole)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", "name", effectiveRole));
 
@@ -224,7 +223,7 @@ public class UserManagementService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
-        RoleName effectiveRole = (roleName == RoleName.ROLE_LAB_TECH) ? RoleName.ROLE_LAB_STAFF : roleName;
+        final RoleName effectiveRole = (roleName == RoleName.ROLE_LAB_TECH) ? RoleName.ROLE_LAB_STAFF : roleName;
         boolean removed = user.getRoles().removeIf(r -> r.getName() == effectiveRole || r.getName() == roleName);
         if (!removed) {
             throw new ResourceNotFoundException("User does not have role: " + roleName);
