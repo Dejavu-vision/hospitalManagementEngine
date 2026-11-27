@@ -84,8 +84,9 @@ public class AccessBootstrapService {
         ), pageMap);
 
         // Lab staff gets lab dashboard
-        assignRolePages(RoleName.ROLE_LAB_STAFF, Set.of("LAB_DASHBOARD"), pageMap);
-        assignRolePages(RoleName.ROLE_LAB_TECH, Set.of("LAB_DASHBOARD"), pageMap);
+        assignRolePages(RoleName.ROLE_LAB_STAFF, Set.of(
+                "LAB_DASHBOARD"
+        ), pageMap);
 
         // Super Admin gets everything
         assignRolePages(RoleName.ROLE_SUPER_ADMIN, pageMap.keySet(), pageMap);
