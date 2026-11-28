@@ -177,14 +177,8 @@ public class UserManagementService {
         String primaryRole = user.getRoles().stream().findFirst().map(r -> r.getName().name()).orElse("");
         final User savedUser = user;
         if ("ROLE_DOCTOR".equals(primaryRole)) {
-            Doctor doctor = doctorRepository.findByUserId(savedUser.getId()).orElseGet(() -> {
-                Doctor d = Doctor.builder()
-                        .user(savedUser)
-                        .isActive(true)
-                        .build();
-                d.setTenantId(savedUser.getTenantId());
-                return d;
-            });
+            Doctor doctor = doctorRepository.findByUserId(savedUser.getId())
+                    .orElseGet(() -> Doctor.builder().user(savedUser).build());
             boolean changed = false;
             if (request.getQualification() != null) { doctor.setQualification(request.getQualification()); changed = true; }
             if (request.getLicenseNumber() != null) { doctor.setLicenseNumber(request.getLicenseNumber()); changed = true; }
@@ -217,9 +211,9 @@ public class UserManagementService {
                         () -> {
                             Receptionist rec = Receptionist.builder()
                                     .user(savedUser)
+                                    .employeeId(savedUser.getEmployeeId())
                                     .shift(shift)
                                     .build();
-                            rec.setTenantId(savedUser.getTenantId());
                             receptionistRepository.save(rec);
                         }
                 );
