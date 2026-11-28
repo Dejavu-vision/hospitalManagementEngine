@@ -12,9 +12,6 @@
 --   reception@curamatrix.com  / reception123
 -- ============================================================
 
--- Ensure roles table check constraint is dropped so new enum roles can be saved without error
-ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_name_check;
-
 -- ------------------------------------------------------------
 -- ROLES (name stored as enum string)
 -- ------------------------------------------------------------
@@ -22,10 +19,7 @@ INSERT INTO roles (name) VALUES
     ('ROLE_SUPER_ADMIN'),
     ('ROLE_ADMIN'),
     ('ROLE_DOCTOR'),
-    ('ROLE_RECEPTIONIST'),
-    ('ROLE_LAB_STAFF'),
-    ('ROLE_NURSE'),
-    ('ROLE_PHARMACIST')
+    ('ROLE_RECEPTIONIST')
 ON CONFLICT (name) DO NOTHING;
 
 -- ------------------------------------------------------------
@@ -104,8 +98,25 @@ WHERE u.email = 'reception@curamatrix.com' AND r.name = 'ROLE_RECEPTIONIST'
 ON CONFLICT DO NOTHING;
 
 -- ------------------------------------------------------------
--- DEPARTMENTS (no hardcoded departments — added manually via Super Admin / Admin)
+-- DEPARTMENTS (unique per name + tenant)
 -- ------------------------------------------------------------
+INSERT INTO departments (tenant_id, name, description, is_active)
+SELECT t.id, d.name, d.description, TRUE
+FROM tenants t
+CROSS JOIN (VALUES
+    ('General Medicine', 'General health consultations and primary care'),
+    ('Cardiology',       'Heart and cardiovascular system'),
+    ('Orthopedics',      'Bones, joints, and muscles'),
+    ('Pediatrics',       'Child healthcare and development'),
+    ('Dermatology',      'Skin, hair, and nails'),
+    ('ENT',              'Ear, Nose, and Throat'),
+    ('Ophthalmology',    'Eye care and vision'),
+    ('Gynecology',       'Women health and reproductive system'),
+    ('Neurology',        'Brain and nervous system'),
+    ('Dentistry',        'Dental care and oral health')
+) AS d(name, description)
+WHERE t.tenant_key = 'default-hospital'
+ON CONFLICT DO NOTHING;
 
 -- ------------------------------------------------------------
 -- DOCTOR PROFILE for doctor@curamatrix.com

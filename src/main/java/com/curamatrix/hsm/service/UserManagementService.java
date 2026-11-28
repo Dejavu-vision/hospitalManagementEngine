@@ -41,10 +41,8 @@ public class UserManagementService {
 
     @Transactional
     public UserResponse createUser(CreateUserRequest request, Long targetTenantId) {
-        final RoleName roleToAssign = request.getRole();
-
-        Role role = roleRepository.findByName(roleToAssign)
-                .orElseThrow(() -> new ResourceNotFoundException("Role", "name", roleToAssign));
+        Role role = roleRepository.findByName(request.getRole())
+                .orElseThrow(() -> new ResourceNotFoundException("Role", "name", request.getRole()));
 
         Set<Role> roles = new HashSet<>();
         roles.add(role);
@@ -74,7 +72,7 @@ public class UserManagementService {
             return reactivateOrRejectExistingUser(existingOpt.get(), request, role, tenantId);
         }
 
-        String generatedEmployeeId = employeeIdGeneratorService.generateEmployeeId(tenantId, roleToAssign);
+        String generatedEmployeeId = employeeIdGeneratorService.generateEmployeeId(tenantId, request.getRole());
 
         User user = User.builder()
                 .email(request.getEmail())
@@ -88,7 +86,7 @@ public class UserManagementService {
         user.setTenantId(tenantId);
 
         user = userRepository.save(user);
-        log.info("User created: {} with role: {}", user.getEmail(), roleToAssign);
+        log.info("User created: {} with role: {}", user.getEmail(), request.getRole());
 
         // Apply extra page access (if provided during creation)
         Set<String> extraPages = request.getAllowedPageKeys();
@@ -99,7 +97,7 @@ public class UserManagementService {
         // Create role-specific profile
         if (request.getRole() == RoleName.ROLE_DOCTOR) {
             createDoctorProfile(user, request);
-        } else if (request.getRole() == RoleName.ROLE_RECEPTIONIST || (request.getShift() != null && !request.getShift().isBlank())) {
+        } else if (request.getRole() == RoleName.ROLE_RECEPTIONIST) {
             createReceptionistProfile(user, request);
         }
 
@@ -124,9 +122,8 @@ public class UserManagementService {
         existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
         existingUser.setRoles(Set.of(role));
 
-        final RoleName roleToAssign = request.getRole();
         if (existingUser.getEmployeeId() == null || existingUser.getEmployeeId().isBlank()) {
-            existingUser.setEmployeeId(employeeIdGeneratorService.generateEmployeeId(tenantId, roleToAssign));
+            existingUser.setEmployeeId(employeeIdGeneratorService.generateEmployeeId(tenantId, request.getRole()));
         }
 
         User user = userRepository.save(existingUser);
@@ -404,7 +401,7 @@ public class UserManagementService {
         }
 
         // Populate shift for shift-based roles
-        if (List.of("ROLE_RECEPTIONIST", "ROLE_NURSE", "ROLE_LAB_TECH", "ROLE_LAB_STAFF").contains(primaryRole)) {
+        if (List.of("ROLE_RECEPTIONIST", "ROLE_NURSE", "ROLE_LAB_TECH").contains(primaryRole)) {
             receptionistRepository.findByUserId(user.getId()).ifPresent(r -> builder.shift(r.getShift() != null ? r.getShift().name() : null));
         }
 

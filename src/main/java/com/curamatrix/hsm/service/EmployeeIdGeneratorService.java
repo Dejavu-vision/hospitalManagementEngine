@@ -22,11 +22,7 @@ public class EmployeeIdGeneratorService {
     private static final Map<RoleName, String> ROLE_PREFIX_MAP = Map.of(
             RoleName.ROLE_ADMIN, "ADM",
             RoleName.ROLE_DOCTOR, "DOC",
-            RoleName.ROLE_RECEPTIONIST, "REC",
-            RoleName.ROLE_LAB_STAFF, "LAB",
-            RoleName.ROLE_SUPER_ADMIN, "SAD",
-            RoleName.ROLE_NURSE, "NUR",
-            RoleName.ROLE_PHARMACIST, "PHR"
+            RoleName.ROLE_RECEPTIONIST, "REC"
     );
 
     private static final int MIN_DIGITS = 3;
@@ -41,11 +37,7 @@ public class EmployeeIdGeneratorService {
 
         String prefix = ROLE_PREFIX_MAP.get(roleName);
         if (prefix == null) {
-            log.warn("No static employee-ID prefix for role {}. Deriving prefix dynamically.", roleName);
-            prefix = roleName.name().replace("ROLE_", "");
-            if (prefix.length() > 3) {
-                prefix = prefix.substring(0, 3);
-            }
+            throw new IllegalArgumentException("No employee-ID prefix configured for role: " + roleName);
         }
 
         long serial = allocateNextSerial(tenantId, prefix);

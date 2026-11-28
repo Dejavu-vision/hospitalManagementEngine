@@ -25,8 +25,8 @@ public class DepartmentController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'SUPER_ADMIN')")
-    public ResponseEntity<List<Department>> getAllDepartments(@RequestParam(required = false) Long tenantId) {
-        return ResponseEntity.ok(departmentService.getAllDepartments(tenantId));
+    public ResponseEntity<List<Department>> getAllDepartments() {
+        return ResponseEntity.ok(departmentService.getAllDepartments());
     }
 
     @GetMapping("/{id}")
@@ -36,10 +36,9 @@ public class DepartmentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<Department> createDepartment(@Valid @RequestBody DepartmentRequest request,
-                                                       @RequestParam(required = false) Long tenantId) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(departmentService.createDepartment(request, tenantId));
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Department> createDepartment(@Valid @RequestBody DepartmentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(departmentService.createDepartment(request));
     }
 
     @PutMapping("/{id}")
