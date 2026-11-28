@@ -401,7 +401,7 @@ public class UserManagementService {
         }
 
         // Populate shift for shift-based roles
-        if (List.of("ROLE_RECEPTIONIST", "ROLE_NURSE", "ROLE_LAB_TECH").contains(primaryRole)) {
+        if (List.of("ROLE_RECEPTIONIST", "ROLE_NURSE", "ROLE_LAB_STAFF", "ROLE_LAB_TECH").contains(primaryRole)) {
             receptionistRepository.findByUserId(user.getId()).ifPresent(r -> builder.shift(r.getShift() != null ? r.getShift().name() : null));
         }
 

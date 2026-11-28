@@ -22,7 +22,8 @@ public class EmployeeIdGeneratorService {
     private static final Map<RoleName, String> ROLE_PREFIX_MAP = Map.of(
             RoleName.ROLE_ADMIN, "ADM",
             RoleName.ROLE_DOCTOR, "DOC",
-            RoleName.ROLE_RECEPTIONIST, "REC"
+            RoleName.ROLE_RECEPTIONIST, "REC",
+            RoleName.ROLE_LAB_STAFF, "LAB"
     );
 
     private static final int MIN_DIGITS = 3;
