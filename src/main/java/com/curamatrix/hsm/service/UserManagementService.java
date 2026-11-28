@@ -164,33 +164,68 @@ public class UserManagementService {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
 
+        // Handle role change if provided
+        if (request.getRole() != null) {
+            Role newRole = roleRepository.findByName(request.getRole())
+                    .orElseThrow(() -> new ResourceNotFoundException("Role", "name", request.getRole()));
+            user.setRoles(new HashSet<>(Set.of(newRole)));
+        }
+
         user = userRepository.save(user);
 
-        // Update doctor profile if this user is a doctor and doctor fields are provided
+        // Update or create doctor profile if this user is a doctor and doctor fields are provided
         String primaryRole = user.getRoles().stream().findFirst().map(r -> r.getName().name()).orElse("");
         final User savedUser = user;
         if ("ROLE_DOCTOR".equals(primaryRole)) {
-            doctorRepository.findByUserId(savedUser.getId()).ifPresent(doctor -> {
-                boolean changed = false;
-                if (request.getQualification() != null) { doctor.setQualification(request.getQualification()); changed = true; }
-                if (request.getLicenseNumber() != null) { doctor.setLicenseNumber(request.getLicenseNumber()); changed = true; }
-                if (request.getExperience() != null) { doctor.setExperienceYears(request.getExperience()); changed = true; }
-                if (request.isConsultationFeeProvided()) {
-                    // Explicitly set — could be a number or null (to clear override)
-                    doctor.setConsultationFee(request.getConsultationFee() != null ? BigDecimal.valueOf(request.getConsultationFee()) : null);
-                    changed = true;
-                }
-                if (request.getDepartmentId() != null) {
-                    Department dept = departmentRepository.findById(request.getDepartmentId())
-                            .orElseThrow(() -> new ResourceNotFoundException("Department", "id", request.getDepartmentId()));
-                    doctor.setDepartment(dept);
-                    changed = true;
-                }
-                if (changed) {
-                    doctorRepository.save(doctor);
-                    log.info("Doctor profile updated for user: {}", savedUser.getEmail());
-                }
+            Doctor doctor = doctorRepository.findByUserId(savedUser.getId()).orElseGet(() -> {
+                Doctor d = Doctor.builder()
+                        .user(savedUser)
+                        .isActive(true)
+                        .build();
+                d.setTenantId(savedUser.getTenantId());
+                return d;
             });
+            boolean changed = false;
+            if (request.getQualification() != null) { doctor.setQualification(request.getQualification()); changed = true; }
+            if (request.getLicenseNumber() != null) { doctor.setLicenseNumber(request.getLicenseNumber()); changed = true; }
+            if (request.getExperience() != null) { doctor.setExperienceYears(request.getExperience()); changed = true; }
+            if (request.isConsultationFeeProvided()) {
+                doctor.setConsultationFee(request.getConsultationFee() != null ? BigDecimal.valueOf(request.getConsultationFee()) : null);
+                changed = true;
+            }
+            if (request.getDepartmentId() != null) {
+                Department dept = departmentRepository.findById(request.getDepartmentId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Department", "id", request.getDepartmentId()));
+                doctor.setDepartment(dept);
+                changed = true;
+            }
+            if (changed || doctor.getId() == null) {
+                doctorRepository.save(doctor);
+                log.info("Doctor profile saved for user: {}", savedUser.getEmail());
+            }
+        }
+
+        // Update shift for shift-based roles
+        if (request.getShift() != null && !request.getShift().isBlank()) {
+            try {
+                com.curamatrix.hsm.enums.Shift shift = com.curamatrix.hsm.enums.Shift.valueOf(request.getShift().toUpperCase());
+                receptionistRepository.findByUserId(savedUser.getId()).ifPresentOrElse(
+                        rec -> {
+                            rec.setShift(shift);
+                            receptionistRepository.save(rec);
+                        },
+                        () -> {
+                            Receptionist rec = Receptionist.builder()
+                                    .user(savedUser)
+                                    .shift(shift)
+                                    .build();
+                            rec.setTenantId(savedUser.getTenantId());
+                            receptionistRepository.save(rec);
+                        }
+                );
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid shift provided during user update: {}", request.getShift());
+            }
         }
 
         log.info("User updated: {}", user.getEmail());
