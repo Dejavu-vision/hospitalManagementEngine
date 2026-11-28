@@ -24,7 +24,6 @@ public class EmployeeIdGeneratorService {
             RoleName.ROLE_DOCTOR, "DOC",
             RoleName.ROLE_RECEPTIONIST, "REC",
             RoleName.ROLE_LAB_STAFF, "LAB",
-            RoleName.ROLE_LAB_TECH, "LAB",
             RoleName.ROLE_SUPER_ADMIN, "SAD",
             RoleName.ROLE_NURSE, "NUR",
             RoleName.ROLE_PHARMACIST, "PHR"

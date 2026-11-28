@@ -12,6 +12,9 @@
 --   reception@curamatrix.com  / reception123
 -- ============================================================
 
+-- Ensure roles table check constraint is dropped so new enum roles can be saved without error
+ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_name_check;
+
 -- ------------------------------------------------------------
 -- ROLES (name stored as enum string)
 -- ------------------------------------------------------------
@@ -19,7 +22,10 @@ INSERT INTO roles (name) VALUES
     ('ROLE_SUPER_ADMIN'),
     ('ROLE_ADMIN'),
     ('ROLE_DOCTOR'),
-    ('ROLE_RECEPTIONIST')
+    ('ROLE_RECEPTIONIST'),
+    ('ROLE_LAB_STAFF'),
+    ('ROLE_NURSE'),
+    ('ROLE_PHARMACIST')
 ON CONFLICT (name) DO NOTHING;
 
 -- ------------------------------------------------------------

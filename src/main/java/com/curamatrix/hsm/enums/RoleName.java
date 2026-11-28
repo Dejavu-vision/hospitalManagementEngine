@@ -8,7 +8,6 @@ public enum RoleName {
     ROLE_DOCTOR,
     ROLE_RECEPTIONIST,
     ROLE_LAB_STAFF,    // Laboratory personnel (canonical in DB & security)
-    ROLE_LAB_TECH,     // Alias for Lab Technician
     ROLE_NURSE,
     ROLE_PHARMACIST;
 
